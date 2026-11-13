@@ -24,10 +24,57 @@ public sealed class HashRecorder : GameComponent
     private string? filePath;
     private readonly StringBuilder buffer = new StringBuilder();
 
+    // Прогон должен начаться строго до первого тика после загрузки, иначе два запуска
+    // стартуют с разных тиков и их нельзя сравнивать. Поэтому старт не ручной:
+    // при загрузке сейва проверяется файл-метка, а сам старт делает префикс DoSingleTick.
+    private static HashRecorder? pendingStart;
+
     // Игра создаёт компоненты через конструктор с параметром Game.
     public HashRecorder(Game game)
     {
     }
+
+    /// <summary>Файл-метка: пока он существует, каждый загруженный сейв начинает прогон сам.</summary>
+    public static string ArmFilePath => Path.Combine(GenFilePaths.SaveDataFolderPath, "RWMLWC", "arm-determinism-run.txt");
+
+    public static bool Armed => File.Exists(ArmFilePath);
+
+    public static void SetArmed(bool armed)
+    {
+        string path = ArmFilePath;
+        if (armed)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllText(path, "Delete this file to stop automatic determinism runs on game load.");
+        }
+        else if (File.Exists(path))
+        {
+            File.Delete(path);
+        }
+    }
+
+    public override void LoadedGame()
+    {
+        pendingStart = Armed ? this : null;
+    }
+
+    /// <summary>Вызывается перед каждым тиком игры (патч TickManager.DoSingleTick).</summary>
+    public static void BeforeTick()
+    {
+        HashRecorder? recorder = pendingStart;
+        if (recorder == null)
+        {
+            return;
+        }
+        pendingStart = null;
+        if (ReferenceEquals(recorder, Instance))
+        {
+            recorder.StartDeterminismRun(AutoRunTicks);
+            Log.Message("[RWMLWC] determinism run auto-started at tick " + recorder.startTick + ": " + recorder.filePath);
+        }
+    }
+
+    public const int AutoRunTicks = 10000;
 
     public bool Recording => recording;
 
