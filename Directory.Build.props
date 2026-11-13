@@ -1,0 +1,16 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <Version>0.0.1</Version>
+
+    <!-- Папка установленной RimWorld 1.7. Задаётся переменной окружения RIMWORLD_DIR. -->
+    <RimWorldDir Condition="'$(RimWorldDir)' == ''">$(RIMWORLD_DIR)</RimWorldDir>
+
+    <!-- Полный путь к 0Harmony.dll (Harmony 3). Задаётся переменной окружения HARMONY_PATH. -->
+    <HarmonyDll Condition="'$(HarmonyDll)' == ''">$(HARMONY_PATH)</HarmonyDll>
+  </PropertyGroup>
+</Project>
