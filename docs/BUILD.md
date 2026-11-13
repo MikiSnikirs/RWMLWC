@@ -13,7 +13,9 @@
 | `RIMWORLD_DIR` | Папка игры, где лежит `Assembly-CSharp.dll` | `C:\Program Files (x86)\Steam\steamapps\common\RimWorld` |
 | `HARMONY_PATH` | Полный путь к `0Harmony.dll` для 1.7 | найдите файл в `...\Steam\steamapps\workshop\content\294100\2009463077\` |
 
-В папке мода Harmony может быть несколько `0Harmony.dll` для разных версий игры. Нужен тот, что для 1.7. Точное расположение внутри мода не проверено — найдите поиском по папке.
+Проще всего: `powershell -ExecutionPolicy Bypass -File tools\setup.ps1` — скрипт сам найдёт игру и Harmony, задаст переменные, соберёт проект и подключит мод. Ниже то же самое вручную.
+
+В папке мода Harmony лежат `0Harmony.dll` для разных версий игры. Для 1.7 это `...\2009463077\1.7\Assemblies\0Harmony.dll`.
 
 PowerShell, один раз:
 
@@ -41,13 +43,13 @@ dotnet test Source/Tests/RWMLWC.Tests.csproj
 
 ## Подключение к игре
 
-Сделайте ссылку на папку `Mod` в папке модов игры (командная строка от администратора):
+Сделайте связь на папку `Mod` в папке модов игры (права администратора не нужны):
 
 ```cmd
-mklink /D "C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\RWMLWC" "<путь к репозиторию>\Mod"
+mklink /J "C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\RWMLWC" "<путь к репозиторию>\Mod"
 ```
 
-Если в папке игры нет каталога `Mods`, создайте его. Где именно 1.7 ищет локальные моды, не проверено: если мод не появился в списке, посмотрите путь в логе игры.
+Если в папке игры нет каталога `Mods`, создайте его. Проверено на 1.7.5005: игра подхватывает локальные моды оттуда.
 
 ## Проверка (TST-001)
 
