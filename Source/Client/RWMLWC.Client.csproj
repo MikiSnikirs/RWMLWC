@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>RWMLWC</AssemblyName>
+    <RootNamespace>RWMLWC.Client</RootNamespace>
+
+    <!-- Сборка кладётся сразу в папку мода. -->
+    <OutputPath>../../Mod/1.7/Assemblies/</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <GenerateRuntimeConfigurationFiles>false</GenerateRuntimeConfigurationFiles>
+    <DebugType>portable</DebugType>
+  </PropertyGroup>
+
+  <!-- Понятная ошибка вместо сотни CS0246, если пути не заданы. -->
+  <Target Name="CheckGamePaths" BeforeTargets="ResolveAssemblyReferences">
+    <Error Condition="'$(RimWorldDir)' == '' Or !Exists('$(RimWorldDir)/Assembly-CSharp.dll')"
+           Text="Не найдена RimWorld 1.7. Задайте переменную окружения RIMWORLD_DIR (папка, где лежит Assembly-CSharp.dll). См. docs/BUILD.md." />
+    <Error Condition="'$(HarmonyDll)' == '' Or !Exists('$(HarmonyDll)')"
+           Text="Не найден Harmony 3. Задайте переменную окружения HARMONY_PATH (полный путь к 0Harmony.dll). См. docs/BUILD.md." />
+  </Target>
+
+  <ItemGroup>
+    <ProjectReference Include="../Shared/RWMLWC.Shared.csproj" />
+  </ItemGroup>
+
+  <!-- Файлы игры: только для компиляции, в папку мода не копируются. -->
+  <ItemGroup>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(RimWorldDir)/Assembly-CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityStubs">
+      <HintPath>$(RimWorldDir)/UnityStubs.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Waylith">
+      <HintPath>$(RimWorldDir)/Waylith.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Waylith.UnityCompat">
+      <HintPath>$(RimWorldDir)/Waylith.UnityCompat.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>$(HarmonyDll)</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+</Project>
