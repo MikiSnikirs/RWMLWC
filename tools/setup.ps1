@@ -87,14 +87,22 @@ $env:HARMONY_PATH = $harmony
 # --- 6. Build ----------------------------------------------------------------
 Step 'Building'
 $log = Join-Path $repo 'build.log'
-& dotnet build (Join-Path $repo 'RWMLWC.slnx') -c Release 2>&1 | Tee-Object -FilePath $log
-if ($LASTEXITCODE -ne 0) { Fail "Build failed. Send this file to the agent: $log" }
+# PowerShell 5.1 turns any stderr line of a native command into a terminating error
+# when ErrorActionPreference is Stop, so native calls run with Continue.
+$ErrorActionPreference = 'Continue'
+& dotnet build (Join-Path $repo 'RWMLWC.slnx') -c Release 2>&1 | ForEach-Object { "$_" } | Tee-Object -FilePath $log
+$buildExit = $LASTEXITCODE
+$ErrorActionPreference = 'Stop'
+if ($buildExit -ne 0) { Fail "Build failed. Send this file to the agent: $log" }
 $dll = Join-Path $repo 'Mod\1.7\Assemblies\RWMLWC.dll'
 if (-not (Test-Path $dll)) { Fail "Build reported success but $dll is missing. Send $log to the agent." }
 
 Step 'Running unit tests'
-& dotnet test (Join-Path $repo 'Source\Tests\RWMLWC.Tests.csproj') -c Release 2>&1 | Tee-Object -FilePath $log -Append
-if ($LASTEXITCODE -ne 0) { Write-Host 'Unit tests failed (see build.log).' -ForegroundColor Yellow }
+$ErrorActionPreference = 'Continue'
+& dotnet test (Join-Path $repo 'Source\Tests\RWMLWC.Tests.csproj') -c Release 2>&1 | ForEach-Object { "$_" } | Tee-Object -FilePath $log -Append
+$testExit = $LASTEXITCODE
+$ErrorActionPreference = 'Stop'
+if ($testExit -ne 0) { Write-Host 'Unit tests failed (see build.log).' -ForegroundColor Yellow }
 
 # --- 7. Link mod into the game ----------------------------------------------
 Step 'Linking Mod folder into the game'
