@@ -42,7 +42,8 @@ public sealed class MapSimState : MapComponent
     {
         unchecked
         {
-            uint seed = ((uint)map.uniqueID * 0x9E3779B1u) ^ PerMapSim.SessionSeed;
+            // +1: у первой карты uniqueID = 0, без сдвига её seed был бы равен SessionSeed (в тесте — нулю).
+            uint seed = (((uint)map.uniqueID + 1u) * 0x9E3779B1u) ^ PerMapSim.SessionSeed;
             return seed; // счётчик итераций = 0
         }
     }
