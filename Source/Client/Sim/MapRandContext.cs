@@ -38,8 +38,21 @@ public static class MapRandContext
     /// <summary>Текущее состояние Rand (для отладки и будущего хеша состояния).</summary>
     public static ulong CurrentRawState => getState();
 
-    /// <summary>Глобальное состояние, пока активен контекст карты.</summary>
-    public static ulong SavedGlobalState => globalState;
+    /// <summary>Глобальное состояние Rand, какой бы контекст ни был активен.</summary>
+    public static ulong GlobalState => current == null ? getState() : globalState;
+
+    /// <summary>Задать глобальное состояние Rand (синхронизация при входе в сессию, тестовые прогоны).</summary>
+    public static void SetGlobalState(ulong state)
+    {
+        if (current == null)
+        {
+            setState(state);
+        }
+        else
+        {
+            globalState = state;
+        }
+    }
 
     /// <summary>Сделать активным состояние указанной карты (null — глобальное).</summary>
     public static void Enter(Map? map)

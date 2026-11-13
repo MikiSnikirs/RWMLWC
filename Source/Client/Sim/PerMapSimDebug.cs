@@ -65,6 +65,45 @@ internal static class PerMapSimDebug
         Log.Message(sb.ToString().TrimEnd());
     }
 
+    [DebugAction("RWMLWC", "Log map state hash", allowedGameStates = AllowedGameStates.Playing)]
+    private static void LogHash()
+    {
+        StringBuilder sb = new StringBuilder();
+        sb.AppendLine($"[RWMLWC] state hash at tick {Find.TickManager.TicksGame}");
+        List<Map> maps = Find.Maps;
+        for (int i = 0; i < maps.Count; i++)
+        {
+            sb.AppendLine($"  map {maps[i].uniqueID}: {MapStateHasher.Compute(maps[i])}");
+        }
+        Log.Message(sb.ToString().TrimEnd());
+    }
+
+    [DebugAction("RWMLWC", "Determinism run: start (10000 ticks)", allowedGameStates = AllowedGameStates.Playing)]
+    private static void StartDeterminismRun()
+    {
+        HashRecorder? recorder = HashRecorder.Instance;
+        if (recorder == null)
+        {
+            Log.Error("[RWMLWC] нет компонента HashRecorder");
+            return;
+        }
+        recorder.StartDeterminismRun(10000);
+        Say("determinism run started: " + recorder.FilePath);
+    }
+
+    [DebugAction("RWMLWC", "Determinism run: stop", allowedGameStates = AllowedGameStates.Playing)]
+    private static void StopDeterminismRun()
+    {
+        HashRecorder? recorder = HashRecorder.Instance;
+        if (recorder == null || !recorder.Recording)
+        {
+            Say("determinism run is not active");
+            return;
+        }
+        recorder.Stop();
+        Say("determinism run stopped: " + recorder.FilePath);
+    }
+
     private static void Say(string text)
     {
         Log.Message("[RWMLWC] " + text);
