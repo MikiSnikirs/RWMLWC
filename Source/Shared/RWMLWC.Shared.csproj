@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>RWMLWC.Shared</AssemblyName>
+    <RootNamespace>RWMLWC.Shared</RootNamespace>
+  </PropertyGroup>
+</Project>

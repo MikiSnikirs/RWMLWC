@@ -1,0 +1,15 @@
+bin/
+obj/
+.vs/
+.idea/
+*.user
+
+# Собранные сборки мода
+Mod/1.7/Assemblies/
+
+# Файлы игры в репозиторий не кладём
+Assembly-CSharp.dll
+Waylith*.dll
+UnityStubs.dll
+0Harmony.dll
+build.log
