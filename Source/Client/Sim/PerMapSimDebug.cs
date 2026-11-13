@@ -78,7 +78,7 @@ internal static class PerMapSimDebug
         Log.Message(sb.ToString().TrimEnd());
     }
 
-    [DebugAction("RWMLWC", "Determinism run: start (10000 ticks)", allowedGameStates = AllowedGameStates.Playing)]
+    [DebugAction("RWMLWC", "Determinism run: start now (10000 ticks)", allowedGameStates = AllowedGameStates.Playing)]
     private static void StartDeterminismRun()
     {
         HashRecorder? recorder = HashRecorder.Instance;
@@ -89,6 +89,16 @@ internal static class PerMapSimDebug
         }
         recorder.StartDeterminismRun(10000);
         Say("determinism run started: " + recorder.FilePath);
+    }
+
+    [DebugAction("RWMLWC", "Determinism run: arm/disarm auto-start on load", allowedGameStates = AllowedGameStates.Playing)]
+    private static void ToggleArmDeterminismRun()
+    {
+        bool armed = !HashRecorder.Armed;
+        HashRecorder.SetArmed(armed);
+        Say(armed
+            ? "ARMED: every loaded save now starts a determinism run before its first tick"
+            : "disarmed: loads no longer start determinism runs");
     }
 
     [DebugAction("RWMLWC", "Determinism run: stop", allowedGameStates = AllowedGameStates.Playing)]

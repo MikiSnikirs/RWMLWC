@@ -96,3 +96,13 @@ internal static class Patch_Map_MapPostTick
         }
     }
 }
+
+[HarmonyPatch(typeof(TickManager), nameof(TickManager.DoSingleTick))]
+internal static class Patch_TickManager_DoSingleTick
+{
+    // Точка «строго перед тиком»: здесь стартует тестовый прогон, заказанный при загрузке сейва.
+    private static void Prefix()
+    {
+        HashRecorder.BeforeTick();
+    }
+}
