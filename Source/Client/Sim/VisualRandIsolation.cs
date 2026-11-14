@@ -47,7 +47,14 @@ internal static class VisualRandIsolation
         ("Verse.Effecter", "Trigger"),
         ("RimWorld.CompFleckEmitterLongTerm", "CompTick"),
         ("Verse.LavaFXComponent", "MapComponentTick"),
+
+        // Крик животного: звучит, только если животное в кадре камеры. Решение принимается в тике,
+        // а само действие — только звук. Внутри изолированного кода камера настоящая (см. SimCamera).
+        ("Verse.Pawn_CallTracker", "TryDoCall"),
     };
+
+    /// <summary>Сейчас выполняется изолированный визуальный код (вложенность). Для SimCamera.</summary>
+    public static int Depth { get; private set; }
 
     private static IEnumerable<MethodBase> TargetMethods()
     {
@@ -94,6 +101,7 @@ internal static class VisualRandIsolation
         {
             Rand.PushState();
             RandTracer.PushSuppress();
+            Depth++;
         }
     }
 
@@ -101,6 +109,7 @@ internal static class VisualRandIsolation
     {
         if (__state)
         {
+            Depth--;
             RandTracer.PopSuppress();
             Rand.PopState();
         }
