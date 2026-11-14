@@ -64,9 +64,10 @@ public static class VirtualUi
             object? watched = FieldWatch.AmbientTarget;
             if (CommandBus.CaptureActive && window is FloatMenu && GizmoCommands.GridDepth > 0 && GizmoCommands.LocalInputDepth == 0)
             {
-                // Меню по правому щелчку на кнопке объекта. Его строки — замыкания, которые исполнились бы
-                // только у этого игрока. Передавать его пока не умеем, поэтому не показываем.
-                Messages.Message("RWMLWC: меню по правому щелчку на кнопке пока не работает в сетевой игре", MessageTypeDefOf.RejectInput, false);
+                // Меню, открытое панелью кнопок помимо нажатия самой кнопки: по правому щелчку на кнопке
+                // либо из встроенного в кнопку элемента (группы мехов и т. п.). Его строки — замыкания,
+                // которые исполнились бы только у этого игрока. Передавать пока не умеем — не показываем.
+                Messages.Message("RWMLWC: это меню кнопки пока не работает в сетевой игре", MessageTypeDefOf.RejectInput, false);
                 return false;
             }
             if (watched != null && CommandBus.CaptureActive && window is FloatMenu direct)
