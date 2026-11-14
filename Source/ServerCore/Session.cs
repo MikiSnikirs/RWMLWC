@@ -53,6 +53,12 @@ public sealed class SessionOptions
     /// </summary>
     public ISet<string>? AllowedNames;
 
+    /// <summary>Пароль сервера (T-068); null или пусто — без пароля.</summary>
+    public string? Password;
+
+    /// <summary>Сколько секунд длится общая пауза по тревоге (T-040), если позванный не вернётся раньше.</summary>
+    public int AlarmSeconds = 45;
+
     /// <summary>Сколько ждать хеши остальных игроков, чтобы выбрать отдающего из большинства при расхождении.</summary>
     public TimeSpan MajorityWait = TimeSpan.FromSeconds(2);
 }
@@ -180,6 +186,9 @@ public sealed class Session
         /// <summary>До какого тика игрок точно дошёл: Welcome с миром, SnapshotApplied, последний присланный хеш.</summary>
         public int LastTick { get; internal set; }
 
+        /// <summary>Игрок в сети, но отошёл (v6, T-040): его выбор скорости не учитывается.</summary>
+        public bool Idle { get; internal set; }
+
         /// <summary>Цвет 0xRRGGBB (v5); 0 — не выбран. Сохраняется при переподключении, как имя.</summary>
         public int Color { get; internal set; } = PlayerColors.None;
 
@@ -232,7 +241,7 @@ public sealed class Session
 
     private bool BroadcastPlayersIfChanged()
     {
-        string roster = string.Join(",", _players.Select(p => (p.Online ? p.Id.ToString() : "-" + p.Id) + ":" + p.Color));
+        string roster = string.Join(",", _players.Select(p => (p.Online ? p.Id.ToString() : "-" + p.Id) + ":" + p.Color + (p.Idle ? "i" : "")));
         if (roster == _lastRoster) return false;
         _lastRoster = roster;
         Broadcast(BuildPlayers());
@@ -243,7 +252,7 @@ public sealed class Session
     {
         var msg = new PlayersMessage();
         foreach (Player p in _players)
-            msg.Players.Add(new PlayerInfo(p.Id, p.Name, p.Online, p.Online ? p.Connection.RoundTripMs : -1, p.Color));
+            msg.Players.Add(new PlayerInfo(p.Id, p.Name, p.Online, p.Online ? p.Connection.RoundTripMs : -1, p.Color, p.Online && p.Idle));
         return msg;
     }
 
@@ -318,6 +327,8 @@ public sealed class Session
             (reason, reject) = (RejectReason.ProtocolMismatch, $"версия протокола клиента {hello.ProtocolVersion}, сервера {ProtocolInfo.ProtocolVersion}");
         else if (hello.ModId != ProtocolInfo.ModId)
             (reason, reject) = (RejectReason.ModMismatch, "чужой мод: " + hello.ModId);
+        else if (!string.IsNullOrEmpty(_options.Password) && hello.Password != _options.Password)
+            (reason, reject) = (RejectReason.WrongPassword, string.IsNullOrEmpty(hello.Password) ? "на сервере пароль — укажите его" : "неверный пароль");
         else if (string.IsNullOrWhiteSpace(hello.PlayerName))
             (reason, reject) = (RejectReason.Other, "пустое имя игрока");
         else if (_options.AllowedNames is { Count: > 0 } allowed && !allowed.Contains(hello.PlayerName.Trim()))
@@ -363,6 +374,7 @@ public sealed class Session
             // Возврат того же игрока: тот же номер. Догон пропущенного — T-045.
             existing.Connection = connection;
             existing.RequestedSpeed = 0;
+            existing.Idle = false;
             player = existing;
             _log($"вернулся игрок {player.Id} «{player.Name}» ({connection.Remote})");
         }
@@ -470,6 +482,21 @@ public sealed class Session
 
             case CursorMessage cursor:
                 ForwardCursor(player, cursor);
+                break;
+
+            case PlayerStateMessage state:
+                if (player.Idle != state.Idle)
+                {
+                    player.Idle = state.Idle;
+                    _log($"игрок {player.Id} «{player.Name}» {(state.Idle ? "отошёл" : "вернулся")}");
+                    BroadcastPlayersIfChanged();
+                    if (!state.Idle) EndAlarmIfAnswered();
+                    UpdateSpeed();
+                }
+                break;
+
+            case AlarmMessage alarm:
+                RaiseAlarm(alarm.MapId, alarm.Text);
                 break;
 
             case SnapshotChunkMessage chunk:
@@ -936,16 +963,82 @@ public sealed class Session
     /// <summary>Правило меньшей скорости: игра идёт на минимальной из скоростей игроков в сети; пауза любого — пауза всех.</summary>
     private void UpdateSpeed()
     {
+        if (_alarmUntilMs > _clockMs && _alarmUntilMs > 0)
+        {
+            Speed = 0; // тревога: общая пауза, пока позванный не вернётся или не выйдет время
+            _tickAccumulator = 0;
+            return;
+        }
+        if (_alarmUntilMs > 0) EndAlarm("время вышло");
+        // Отошедшие не держат скорость (T-040); если отошли все — решают все.
+        bool anyActive = _players.Any(p => p.Online && !p.Idle);
         byte speed = 0;
         bool any = false;
         foreach (Player p in _players)
         {
-            if (!p.Online) continue;
+            if (!p.Online || (anyActive && p.Idle)) continue;
             speed = any ? Math.Min(speed, p.RequestedSpeed) : p.RequestedSpeed;
             any = true;
         }
         Speed = any ? speed : (byte)0;
         if (Speed == 0) _tickAccumulator = 0;
+    }
+
+    // ---- тревога (T-040) ----
+    private double _alarmUntilMs;
+    private int _alarmTarget = -1; // кого зовут: номер игрока; 0 — всех отошедших
+    private int _alarmMap;
+    private readonly Dictionary<int, double> _alarmLastByMap = new();
+
+    /// <summary>Идёт тревога (общая пауза).</summary>
+    public bool AlarmActive => _alarmUntilMs > _clockMs;
+
+    /// <summary>
+    /// Крупная угроза на карте. Хозяин карты в сети и отошёл — тревога для него; карта без хозяина — тревога,
+    /// если кто-то отошёл. Хозяин на месте или не в сети — ничего (не в сети — режимы отсутствия, T-041/T-043).
+    /// </summary>
+    private void RaiseAlarm(int mapId, string text)
+    {
+        if (_alarmLastByMap.TryGetValue(mapId, out double last) && _clockMs - last < ProtocolLimits.AlarmRepeatSeconds * 1000.0) return;
+        int owner = OwnerOf(mapId);
+        int target;
+        if (owner != 0)
+        {
+            Player? p = _players.FirstOrDefault(x => x.Id == owner);
+            if (p == null || !p.Online || !p.Idle) return;
+            target = owner;
+        }
+        else
+        {
+            if (!_players.Any(x => x.Online && x.Idle)) return;
+            target = 0;
+        }
+        _alarmLastByMap[mapId] = _clockMs;
+        _alarmUntilMs = _clockMs + _options.AlarmSeconds * 1000.0;
+        _alarmTarget = target;
+        _alarmMap = mapId;
+        text = (text ?? "").Trim();
+        if (text.Length > ProtocolLimits.MaxChatChars) text = text.Substring(0, ProtocolLimits.MaxChatChars);
+        _log($"ТРЕВОГА карта {mapId}: {text}; зовём {(target == 0 ? "всех отошедших" : "игрока " + target)}, пауза {_options.AlarmSeconds} с");
+        Broadcast(new AlarmMessage { MapId = mapId, PlayerId = target, Seconds = _options.AlarmSeconds, Text = text });
+        UpdateSpeed();
+    }
+
+    private void EndAlarmIfAnswered()
+    {
+        if (!AlarmActive) return;
+        bool answered = _alarmTarget == 0
+            ? !_players.Any(x => x.Online && x.Idle)
+            : _players.Any(x => x.Id == _alarmTarget && x.Online && !x.Idle);
+        if (answered) EndAlarm("игрок вернулся");
+    }
+
+    private void EndAlarm(string why)
+    {
+        _alarmUntilMs = 0;
+        _log($"тревога снята: {why}");
+        Broadcast(new AlarmMessage { MapId = _alarmMap, PlayerId = _alarmTarget, Seconds = 0, Text = why });
+        _alarmTarget = -1;
     }
 
     private void Broadcast(Message m)

@@ -249,6 +249,7 @@ public static class LockstepClient
                 // Версия локальной копии сейва (контракт v2): мир и тик, на котором стоит игра.
                 SaveWorldId = Current.Game != null ? unchecked((uint)Find.World.info.persistentRandomValue) : 0UL,
                 SaveTick = tickManager != null ? tickManager.TicksGame : 0,
+                Password = ConnectPassword, // v6, T-068
             });
             state = State.WaitingWelcome;
             TestAutomation.Note("lockstep: connected to " + connection.Remote + ", Hello sent");
@@ -767,6 +768,9 @@ public static class LockstepClient
             conn.Send(message);
         }
     }
+
+    /// <summary>Пароль для следующего подключения (v6, T-068); задают окна подключения и хост сессии.</summary>
+    public static string ConnectPassword = "";
 
     /// <summary>Отправить серверу сообщение не про симуляцию (чат и т. п., T-025). false — нет сессии.</summary>
     public static bool TrySend(Message message)
