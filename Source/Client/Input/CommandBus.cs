@@ -1,0 +1,255 @@
+using System;
+using System.Collections.Generic;
+using RimWorld;
+using RWMLWC.Client.Sim;
+using RWMLWC.Shared.Protocol;
+using Verse;
+
+namespace RWMLWC.Client.Input;
+
+/// <summary>Виды команд игрока (поле Kind в Command). Номера не переиспользуются.</summary>
+public static class CommandKinds
+{
+    /// <summary>Разметка: вызов Designator.DesignateSingleCell / DesignateMultiCell / DesignateThing (T-020).</summary>
+    public const int Designate = 1;
+}
+
+/// <summary>
+/// Общий путь команды игрока (T-020): действие в интерфейсе не исполняется сразу, а уходит серверу
+/// (<see cref="Send"/>); сервер ставит его в общий порядок, и все клиенты, включая автора, исполняют его
+/// между одними и теми же тиками (<see cref="Execute"/>).
+///
+/// Вместе с командой едет «обстановка» интерфейса автора, от которой зависит результат: текущая карта,
+/// выделенные объекты, режим бога. На время исполнения она подставляется у каждого клиента.
+/// </summary>
+public static class CommandBus
+{
+    /// <summary>Сейчас исполняется команда из общего порядка: перехват ввода отключён.</summary>
+    public static bool Executing { get; private set; }
+
+    /// <summary>Исполняется команда другого игрока: звуки, сообщения и выбор инструмента на этом клиенте не трогаем.</summary>
+    public static bool ExecutingRemote { get; private set; }
+
+    public static int Executed { get; private set; }
+
+    public static int Failed { get; private set; }
+
+    /// <summary>Действие игрока надо перехватить: идёт сессия, это не исполнение команды и не тик симуляции.</summary>
+    public static bool CaptureActive => LockstepClient.InSession && !Executing && !MapRandContext.InTick;
+
+    public static void Reset()
+    {
+        Executing = false;
+        ExecutingRemote = false;
+        Executed = 0;
+        Failed = 0;
+    }
+
+    /// <summary>Начать команду: записывает обстановку автора. Дальше вызывающий дописывает данные команды и зовёт Send.</summary>
+    public static PacketWriter Begin(Map map)
+    {
+        PacketWriter w = new PacketWriter(256);
+        CommandContext.Capture(map).Write(w);
+        return w;
+    }
+
+    public static void Send(Map map, int kind, PermissionLevel required, PacketWriter payload)
+    {
+        LockstepClient.SendCommand(map.uniqueID, kind, required, payload.ToArray());
+    }
+
+    /// <summary>Исполнить команду из общего порядка. Вызывается между тиками, у всех клиентов на одном и том же тике.</summary>
+    public static void Execute(CommandOrderedMessage command)
+    {
+        Game game = Current.Game;
+        if (game == null)
+        {
+            return;
+        }
+        Map? map = null;
+        List<Map> maps = Find.Maps;
+        for (int i = 0; i < maps.Count; i++)
+        {
+            if (maps[i].uniqueID == command.MapId)
+            {
+                map = maps[i];
+                break;
+            }
+        }
+        if (map == null)
+        {
+            Failed++;
+            TestAutomation.Note($"command #{command.Seq}: map {command.MapId} not found, skipped");
+            return;
+        }
+
+        bool own = command.PlayerId == LockstepClient.PlayerId;
+        sbyte previousMapIndex = game.currentMapIndex;
+        bool previousGodMode = DebugSettings.godMode;
+        List<object> selection = Find.Selector.SelectedObjects;
+        List<object>? savedSelection = null;
+        bool beganTick = !MapRandContext.InTick;
+        try
+        {
+            PacketReader reader = new PacketReader(command.Payload);
+            CommandContext context = CommandContext.Read(ref reader);
+
+            game.currentMapIndex = (sbyte)maps.IndexOf(map);
+            List<object> contextSelection = context.Resolve(map);
+            if (!own || !CommandContext.SameObjects(selection, contextSelection, map))
+            {
+                savedSelection = new List<object>(selection);
+                selection.Clear();
+                selection.AddRange(contextSelection);
+            }
+            DebugSettings.godMode = context.godMode;
+
+            Executing = true;
+            ExecutingRemote = !own;
+            // Как в тике карты: Rand и номера новых вещей — из состояния этой карты.
+            if (beganTick)
+            {
+                MapRandContext.BeginTick();
+            }
+            MapRandContext.Enter(map);
+
+            switch (command.Kind)
+            {
+                case CommandKinds.Designate:
+                    DesignatorCommands.Execute(map, ref reader);
+                    break;
+                default:
+                    Failed++;
+                    TestAutomation.Note($"command #{command.Seq}: unknown kind {command.Kind}");
+                    break;
+            }
+            Executed++;
+        }
+        catch (Exception ex)
+        {
+            Failed++;
+            TestAutomation.Note($"command #{command.Seq} kind {command.Kind} FAILED: {ex}");
+            Log.Error($"[RWMLWC] команда #{command.Seq} (вид {command.Kind}) упала: {ex}");
+        }
+        finally
+        {
+            if (beganTick)
+            {
+                MapRandContext.EndTick();
+            }
+            Executing = false;
+            ExecutingRemote = false;
+            DebugSettings.godMode = previousGodMode;
+            if (!own && savedSelection != null)
+            {
+                // Чужая команда: вернуть игроку его выделение.
+                selection.Clear();
+                selection.AddRange(savedSelection);
+            }
+            game.currentMapIndex = previousMapIndex;
+        }
+    }
+}
+
+/// <summary>Обстановка интерфейса автора команды в момент действия.</summary>
+public sealed class CommandContext
+{
+    private const byte RefThing = 1;
+    private const byte RefZone = 2;
+    private const int MaxSelection = 256;
+
+    public bool godMode;
+    private readonly List<(byte kind, int id)> selection = new List<(byte, int)>();
+
+    public static CommandContext Capture(Map map)
+    {
+        CommandContext context = new CommandContext { godMode = DebugSettings.godMode };
+        List<object> selected = Find.Selector.SelectedObjects;
+        for (int i = 0; i < selected.Count && context.selection.Count < MaxSelection; i++)
+        {
+            if (TryRef(selected[i], map, out (byte, int) reference))
+            {
+                context.selection.Add(reference);
+            }
+        }
+        return context;
+    }
+
+    private static bool TryRef(object obj, Map map, out (byte kind, int id) reference)
+    {
+        if (obj is Thing thing && thing.Spawned && thing.Map == map)
+        {
+            reference = (RefThing, thing.thingIDNumber);
+            return true;
+        }
+        if (obj is Zone zone && zone.Map == map)
+        {
+            reference = (RefZone, zone.ID);
+            return true;
+        }
+        reference = default;
+        return false;
+    }
+
+    public void Write(PacketWriter w)
+    {
+        w.WriteBool(godMode);
+        w.WriteInt32(selection.Count);
+        foreach ((byte kind, int id) in selection)
+        {
+            w.WriteByte(kind);
+            w.WriteInt32(id);
+        }
+    }
+
+    public static CommandContext Read(ref PacketReader r)
+    {
+        CommandContext context = new CommandContext { godMode = r.ReadBool() };
+        int count = r.ReadCount(MaxSelection, 5);
+        for (int i = 0; i < count; i++)
+        {
+            byte kind = r.ReadByte();
+            context.selection.Add((kind, r.ReadInt32()));
+        }
+        return context;
+    }
+
+    /// <summary>Объекты выделения автора на этом клиенте (которых нет — пропускаются).</summary>
+    public List<object> Resolve(Map map)
+    {
+        List<object> result = new List<object>(selection.Count);
+        foreach ((byte kind, int id) in selection)
+        {
+            object? obj = kind switch
+            {
+                RefThing => ValueCodec.FindThing(map, id),
+                RefZone => ValueCodec.FindZone(map, id),
+                _ => null,
+            };
+            if (obj != null)
+            {
+                result.Add(obj);
+            }
+        }
+        return result;
+    }
+
+    /// <summary>Текущее выделение (та его часть, что передаётся по сети) совпадает с выделением из команды.</summary>
+    public static bool SameObjects(List<object> current, List<object> fromCommand, Map map)
+    {
+        int index = 0;
+        for (int i = 0; i < current.Count; i++)
+        {
+            if (!TryRef(current[i], map, out _))
+            {
+                continue;
+            }
+            if (index >= fromCommand.Count || !ReferenceEquals(current[i], fromCommand[index]))
+            {
+                return false;
+            }
+            index++;
+        }
+        return index == fromCommand.Count;
+    }
+}
