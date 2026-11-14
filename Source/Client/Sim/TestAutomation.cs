@@ -19,6 +19,8 @@ namespace RWMLWC.Client.Sim;
 ///                        когда очередь пройдена, метка считается выключенной;
 ///   ticks=10000        — длительность прогона;
 ///   trace=0|1          — писать ли трассировку Rand (большой файл);
+///   densefrom=0, denseto=300 — окно (в тиках от старта), где хеш пишется каждый тик и идёт трассировка;
+///   perprocess=1       — между прогонами очереди перезапускать игру, а не перезагружать сейв;
 ///   quit=1             — после прогона закрыть игру.
 /// Файл без строк ключ=значение означает прежнее поведение: автостарт при загрузке, без сценария.
 /// </summary>
@@ -33,6 +35,9 @@ public static class TestAutomation
         public int queueIndex;
         public int ticks = HashRecorder.AutoRunTicks;
         public bool trace = true;
+        public int denseFrom;
+        public int denseTo = HashRecorder.DenseTicks;
+        public bool perProcess;
         public bool quit;
     }
 
@@ -124,6 +129,21 @@ public static class TestAutomation
                     {
                         cfg.ticks = ticks;
                     }
+                    break;
+                case "densefrom":
+                    if (int.TryParse(value, out int from) && from >= 0)
+                    {
+                        cfg.denseFrom = from;
+                    }
+                    break;
+                case "denseto":
+                    if (int.TryParse(value, out int to) && to >= 0)
+                    {
+                        cfg.denseTo = to;
+                    }
+                    break;
+                case "perprocess":
+                    cfg.perProcess = value == "1";
                     break;
                 case "trace":
                     cfg.trace = value != "0";
@@ -219,6 +239,15 @@ public static class TestAutomation
         {
             int next = cfg.queueIndex + 1;
             WriteProgress(next);
+            if (next < cfg.queue.Count && cfg.perProcess)
+            {
+                // Следующий прогон — в новом процессе игры: штатный перезапуск, как после смены модов.
+                Note("queue: restarting game for run #" + next + " (" + cfg.queue[next] + ")");
+                automationActive = false;
+                quitWhenDone = false;
+                GenCommandLine.Restart();
+                return;
+            }
             if (next < cfg.queue.Count && cfg.save != null)
             {
                 // Следующий прогон очереди: перезагрузить сейв. Делается из кадра, не из тика.
