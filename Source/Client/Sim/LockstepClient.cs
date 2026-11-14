@@ -48,6 +48,17 @@ public static class LockstepClient
     private static bool applyingServerSpeed;
     private static int commandsIgnored;
     private static readonly Stopwatch frameClock = new Stopwatch();
+    private static readonly Stopwatch holdClock = new Stopwatch();
+    private static int heldSpeed = -1;
+
+    /// <summary>
+    /// Для тестов: столько секунд после Welcome клиент не просит снять паузу. Сервер держит паузу,
+    /// пока новый игрок не прислал SpeedRequest, поэтому за это время успевает войти второй клиент
+    /// (вход в уже идущую сессию — T-045).
+    /// </summary>
+    public static int HoldSeconds;
+
+    private static bool Holding => HoldSeconds > 0 && holdClock.IsRunning && holdClock.ElapsedMilliseconds < HoldSeconds * 1000L;
 
     private static readonly AccessTools.FieldRef<TickManager, int> ticksThisFrameRef =
         AccessTools.FieldRefAccess<TickManager, int>("ticksThisFrame");
@@ -77,6 +88,8 @@ public static class LockstepClient
         }
         playerName = name;
         sentSpeed = -1;
+        heldSpeed = -1;
+        holdClock.Reset();
         commandsIgnored = 0;
         connecting = QuicTransport.ConnectAsync(host, port, certThumbprintSha256);
         state = State.Connecting;
@@ -165,6 +178,13 @@ public static class LockstepClient
 
         if (state == State.InSession)
         {
+            if (heldSpeed >= 0 && !Holding)
+            {
+                int speed = heldSpeed;
+                heldSpeed = -1;
+                TestAutomation.Note("lockstep: hold is over, requesting speed " + speed);
+                RequestSpeed(speed);
+            }
             RunTicks(tickManager);
         }
         return true;
@@ -186,6 +206,7 @@ public static class LockstepClient
                 }
                 SimSession.Begin(welcome.SessionSeed);
                 state = State.InSession;
+                holdClock.Restart();
                 TestAutomation.Note($"lockstep: Welcome, playerId={welcome.PlayerId}, serverTick={welcome.ServerTick}, seed={welcome.SessionSeed}");
                 // Новый игрок держит паузу, пока не пришлёт SpeedRequest: шлём, как только готовы тикать.
                 RequestSpeed((int)tickManager.CurTimeSpeed);
@@ -286,6 +307,12 @@ public static class LockstepClient
         {
             speed = 4;
         }
+        if (speed > 0 && Holding)
+        {
+            heldSpeed = speed;
+            return;
+        }
+        heldSpeed = -1;
         if (speed == sentSpeed)
         {
             return;

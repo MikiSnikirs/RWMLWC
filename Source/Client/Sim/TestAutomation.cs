@@ -46,6 +46,7 @@ public static class TestAutomation
         public int serverPort;
         public string thumbprint = "";
         public string playerName = "player";
+        public int holdSec;
         public bool quit;
     }
 
@@ -165,6 +166,12 @@ public static class TestAutomation
                 case "thumbprint":
                     cfg.thumbprint = value;
                     break;
+                case "holdsec":
+                    if (int.TryParse(value, out int holdSec) && holdSec >= 0)
+                    {
+                        cfg.holdSec = holdSec;
+                    }
+                    break;
                 case "name":
                     if (value == "auto")
                     {
@@ -248,6 +255,7 @@ public static class TestAutomation
         }
         if (cfg.serverHost != null && LockstepClient.CurrentState == LockstepClient.State.Off)
         {
+            LockstepClient.HoldSeconds = cfg.holdSec;
             LockstepClient.Connect(cfg.serverHost, cfg.serverPort, cfg.thumbprint, cfg.playerName);
         }
     }
