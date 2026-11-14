@@ -843,6 +843,21 @@ public sealed class Session
         _onlineWithWorld = withWorld;
         bool due = _clockMs - _lastAutosaveMs >= _options.AutosaveInterval.Value.TotalMilliseconds;
         if ((!due && !someoneLeft) || withWorld == 0 || TickUpTo == _lastAutosaveTick) return;
+        OrderSave(someoneLeft ? " (игрок ушёл)" : "");
+    }
+
+    /// <summary>
+    /// Сохранить мир сейчас (команда консоли <c>save</c>, T-069). Нужен игрок в сети с миром.
+    /// Возвращает, у кого заказан мир, или null, если некому отдать.
+    /// </summary>
+    public int? SaveNow()
+    {
+        if (_options.Store == null || !_players.Any(p => p.Online && p.HasWorld)) return null;
+        return OrderSave(" (по команде)");
+    }
+
+    private int OrderSave(string note)
+    {
         _lastAutosaveMs = _clockMs;
         _lastAutosaveTick = TickUpTo;
         int sender = ChooseWorldSender();
@@ -860,7 +875,8 @@ public sealed class Session
             Kind = ProtocolIds.SaveWorldSnapshotKind,
             Payload = WorldSnapshotOrder.Encode(sender),
         });
-        _log($"автосохранение #{seq} на тике {TickUpTo}{(someoneLeft ? " (игрок ушёл)" : "")}: мир отдаёт игрок {sender}");
+        _log($"автосохранение #{seq} на тике {TickUpTo}{note}: мир отдаёт игрок {sender}");
+        return sender;
     }
 
     /// <summary>
