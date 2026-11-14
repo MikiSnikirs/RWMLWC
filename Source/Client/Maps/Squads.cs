@@ -367,7 +367,7 @@ public sealed class Dialog_Squads : Window
             Widgets.Label(new Rect(34f, cy, 260f, rowHeight), s.name);
             Text.Font = GameFont.Small;
             bool look = !LockstepClient.InSession || Squads.CanEditLook(s, LockstepClient.PlayerId);
-            if (look && Widgets.ButtonText(new Rect(view.width - 410f, cy, 75f, 26f), "Цвет"))
+            if (look && Widgets.ButtonText(new Rect(view.width - 245f, cy, 75f, 26f), "Цвет"))
             {
                 int squadId = s.id;
                 List<FloatMenuOption> colors = new List<FloatMenuOption>();
@@ -380,7 +380,9 @@ public sealed class Dialog_Squads : Window
             }
             if (manage)
             {
-                if (Widgets.ButtonText(new Rect(view.width - 330f, cy, 160f, 26f), $"Добавить выделенных ({selected.Count})") && selected.Count > 0)
+                Rect addRect = new Rect(view.width - 375f, cy, 125f, 26f);
+                TooltipHandler.TipRegion(addRect, "Перевести выделенных колонистов в этот отряд (из прежнего отряда они уйдут)");
+                if (Widgets.ButtonText(addRect, $"Добавить ({selected.Count})") && selected.Count > 0)
                 {
                     Squads.AssignPawns(map, s.id, selected);
                 }
