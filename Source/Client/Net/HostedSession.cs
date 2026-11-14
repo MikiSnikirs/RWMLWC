@@ -157,6 +157,7 @@ public static class HostedSession
     /// <summary>Выйти из сессии и закрыть её (хост).</summary>
     public static void StopAndLeave()
     {
+        Reconnect.UserLeaving();
         RWMLWC.Client.Sim.LockstepClient.Disconnect("хост остановил сессию");
         Stop();
         SteamInvite.Clear();

@@ -128,8 +128,14 @@ public class Dialog_ServerJoin : Window
             if (Widgets.ButtonText(list.GetRect(32f), "Подключиться", active: ready) && ready && st == LockstepClient.State.Off)
             {
                 _started = true;
-                LockstepClient.ConnectPassword = _password;
-                LockstepClient.Connect(host, port, thumb, _name.Trim());
+                string name = _name.Trim(), password = _password;
+                void Go()
+                {
+                    LockstepClient.ConnectPassword = password;
+                    LockstepClient.Connect(host, port, thumb, name);
+                }
+                Reconnect.Remember($"серверу {host}:{port}", Go);
+                Go();
             }
         }
         else
