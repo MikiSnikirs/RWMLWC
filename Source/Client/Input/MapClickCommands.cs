@@ -152,6 +152,10 @@ public static class MapClickCommands
         {
             return;
         }
+        if (RWMLWC.Client.Maps.SquadRules.RejectAtExecution(RWMLWC.Client.Maps.SquadRules.Forbidden(pawn, CommandBus.CurrentPlayerId), CommandBus.CurrentSeq))
+        {
+            return; // отряды (T-061)
+        }
         FloatMenuOptionProvider_DraftedMove.PawnGotoAction(clickCell, pawn, gotoLoc);
     }
 

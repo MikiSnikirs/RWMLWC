@@ -57,6 +57,9 @@ public static class CommandBus
     /// <summary>Игрок — автор исполняемой команды.</summary>
     public static int CurrentPlayerId { get; private set; }
 
+    /// <summary>Номер исполняемой команды в общем порядке (для журнала).</summary>
+    public static long CurrentSeq { get; private set; }
+
     /// <summary>Обстановка автора исполняемой команды; вне исполнения — null.</summary>
     public static CommandContext? Context { get; private set; }
 
@@ -78,6 +81,7 @@ public static class CommandBus
         Executed = 0;
         ExecutedOwn = 0;
         Failed = 0;
+        RWMLWC.Client.Maps.SquadRules.Reset();
         VirtualUi.Reset();
     }
 
@@ -96,8 +100,17 @@ public static class CommandBus
 
     public static void Send(Map map, int kind, PermissionLevel required, PacketWriter payload)
     {
+        if (ActsOnSelection(kind) && !RWMLWC.Client.Maps.SquadRules.LocalMay(Find.Selector.SelectedObjects))
+        {
+            return; // отряды (T-061): приказ чужим пешкам не отправляем
+        }
         LockstepClient.SendCommand(map.uniqueID, kind, required, payload.ToArray());
     }
+
+    /// <summary>Команда действует на выделенные объекты автора (кнопки, меню, цель, правый щелчок, «идти»).</summary>
+    private static bool ActsOnSelection(int kind) =>
+        kind == CommandKinds.GizmoClick || kind == CommandKinds.MenuOption || kind == CommandKinds.TargetPicked
+        || kind == CommandKinds.MapRightClick || kind == CommandKinds.PawnGoto;
 
     /// <summary>Исполнить команду из общего порядка. Вызывается между тиками, у всех клиентов на одном и том же тике.</summary>
     public static void Execute(CommandOrderedMessage command)
@@ -148,6 +161,7 @@ public static class CommandBus
             Executing = true;
             ExecutingRemote = !own;
             CurrentPlayerId = command.PlayerId;
+            CurrentSeq = command.Seq;
             Context = context;
             // Как в тике карты: Rand и номера новых вещей — из состояния этой карты.
             if (beganTick)
@@ -155,6 +169,18 @@ public static class CommandBus
                 MapRandContext.BeginTick();
             }
             MapRandContext.Enter(map);
+
+            // Отряды (T-061): команда по выделению с чужой для автора пешкой пропускается у всех.
+            if (ActsOnSelection(command.Kind)
+                && RWMLWC.Client.Maps.SquadRules.RejectAtExecution(RWMLWC.Client.Maps.SquadRules.ForbiddenAny(contextSelection, command.PlayerId), command.Seq))
+            {
+                Executed++; // команда дошла и обработана (отклонена) — для проверки «свои команды исполнены»
+                if (own)
+                {
+                    ExecutedOwn++;
+                }
+                return;
+            }
 
             switch (command.Kind)
             {
