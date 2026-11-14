@@ -1,4 +1,5 @@
 using HarmonyLib;
+using RimWorld;
 using Verse;
 
 namespace RWMLWC.Client.Sim;
@@ -145,5 +146,36 @@ internal static class Patch_Rand_Int
         {
             RandTracer.Record();
         }
+    }
+}
+
+// Номера вещей по картам: вещь, созданная в тике карты, получает номер из счётчика этой карты.
+// Вещи, созданные в глобальном контексте (рейд от рассказчика, мир) или вне тика, — из общего счётчика игры.
+[HarmonyPatch(typeof(UniqueIDsManager), nameof(UniqueIDsManager.GetNextThingID))]
+internal static class Patch_UniqueIDsManager_GetNextThingID
+{
+    private static bool Prefix(ref int __result)
+    {
+        if (!PerMapSim.Enabled || !MapRandContext.InTick)
+        {
+            return true;
+        }
+        Map? map = MapRandContext.Current;
+        if (map == null)
+        {
+            return true;
+        }
+        MapSimState? state = MapSimState.For(map);
+        if (state == null)
+        {
+            return true;
+        }
+        int id = state.TakeThingId();
+        if (id < 0)
+        {
+            return true;
+        }
+        __result = id;
+        return false;
     }
 }

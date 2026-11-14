@@ -26,6 +26,8 @@ public sealed class HashRecorder : GameComponent
     private int endTick;
     private string? filePath;
     private string scenarioName = "none";
+    private int denseFrom;
+    private int denseTo = DenseTicks;
     private readonly StringBuilder buffer = new StringBuilder();
 
     // Диагностика поворотов в первых тиках прогона (по одной карте — первой).
@@ -80,7 +82,7 @@ public sealed class HashRecorder : GameComponent
         if (ReferenceEquals(recorder, Instance))
         {
             TestAutomation.Config cfg = TestAutomation.Read();
-            recorder.StartDeterminismRun(cfg.ticks, cfg.scenario, cfg.trace);
+            recorder.StartDeterminismRun(cfg.ticks, cfg.scenario, cfg.trace, cfg.denseFrom, cfg.denseTo);
             TestAutomation.OnRunStarted(cfg, recorder.startTick, recorder.filePath);
             Log.Message("[RWMLWC] determinism run auto-started at tick " + recorder.startTick + ": " + recorder.filePath);
         }
@@ -98,8 +100,10 @@ public sealed class HashRecorder : GameComponent
     /// Начать прогон: включить раздельную симуляцию, привести все состояния Rand к известным значениям
     /// и писать хеши <paramref name="durationTicks"/> тиков.
     /// </summary>
-    public void StartDeterminismRun(int durationTicks, string scenario = "none", bool trace = true)
+    public void StartDeterminismRun(int durationTicks, string scenario = "none", bool trace = true, int denseFromTick = 0, int denseToTick = DenseTicks)
     {
+        denseFrom = denseFromTick;
+        denseTo = denseToTick;
         PerMapSim.SetEnabled(true);
         MapRandContext.SetGlobalState(TestGlobalRandState);
 
@@ -112,6 +116,7 @@ public sealed class HashRecorder : GameComponent
                 state.frozen = false;
                 state.randState = state.InitialRandState();
                 state.randInitialized = true;
+                state.nextThingId = 0;
             }
         }
 
@@ -128,7 +133,7 @@ public sealed class HashRecorder : GameComponent
         lastRot.Clear();
         if (trace)
         {
-            RandTracer.Start(Path.Combine(dir, "randtrace-" + stamp + ".txt"), startTick, DenseTicks);
+            RandTracer.Start(Path.Combine(dir, "randtrace-" + stamp + ".txt"), startTick + denseFrom, startTick + denseTo);
         }
         buffer.Clear();
         buffer.AppendLine($"# RWMLWC determinism run; startTick={startTick}; duration={durationTicks}; interval={Interval}; sessionSeed={PerMapSim.SessionSeed}; scenario={scenario}");
@@ -160,7 +165,7 @@ public sealed class HashRecorder : GameComponent
         }
         int tick = Find.TickManager.TicksGame;
         int elapsed = tick - startTick;
-        if (elapsed <= DenseTicks || elapsed % Interval == 0)
+        if ((elapsed >= denseFrom && elapsed <= denseTo) || elapsed % Interval == 0)
         {
             WriteSample();
         }
@@ -203,7 +208,7 @@ public sealed class HashRecorder : GameComponent
             MapStateHash hash = MapStateHasher.Compute(map);
             buffer.AppendLine($"{tick};map{map.uniqueID};{hash}");
         }
-        if (tick - startTick <= DenseTicks && maps.Count > 0)
+        if (tick - startTick >= denseFrom && tick - startTick <= denseTo && maps.Count > 0)
         {
             MapStateHasher.LogRotationChanges(maps[0], tick, lastRot, rotBuffer);
         }

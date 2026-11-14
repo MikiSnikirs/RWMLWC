@@ -22,8 +22,8 @@ public static class RandTracer
 
     private static bool active;
     private static string? filePath;
-    private static int startTick;
-    private static int ticksToTrace;
+    private static int firstTick;
+    private static int lastTick;
     private static int currentTick;
     private static readonly StringBuilder buffer = new StringBuilder();
 
@@ -44,11 +44,12 @@ public static class RandTracer
         }
     }
 
-    public static void Start(string path, int fromTick, int ticks)
+    /// <summary>Писать вызовы Rand в тиках с номерами от fromTick (не включая) до toTick (включая).</summary>
+    public static void Start(string path, int fromTick, int toTick)
     {
         filePath = path;
-        startTick = fromTick;
-        ticksToTrace = ticks;
+        firstTick = fromTick;
+        lastTick = toTick;
         currentTick = fromTick;
         buffer.Clear();
         buffer.AppendLine("# tick;context;callers (innermost first)");
@@ -76,7 +77,7 @@ public static class RandTracer
         }
         // DoSingleTick увеличивает счётчик внутри себя, поэтому идущий тик — это текущее значение + 1.
         currentTick = Find.TickManager.TicksGame + 1;
-        if (currentTick - startTick > ticksToTrace)
+        if (currentTick > lastTick)
         {
             Stop();
             return;
@@ -91,7 +92,7 @@ public static class RandTracer
     public static void Record()
     {
         // Вне тика Rand принадлежит показу (интерфейс, отрисовка, звук) — это не симуляция, не пишем.
-        if (!MapRandContext.InTick)
+        if (!MapRandContext.InTick || currentTick <= firstTick)
         {
             return;
         }
