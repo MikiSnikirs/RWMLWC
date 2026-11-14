@@ -11,7 +11,7 @@ using Xunit;
 
 namespace RWMLWC.Tests;
 
-/// <summary>TST-062: отдающий мир по пингу, лечение расхождения сервером, автосохранение на сервер.</summary>
+/// <summary>TST-065: отдающий мир по пингу, лечение расхождения сервером, автосохранение на сервер.</summary>
 public sealed class WorldSenderTests : IDisposable
 {
     private const ulong World = 0x00000000_0000BEEF;

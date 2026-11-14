@@ -81,7 +81,7 @@ public static class HostedSession
         if (Running) throw new InvalidOperationException("сессия уже запущена");
         Directory.CreateDirectory(DataDir);
         var cert = ServerCertificate.LoadOrCreate(Path.Combine(DataDir, "server.pfx"));
-        // Настройки хоста — RWMLWC/host.txt (T-062). direct_port > 0 — принимать и прямые подключения по коду.
+        // Настройки хоста — RWMLWC/host.txt (T-065). direct_port > 0 — принимать и прямые подключения по коду.
         SettingsFile settings = SettingsFile.LoadOrCreate(SettingsPath, SettingsTemplate, w => Write("ВНИМАНИЕ: " + w));
         int directPort = settings.GetInt("direct_port", 0, 0, 65535);
         int maxPlayers = settings.GetInt("max_players", 8, 1, 64);
