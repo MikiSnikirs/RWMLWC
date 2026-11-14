@@ -134,8 +134,15 @@ public class Dialog_SteamJoin : Window
             if (list.ButtonText("Подключиться") && valid && st == LockstepClient.State.Off)
             {
                 _started = true;
-                LockstepClient.ConnectPassword = _password;
-                SteamJoin.Start(id);
+                string password = _password;
+                ulong host = id;
+                void Go()
+                {
+                    LockstepClient.ConnectPassword = password;
+                    SteamJoin.Start(host);
+                }
+                Reconnect.Remember("другу (Steam)", Go);
+                Go();
             }
         }
         else
