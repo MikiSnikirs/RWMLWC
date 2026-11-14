@@ -1,0 +1,19 @@
+A: # RWMLWC determinism run; startTick=14998; duration=8000; interval=250; sessionSeed=0; scenario=raid
+B: # RWMLWC determinism run; startTick=14998; duration=8000; interval=250; sessionSeed=0; scenario=raid
+замеров: A=466, B=466, общих=466
+ХЕШИ: расходятся. Первое расхождение по полям:
+  map0    nThings  тик 22748
+  map0    tDef     тик 22748
+  map0    tHp      тик 22748
+  map0    tId      тик 22748
+  map0    tPos     тик 22748
+  map0    tRot     тик 22748
+  map0    tStack   тик 22748
+  map0    things   тик 22748
+  map0    total    тик 22748
+  map0    pawns    тик 22998
+  map0    rand     тик 22998
+последний замер без расхождений: тик 22498; первый с расхождением: тик 22748
+
+трассировка: A тики 20499..20698 (14935 вызовов), B тики 20499..20698 (14935 вызовов)
+ТРАССИРОВКА: число вызовов Rand совпадает на всех тиках и во всех контекстах
