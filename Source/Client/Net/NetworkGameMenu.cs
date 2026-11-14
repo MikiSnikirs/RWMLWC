@@ -13,7 +13,7 @@ namespace RWMLWC.Client.Net;
 /// </summary>
 public class Dialog_NetworkGame : Window
 {
-    public override Vector2 InitialSize => new Vector2(460f, 330f);
+    public override Vector2 InitialSize => new Vector2(460f, 290f);
 
     public Dialog_NetworkGame()
     {
