@@ -20,6 +20,12 @@ public sealed class SessionOptions
     public TimeSpan HelloTimeout = TimeSpan.FromSeconds(10);
 
     public int MaxPlayers = 8;
+
+    /// <summary>Хранилище сейвов (T-044); null — сервер копии мира не хранит.</summary>
+    public SaveStore? Store;
+
+    /// <summary>Предел размера одного собираемого снимка мира.</summary>
+    public long MaxSnapshotBytes = 512L * 1024 * 1024;
 }
 
 /// <summary>
@@ -61,6 +67,29 @@ public sealed class Session
         _options = options;
         _log = log ?? (_ => { });
         TickUpTo = options.StartTick;
+        SaveCopy? latest = options.Store?.Latest;
+        if (latest != null)
+        {
+            SaveWorldId = latest.WorldId;
+            SaveTick = latest.Tick;
+        }
+    }
+
+    /// <summary>Мир последней копии на сервере; 0 — копии нет.</summary>
+    public ulong SaveWorldId { get; private set; }
+
+    /// <summary>Тик последней копии на сервере; 0 — копии нет.</summary>
+    public int SaveTick { get; private set; }
+
+    // Сборка снимков мира из кусков: (игрок, номер снимка) → куски.
+    private readonly Dictionary<(int player, int snapshot), SnapshotAssembly> _assemblies = new();
+
+    private sealed class SnapshotAssembly
+    {
+        public required int Tick;
+        public required byte[]?[] Chunks;
+        public long Bytes;
+        public int Received;
     }
 
     /// <summary>
@@ -93,6 +122,10 @@ public sealed class Session
 
         /// <summary>Скорость, выбранная игроком. Новый игрок держит паузу, пока не пришлёт <c>SpeedRequest</c>.</summary>
         public byte RequestedSpeed { get; internal set; }
+
+        /// <summary>Мир и тик локальной копии сейва, о которых игрок сообщил в <c>Hello</c>.</summary>
+        public ulong SaveWorldId { get; internal set; }
+        public int SaveTick { get; internal set; }
     }
 
     private sealed class Pending
@@ -205,8 +238,18 @@ public sealed class Session
             _log($"вошёл игрок {player.Id} «{player.Name}» ({connection.Remote})");
         }
 
-        connection.Send(new WelcomeMessage { PlayerId = player.Id, ServerTick = TickUpTo, SessionSeed = _options.SessionSeed });
+        player.SaveWorldId = hello.SaveWorldId;
+        player.SaveTick = hello.SaveTick;
+        connection.Send(new WelcomeMessage
+        {
+            PlayerId = player.Id,
+            ServerTick = TickUpTo,
+            SessionSeed = _options.SessionSeed,
+            SaveWorldId = SaveWorldId,
+            SaveTick = SaveTick,
+        });
         connection.Send(BuildPermissions());
+        CheckSaveVersion(player);
         // Новому игроку — текущее разрешение, остальным — новая скорость (новый игрок держит паузу).
         connection.Send(new TickMessage { TickUpTo = TickUpTo, Speed = Speed });
         UpdateSpeed();
@@ -264,9 +307,11 @@ public sealed class Session
                 break;
 
             case SnapshotChunkMessage chunk:
-                // Пересылка снимка остальным; кому и когда — уточнят T-030/T-034.
+                // Пересылка снимка остальным; кому и когда — уточнят T-032/T-034/T-045.
                 foreach (Player other in _players)
                     if (other != player && other.Online) other.Connection.Send(chunk);
+                if (chunk.MapId == ProtocolIds.WorldMapId && _options.Store != null)
+                    CollectWorldSnapshot(player, chunk);
                 break;
 
             default:
@@ -291,6 +336,80 @@ public sealed class Session
         {
             _log($"РАСХОЖДЕНИЕ карта {h.MapId} тик {h.Tick}: игрок {first.playerId} {first.hash.Total:X16}, игрок {player.Id} {h.Total:X16}");
             Desync?.Invoke(first.hash, first.playerId, h, player.Id);
+        }
+    }
+
+    /// <summary>
+    /// Защита от запуска со старой копии (T-044): если у игрока копия того же мира с бо́льшим тиком,
+    /// сервер, вероятно, поднят со старого сейва — предупреждаем всех и пишем в лог. Соединение не рвём.
+    /// </summary>
+    private void CheckSaveVersion(Player player)
+    {
+        if (player.SaveWorldId == 0 || SaveWorldId == 0) return;
+        if (player.SaveWorldId != SaveWorldId)
+        {
+            string t = $"У игрока «{player.Name}» сейв другого мира ({player.SaveWorldId:X16}), на сервере — {SaveWorldId:X16}.";
+            _log("ВНИМАНИЕ: " + t);
+            player.Connection.Send(new NoticeMessage { Code = NoticeCode.DifferentWorld, Text = t });
+            return;
+        }
+        if (player.SaveTick > SaveTick)
+        {
+            string t = $"У игрока «{player.Name}» копия сейва новее, чем на сервере (тик {player.SaveTick} против {SaveTick}). " +
+                       "Похоже, сервер запущен со старой копии — продолжать с неё значит потерять прогресс.";
+            _log("ВНИМАНИЕ: " + t);
+            Broadcast(new NoticeMessage { Code = NoticeCode.NewerSaveOnClient, Text = t });
+        }
+    }
+
+    private void CollectWorldSnapshot(Player player, SnapshotChunkMessage chunk)
+    {
+        var key = (player.Id, chunk.SnapshotId);
+        if (!_assemblies.TryGetValue(key, out SnapshotAssembly? a))
+        {
+            if (chunk.ChunkCount > 65536) { _log($"игрок {player.Id}: снимок {chunk.SnapshotId} — слишком много кусков"); return; }
+            a = new SnapshotAssembly { Tick = chunk.Tick, Chunks = new byte[]?[chunk.ChunkCount] };
+            _assemblies[key] = a;
+        }
+        if (chunk.ChunkCount != a.Chunks.Length || chunk.Tick != a.Tick || a.Chunks[chunk.ChunkIndex] != null)
+        {
+            _log($"игрок {player.Id}: снимок {chunk.SnapshotId} — несогласованные куски, сборка сброшена");
+            _assemblies.Remove(key);
+            return;
+        }
+        a.Bytes += chunk.Data.Length;
+        if (a.Bytes > _options.MaxSnapshotBytes)
+        {
+            _log($"игрок {player.Id}: снимок {chunk.SnapshotId} больше {_options.MaxSnapshotBytes} байт, отброшен");
+            _assemblies.Remove(key);
+            return;
+        }
+        a.Chunks[chunk.ChunkIndex] = chunk.Data;
+        if (++a.Received < a.Chunks.Length) return;
+
+        _assemblies.Remove(key);
+        byte[] data = new byte[a.Bytes];
+        int offset = 0;
+        foreach (byte[]? part in a.Chunks)
+        {
+            Buffer.BlockCopy(part!, 0, data, offset, part!.Length);
+            offset += part.Length;
+        }
+        if (player.SaveWorldId == 0)
+        {
+            _log($"игрок {player.Id}: снимок мира без идентификатора мира (SaveWorldId = 0 в Hello) — не сохранён");
+            return;
+        }
+        try
+        {
+            SaveCopy copy = _options.Store!.Store(player.SaveWorldId, a.Tick, data);
+            SaveWorldId = copy.WorldId;
+            SaveTick = copy.Tick;
+            _log($"сохранена копия мира {copy.WorldId:X16}, тик {copy.Tick}, {copy.Size} байт, sha256 {copy.Sha256[..16]}");
+        }
+        catch (Exception e)
+        {
+            _log($"игрок {player.Id}: копия мира не сохранена: {e.Message}");
         }
     }
 
