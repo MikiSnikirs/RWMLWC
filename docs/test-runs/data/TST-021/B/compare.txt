@@ -1,0 +1,16 @@
+A: # RWMLWC determinism run; startTick=14998; duration=3000; interval=250; sessionSeed=7; scenario=gizmo
+B: # RWMLWC determinism run; startTick=14998; duration=3000; interval=250; sessionSeed=7; scenario=gizmo
+замеров: A=624, B=624, общих=624
+ХЕШИ: расходятся. Первое расхождение по полям:
+  map0    rand     тик 16748
+  map0    tRot     тик 16748
+  map0    things   тик 16748
+  map0    total    тик 16748
+  map0    pawns    тик 16998
+  map0    tHp      тик 16998
+  map0    tPos     тик 16998
+  map0    nThings  тик 17248
+  map0    tDef     тик 17248
+  map0    tId      тик 17248
+  map0    tStack   тик 17248
+последний замер без расхождений: тик 16498; первый с расхождением: тик 16748

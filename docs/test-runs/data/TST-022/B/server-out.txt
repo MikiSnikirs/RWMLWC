@@ -1,0 +1,6 @@
+RWMLWC server, protocol v2
+LISTENING 51284 33C72CAC84A3C7BD8FB0DE621B62C3A90F1A409152D21D67FB1F7137DE502BF1
+SAVE нет — ждём снимок мира от хоста
+SESSION startTick=14998 seed=7
+вошёл игрок 1 «c1» (quic:127.0.0.1:54825)
+вошёл игрок 2 «c2» (quic:127.0.0.1:63471)
