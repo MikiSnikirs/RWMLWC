@@ -185,6 +185,20 @@
 
 Ожидание: файл хешей прогона `ui` совпадает с файлом прогона `none` полностью (`tools/compare_runs.py`); в `automation-log.txt` — девять строк `ui: …`, строк `FAILED` нет.
 
+## TST-045: вход в идущую игру
+
+Два экземпляра игры и сервер на одной машине. c1 загружает сейв и играет один (третья скорость). c2 сейв не загружает: через 45 секунд подключается из главного меню.
+
+Запуск: `powershell -ExecutionPolicy Bypass -File tools\run-tst014.ps1 -Clients 2 -Scenario join -Name tst045`.
+
+Ожидание:
+1. c2, `automation-log.txt`: `entry: will connect…`, `lockstep: Welcome … requesting world snapshot`, `lockstep: snapshot N received … loading`, `lockstep: snapshot loaded, tick T`, затем обычный прогон 3000 тиков до конца.
+2. c1: `lockstep: snapshot for player 2 at tick T: … chunks sent; reloading it here too`, `lockstep: snapshot loaded, tick T`, `resumed after snapshot reload at tick T` — с тем же T, что у c2.
+3. Файлы хешей c1 и c2 совпадают на всех общих тиках (от T и до конца прогона c2); сервер не сообщает о расхождении; в логе сервера — сохранение копии мира (T-044).
+4. Остановка игры на время входа — от `asked for a snapshot` до `snapshot loaded` у c1 — не дольше 10 секунд (критерий T-045).
+
+Ключи метки: `snapsender=1` — этот клиент отдаёт снимок (в обычной игре это тот, кто держит сессию у себя); `connectdelay` — через сколько секунд подключаться из главного меню, если `save` пуст.
+
 ## Автоматические прогоны (T-008)
 
 Файл `RWMLWC/arm-determinism-run.txt` в папке данных игры, строки `ключ=значение`:

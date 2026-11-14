@@ -50,6 +50,8 @@ public static class TestAutomation
         public string playerName = "player";
         public int holdSec;
         public bool issuer;
+        public bool snapSender;
+        public int connectDelaySec;
         public bool quit;
     }
 
@@ -170,6 +172,15 @@ public static class TestAutomation
                     break;
                 case "thumbprint":
                     cfg.thumbprint = value;
+                    break;
+                case "snapsender":
+                    cfg.snapSender = value == "1";
+                    break;
+                case "connectdelay":
+                    if (int.TryParse(value, out int connectDelay) && connectDelay >= 0)
+                    {
+                        cfg.connectDelaySec = connectDelay;
+                    }
                     break;
                 case "issuer":
                     cfg.issuer = value == "1";
@@ -298,6 +309,7 @@ public static class TestAutomation
         if (cfg.serverHost != null && LockstepClient.CurrentState == LockstepClient.State.Off)
         {
             LockstepClient.HoldSeconds = cfg.holdSec;
+            LockstepClient.ForceSnapshotSender = cfg.snapSender;
             LockstepClient.Connect(cfg.serverHost, cfg.serverPort, cfg.thumbprint, cfg.playerName);
         }
     }
@@ -688,6 +700,35 @@ public static class TestAutomation
         }
     }
 
+    // --- вход без мира (T-045): подключение из главного меню ---
+
+    private static Config? entryConnect;
+    private static readonly System.Diagnostics.Stopwatch entryClock = new System.Diagnostics.Stopwatch();
+
+    /// <summary>В метке задан сервер, но не задан сейв: подключиться из главного меню через connectdelay секунд.</summary>
+    public static void ScheduleEntryConnect(Config cfg)
+    {
+        entryConnect = cfg;
+        entryClock.Restart();
+        Note($"entry: will connect to {cfg.serverHost}:{cfg.serverPort} in {cfg.connectDelaySec} s without a loaded game");
+    }
+
+    /// <summary>Раз в кадр в главном меню.</summary>
+    public static void EntryFrame()
+    {
+        Config? cfg = entryConnect;
+        if (cfg == null || cfg.serverHost == null || entryClock.ElapsedMilliseconds < cfg.connectDelaySec * 1000L)
+        {
+            return;
+        }
+        entryConnect = null;
+        if (cfg.quit)
+        {
+            automationActive = true;
+        }
+        LockstepClient.Connect(cfg.serverHost, cfg.serverPort, cfg.thumbprint, cfg.playerName);
+    }
+
     public static void KeepRunning()
     {
         if (!LockstepClient.OwnsTicking)
@@ -777,6 +818,11 @@ public static class TestAutomationBoot
         try
         {
             TestAutomation.Config cfg = TestAutomation.Read();
+            if (cfg.armed && cfg.save == null && cfg.serverHost != null)
+            {
+                TestAutomation.ScheduleEntryConnect(cfg);
+                return;
+            }
             if (!cfg.armed || cfg.save == null)
             {
                 return;
