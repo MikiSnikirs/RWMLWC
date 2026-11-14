@@ -308,6 +308,9 @@ public static class TestAutomation
                 sessionSteps.Enqueue((startTick + 2100, "access: draft with Build", () => AccessTry("draft, Build", GizmoDraft)));
                 // Отзыв действует сразу: c2 отзывает права на 3000-м тике, шаг ждёт, пока отзыв дойдёт до c1.
                 sessionSteps.Enqueue((startTick + 3300, "access: designate after revoke", () => AccessTry("designate, revoked", ScenarioDesignate)));
+                sessionSteps.Enqueue((startTick + 4000, "access: draft with Full until return", () => AccessTry("draft, Full until return, owner online", GizmoDraft)));
+                stepGates["access: draft with Full until return"] = () =>
+                    RWMLWC.Client.Maps.MapAccess.IsUntilReturn((Find.CurrentMap ?? Find.Maps[0]).uniqueID, LockstepClient.PlayerId);
                 stepGates["access: designate after revoke"] = () =>
                     RWMLWC.Client.Maps.MapAccess.MyLevel((Find.CurrentMap ?? Find.Maps[0]).uniqueID) == RWMLWC.Shared.Protocol.PermissionLevel.None;
                 // Права приходят вне общего порядка команд, а клиенты идут по тикам не вровень.
@@ -326,6 +329,19 @@ public static class TestAutomation
                 sessionSteps.Enqueue((startTick + 300, "access: claim", AccessClaim));
                 sessionSteps.Enqueue((startTick + 1500, "access: grant Build", AccessGrantBuild));
                 sessionSteps.Enqueue((startTick + 3000, "access: revoke", AccessRevoke));
+                // Управляющий (v7): полные права «пока меня нет»; пока владелец в сети, они не действуют.
+                sessionSteps.Enqueue((startTick + 3500, "access: grant Full until return", () =>
+                {
+                    Map map = Find.CurrentMap ?? Find.Maps[0];
+                    int other = LockstepClient.PlayerId == 1 ? 2 : 1;
+                    RWMLWC.Client.Maps.MapAccess.Grant(map.uniqueID, other, RWMLWC.Shared.Protocol.PermissionLevel.Full, true);
+                    Note($"access: granting Full until return to player {other}");
+                }));
+                sessionSteps.Enqueue((startTick + 3900, "access: show rights window", () =>
+                {
+                    Find.WindowStack.Add(new RWMLWC.Client.Maps.Dialog_MapAccess());
+                }));
+                sessionSteps.Enqueue((startTick + 4000, "access: screenshot", () => ScreenshotTaker.TakeNonSteamShot("access-look")));
             }
         }
         if (cfg.issuer && cfg.scenario == "tabs")
