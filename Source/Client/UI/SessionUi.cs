@@ -192,7 +192,7 @@ public class Dialog_Session : Window
         // Игроки.
         foreach (PlayerInfo p in SessionUi.Players)
         {
-            string ping = !p.Online ? "не в сети" : p.PingMs >= 0 ? p.PingMs + " мс" : "—";
+            string ping = !p.Online ? "не в сети" : (p.PingMs >= 0 ? p.PingMs + " мс" : "—") + (p.Idle ? ", отошёл" : "");
             string me = p.PlayerId == LockstepClient.PlayerId ? " (вы)" : "";
             Widgets.DrawBoxSolid(new Rect(inRect.x + 8f, y + 5f, 12f, 12f), SessionUi.ToUnityColor(p.Color));
             GUI.color = p.Online ? Color.white : Color.gray;
