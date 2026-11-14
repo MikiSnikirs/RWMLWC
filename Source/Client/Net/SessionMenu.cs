@@ -83,7 +83,7 @@ internal static class SteamInvite
             ulong host = Parse(string.Join(" ", Environment.GetCommandLineArgs()));
             if (host != 0)
             {
-                Log.Message("[RWMLWC] запуск по приглашению Steam, хост " + host);
+                Log.Message("[RWMLWC] запуск по приглашению Steam");
                 _pendingHost = host;
             }
         }
@@ -111,7 +111,7 @@ internal static class SteamInvite
     {
         ulong host = Parse(e.m_rgchConnect);
         if (host == 0) return;
-        Log.Message("[RWMLWC] приглашение Steam: присоединиться к " + host);
+        Log.Message("[RWMLWC] приглашение Steam: присоединиться к другу");
         if (Current.ProgramState == ProgramState.Entry)
         {
             _pendingHost = host;

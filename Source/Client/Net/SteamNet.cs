@@ -107,7 +107,7 @@ public static class SteamNet
             HSteamNetConnection handle = SteamNetworkingSockets.ConnectP2P(ref identity, VirtualPort, 0, Array.Empty<SteamNetworkingConfigValue_t>());
             if (handle == HSteamNetConnection.Invalid)
                 throw new InvalidOperationException("Steam: ConnectP2P вернул пустой дескриптор");
-            connection = Register(handle, "steam:" + hostSteamId);
+            connection = Register(handle, "steam:host"); // SteamID в имени не держим: имя попадает в журналы
         }
         try
         {
@@ -173,7 +173,7 @@ public static class SteamNet
                     SteamNetworkingSockets.CloseConnection(e.m_hConn, 0, "accept failed", false);
                     return;
                 }
-                SteamConnection incoming = Register(e.m_hConn, "steam:" + e.m_info.m_identityRemote.GetSteamID64());
+                SteamConnection incoming = Register(e.m_hConn, "steam:friend#" + e.m_hConn.m_HSteamNetConnection); // номер соединения, не SteamID
                 Accepted?.Invoke(incoming);
                 return;
             }
