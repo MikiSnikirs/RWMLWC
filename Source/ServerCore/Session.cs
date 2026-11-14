@@ -33,6 +33,12 @@ public sealed class SessionOptions
     /// Игроку без мира, который входит в пустую сессию, сервер сам отдаёт сохранённую копию.
     /// </summary>
     public bool Dedicated;
+
+    /// <summary>
+    /// Автосохранение (T-065): раз в столько времени сервер просит отдающего прислать мир и сохраняет копию.
+    /// null — выключено (сессия в игре хоста: у хоста свои сейвы).
+    /// </summary>
+    public TimeSpan? AutosaveInterval;
 }
 
 /// <summary>
@@ -51,14 +57,11 @@ public sealed class Session
 
     private static readonly int[] SpeedMultiplier = { 0, 1, 3, 6, 15 };
 
-    /// <summary>
-    /// Вид команды «пришлите мне мир» (клиент A: <c>LockstepClient.RequestSnapshotKind</c>). Номер снимка,
-    /// который ждёт просивший, — <c>Seq &amp; 0x7FFFFFFF</c> этой команды в общем порядке.
-    /// </summary>
-    public const int RequestWorldSnapshotKind = 100;
+    /// <summary>Вид команды «общий снимок мира» (<see cref="ProtocolIds.RequestWorldSnapshotKind"/>).</summary>
+    public const int RequestWorldSnapshotKind = ProtocolIds.RequestWorldSnapshotKind;
 
-    /// <summary>Номер игрока-«автора» сообщений самого сервера (чат из консоли).</summary>
-    public const int ServerPlayerId = 0;
+    /// <summary>Номер «игрока» самого сервера (чат из консоли, команды сервера).</summary>
+    public const int ServerPlayerId = ProtocolIds.ServerPlayerId;
 
     private readonly SessionOptions _options;
     private readonly List<Pending> _pending = new();
@@ -88,8 +91,12 @@ public sealed class Session
         {
             SaveWorldId = latest.WorldId;
             SaveTick = latest.Tick;
+            WorldId = latest.WorldId;
         }
     }
+
+    /// <summary>Мир сессии: из копии сервера или от первого игрока со своим сейвом; 0 — неизвестен.</summary>
+    public ulong WorldId { get; private set; }
 
     /// <summary>Мир последней копии на сервере; 0 — копии нет.</summary>
     public ulong SaveWorldId { get; private set; }
@@ -146,6 +153,12 @@ public sealed class Session
 
         /// <summary>Когда (часы сессии, мс) игрок писал в чат в последнем окне — для ограничения частоты.</summary>
         internal Queue<double> ChatTimes { get; } = new();
+
+        /// <summary>
+        /// У игрока загружен мир сессии: вошёл со своим сейвом на тике сервера или подтвердил снимок
+        /// (<c>SnapshotApplied</c>). Только такой может отдавать мир другим.
+        /// </summary>
+        public bool HasWorld { get; internal set; }
     }
 
     private sealed class Pending
@@ -221,6 +234,7 @@ public sealed class Session
         }
 
         _clockMs += elapsed.TotalMilliseconds;
+        Autosave();
         if (_clockMs - _lastPingMs >= ProtocolLimits.PingIntervalMs)
         {
             _lastPingMs = _clockMs;
@@ -318,6 +332,9 @@ public sealed class Session
 
         player.SaveWorldId = hello.SaveWorldId;
         player.SaveTick = hello.SaveTick;
+        // Мир есть, если сейв на тике сервера (иначе клиент сейчас попросит снимок).
+        player.HasWorld = hello.SaveWorldId != 0 && hello.SaveTick == TickUpTo;
+        if (player.HasWorld && WorldId == 0) WorldId = hello.SaveWorldId;
         connection.Send(new WelcomeMessage
         {
             PlayerId = player.Id,
@@ -353,10 +370,19 @@ public sealed class Session
                 }
                 // Исполняется всеми после тика TickUpTo: ни один клиент ещё не ушёл дальше него,
                 // а Tick с большим номером будет разослан только после этой команды.
-                long seq = _nextSeq++;
+                if (c.Kind == ProtocolIds.SaveWorldSnapshotKind)
+                {
+                    _log($"игрок {player.Id}: команда сохранения мира — только от сервера, отброшена");
+                    break;
+                }
+                if (c.Kind == RequestWorldSnapshotKind)
+                {
+                    OrderWorldSnapshot(player, c.ClientSeq, "просьба игрока " + player.Id);
+                    break;
+                }
                 Broadcast(new CommandOrderedMessage
                 {
-                    Seq = seq,
+                    Seq = _nextSeq++,
                     Tick = TickUpTo,
                     PlayerId = player.Id,
                     ClientSeq = c.ClientSeq,
@@ -364,7 +390,6 @@ public sealed class Session
                     Kind = c.Kind,
                     Payload = c.Payload,
                 });
-                if (c.Kind == RequestWorldSnapshotKind) ServeStoredWorld(player, seq);
                 break;
 
             case MapClaimMessage claim:
@@ -378,6 +403,7 @@ public sealed class Session
             case SnapshotAppliedMessage applied:
                 // Поток «снимок → все загружают → все подтвердили → тики дальше» — T-032/T-034/T-045.
                 _log($"игрок {player.Id}: снимок {applied.SnapshotId} применён, тик {applied.Tick}");
+                player.HasWorld = true;
                 break;
 
             case SpeedRequestMessage s:
@@ -394,9 +420,10 @@ public sealed class Session
                 break;
 
             case SnapshotChunkMessage chunk:
-                // Пересылка снимка остальным; кому и когда — уточнят T-032/T-034/T-045.
-                foreach (Player other in _players)
-                    if (other != player && other.Online) other.Connection.Send(chunk);
+                // Пересылка снимка остальным; снимок автосохранения (101) — только серверу.
+                if (!_saveSnapshotIds.Contains(chunk.SnapshotId))
+                    foreach (Player other in _players)
+                        if (other != player && other.Online) other.Connection.Send(chunk);
                 if (chunk.MapId == ProtocolIds.WorldMapId && _options.Store != null)
                     CollectWorldSnapshot(player, chunk);
                 break;
@@ -426,6 +453,9 @@ public sealed class Session
         {
             _log($"РАСХОЖДЕНИЕ карта {h.MapId} тик {h.Tick}: игрок {first.playerId} {first.hash.Total:X16}, игрок {player.Id} {h.Total:X16}");
             Desync?.Invoke(first.hash, first.playerId, h, player.Id);
+            // Хеш тика не позже уже заказанного общего снимка: этот снимок его и вылечит, второй не нужен.
+            // (Клиенты присылают хеши с отставанием — без этой проверки за время одной перезагрузки заказывалось несколько.)
+            if (h.Tick <= _lastWorldSnapshotTick) return;
             if (!_desyncNoticeTick.TryGetValue(h.MapId, out int last) || h.Tick - last >= ProtocolLimits.DesyncNoticeIntervalTicks || h.Tick < last)
             {
                 _desyncNoticeTick[h.MapId] = h.Tick;
@@ -434,6 +464,8 @@ public sealed class Session
                     Code = NoticeCode.Desync,
                     Text = $"карта {h.MapId} тик {h.Tick}: игрок {first.playerId} ≠ игрок {player.Id}",
                 });
+                // v4: лечит сервер — общий снимок от игрока с лучшим пингом (не чаще Notice).
+                OrderWorldSnapshot(null, 0, $"расхождение карты {h.MapId} на тике {h.Tick}");
             }
         }
     }
@@ -494,14 +526,15 @@ public sealed class Session
             Buffer.BlockCopy(part!, 0, data, offset, part!.Length);
             offset += part.Length;
         }
-        if (player.SaveWorldId == 0)
+        ulong world = player.SaveWorldId != 0 ? player.SaveWorldId : WorldId;
+        if (world == 0)
         {
-            _log($"игрок {player.Id}: снимок мира без идентификатора мира (SaveWorldId = 0 в Hello) — не сохранён");
+            _log($"игрок {player.Id}: снимок мира без идентификатора мира — не сохранён");
             return;
         }
         try
         {
-            SaveCopy copy = _options.Store!.Store(player.SaveWorldId, a.Tick, data);
+            SaveCopy copy = _options.Store!.Store(world, a.Tick, data);
             SaveWorldId = copy.WorldId;
             SaveTick = copy.Tick;
             _log($"сохранена копия мира {copy.WorldId:X16}, тик {copy.Tick}, {copy.Size} байт, sha256 {copy.Sha256[..16]}");
@@ -612,6 +645,7 @@ public sealed class Session
         if (playerHasWorld && (latest == null || (hello.SaveWorldId == latest.WorldId && hello.SaveTick > latest.Tick)))
         {
             tick = hello.SaveTick;
+            WorldId = hello.SaveWorldId;
             source = latest == null ? "сейв игрока (на сервере мира ещё нет)" : $"сейв игрока новее копии сервера ({latest.Tick})";
         }
         else if (latest != null)
@@ -634,12 +668,100 @@ public sealed class Session
     }
 
     /// <summary>
+    /// Кто отдаёт мир (T-065): из игроков в сети с загруженным миром — с наименьшим пингом до сервера.
+    /// Путь «отдающий → сервер → получатель» короче всего через того, кто ближе к серверу; пинг между двумя
+    /// игроками напрямую сервер не знает. Неизмеренный пинг считается худшим. 0 — отдать некому.
+    /// </summary>
+    public int ChooseWorldSender(Player? except = null)
+    {
+        Player? best = null;
+        foreach (Player p in _players)
+        {
+            if (!p.Online || !p.HasWorld || p == except) continue;
+            int rtt = p.Connection.RoundTripMs < 0 ? int.MaxValue : p.Connection.RoundTripMs;
+            int bestRtt = best == null ? int.MaxValue : (best.Connection.RoundTripMs < 0 ? int.MaxValue : best.Connection.RoundTripMs);
+            if (best == null || rtt < bestRtt) best = p;
+        }
+        return best?.Id ?? ServerPlayerId;
+    }
+
+    /// <summary>
+    /// Поставить в общий порядок «общий снимок мира» с назначенным отдающим. <paramref name="requester"/> — кто просил
+    /// (null — сервер сам, например при расхождении). Отдающего нет — на выделенном сервере мир отдаёт сам сервер.
+    /// </summary>
+    private void OrderWorldSnapshot(Player? requester, int clientSeq, string why)
+    {
+        int sender = ChooseWorldSender(requester != null && !requester.HasWorld ? requester : null);
+        if (sender == ServerPlayerId && requester == null)
+        {
+            _log($"общий снимок ({why}) не заказан: мир некому отдать");
+            return;
+        }
+        long seq = _nextSeq++;
+        _lastWorldSnapshotTick = TickUpTo;
+        Broadcast(new CommandOrderedMessage
+        {
+            Seq = seq,
+            Tick = TickUpTo,
+            PlayerId = requester?.Id ?? ServerPlayerId,
+            ClientSeq = clientSeq,
+            MapId = ProtocolIds.WorldMapId,
+            Kind = RequestWorldSnapshotKind,
+            Payload = WorldSnapshotOrder.Encode(sender),
+        });
+        _log($"общий снимок #{seq} ({why}): отдаёт {(sender == ServerPlayerId ? "сервер" : "игрок " + sender)}");
+        if (sender == ServerPlayerId && requester != null) ServeStoredWorld(requester, seq);
+    }
+
+    // Номера снимков автосохранения: их куски не пересылаются игрокам. Держим последние несколько.
+    private readonly HashSet<int> _saveSnapshotIds = new();
+    private readonly Queue<int> _saveSnapshotOrder = new();
+
+    // Тик последнего заказанного общего снимка: расхождения до него уже лечатся.
+    private int _lastWorldSnapshotTick = int.MinValue;
+
+    private double _lastAutosaveMs;
+    private int _lastAutosaveTick = -1;
+    private int _onlineWithWorld;
+
+    /// <summary>
+    /// Автосохранение: по таймеру и когда кто-то ушёл (пока ещё есть кому отдать мир). Тик не изменился — не сохраняем.
+    /// </summary>
+    private void Autosave()
+    {
+        if (_options.AutosaveInterval == null || _options.Store == null) return;
+        int withWorld = _players.Count(p => p.Online && p.HasWorld);
+        bool someoneLeft = withWorld < _onlineWithWorld;
+        _onlineWithWorld = withWorld;
+        bool due = _clockMs - _lastAutosaveMs >= _options.AutosaveInterval.Value.TotalMilliseconds;
+        if ((!due && !someoneLeft) || withWorld == 0 || TickUpTo == _lastAutosaveTick) return;
+        _lastAutosaveMs = _clockMs;
+        _lastAutosaveTick = TickUpTo;
+        int sender = ChooseWorldSender();
+        long seq = _nextSeq++;
+        int snapshotId = WorldSnapshotOrder.SnapshotId(seq);
+        _saveSnapshotIds.Add(snapshotId);
+        _saveSnapshotOrder.Enqueue(snapshotId);
+        while (_saveSnapshotOrder.Count > 8) _saveSnapshotIds.Remove(_saveSnapshotOrder.Dequeue());
+        Broadcast(new CommandOrderedMessage
+        {
+            Seq = seq,
+            Tick = TickUpTo,
+            PlayerId = ServerPlayerId,
+            MapId = ProtocolIds.WorldMapId,
+            Kind = ProtocolIds.SaveWorldSnapshotKind,
+            Payload = WorldSnapshotOrder.Encode(sender),
+        });
+        _log($"автосохранение #{seq} на тике {TickUpTo}{(someoneLeft ? " (игрок ушёл)" : "")}: мир отдаёт игрок {sender}");
+    }
+
+    /// <summary>
     /// Выделенный сервер: игрок просит мир, а отдать его некому (он в сети один) — отдаём копию сервера.
     /// Куски — с номером, который ждёт клиент (<c>Seq &amp; 0x7FFFFFFF</c> его просьбы), и тиком копии.
     /// </summary>
     private void ServeStoredWorld(Player player, long requestSeq)
     {
-        if (!_options.Dedicated || _players.Any(p => p.Online && p != player)) return;
+        if (!_options.Dedicated) return;
         SaveCopy? latest = _options.Store?.Latest;
         if (latest == null) return;
         if (latest.Tick != TickUpTo)
@@ -657,7 +779,7 @@ public sealed class Session
             _log($"мир для игрока {player.Id} не прочитан: {e.Message}");
             return;
         }
-        int id = unchecked((int)(requestSeq & 0x7FFFFFFF));
+        int id = WorldSnapshotOrder.SnapshotId(requestSeq);
         int size = ProtocolLimits.SnapshotChunkBytes;
         int count = Math.Max(1, (data.Length + size - 1) / size);
         for (int i = 0; i < count; i++)

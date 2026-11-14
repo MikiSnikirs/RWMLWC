@@ -49,7 +49,7 @@ public static class LockstepClient
     }
 
     /// <summary>Вид команды «нужен снимок мира»; исполняет её сам LockstepClient, не CommandBus.</summary>
-    public const int RequestSnapshotKind = 100;
+    public const int RequestSnapshotKind = ProtocolIds.RequestWorldSnapshotKind;
 
     private const byte SnapshotFormat = 1;
     private const int SnapshotChunkPayload = 200_000;
@@ -469,6 +469,11 @@ public static class LockstepClient
                 BeginSnapshotRound(command);
                 continue; // состояние сменилось: цикл остановится, остальные команды — после загрузки
             }
+            if (command.Kind == ProtocolIds.SaveWorldSnapshotKind)
+            {
+                SaveWorldForServer(command); // v4: автосохранение — отдающий шлёт мир серверу, остальные пропускают
+                continue;
+            }
             if (command.Tick < tickManager.TicksGame)
             {
                 // Сервер обещает прислать команду раньше разрешения на следующий тик; сюда попадать не должны.
@@ -502,20 +507,18 @@ public static class LockstepClient
             }
             return;
         }
-        // Лечение расхождения (T-034, первая версия): тот же общий снимок, что при входе игрока.
-        // Просит его клиент, который держит сессию; не чаще раза в 10 секунд.
-        if (!IsSnapshotSender || state != State.InSession || (resyncClock.IsRunning && resyncClock.ElapsedMilliseconds < 10_000))
+        // Лечение расхождения (v4): общий снимок заказывает сам сервер, назначая отдающего; клиент только сообщает.
+        if (state != State.InSession || (resyncClock.IsRunning && resyncClock.ElapsedMilliseconds < 10_000))
         {
             return;
         }
         resyncClock.Restart();
         ResyncsStarted++;
-        TestAutomation.Note("lockstep: desync reported, requesting a common snapshot");
+        TestAutomation.Note("lockstep: desync reported, the server orders a common snapshot");
         if (Current.ProgramState == ProgramState.Playing)
         {
             Messages.Message("RWMLWC: игра разошлась между игроками — перезагружаем общий снимок", MessageTypeDefOf.CautionInput, false);
         }
-        RequestCommonSnapshot();
     }
 
     /// <summary>
@@ -548,18 +551,43 @@ public static class LockstepClient
         RequestSpeed(0);
         state = State.WaitingSnapshot;
         HashRecorder.Instance?.SuspendForSnapshotReload();
-        if (!IsSnapshotSender)
+        if (!IAmWorldSender(request))
         {
             TestAutomation.Note($"lockstep: player {request.PlayerId} asked for a snapshot at tick {tickManager.TicksGame}; waiting for it");
             TryLoadExpectedSnapshot(); // куски могли прийти раньше
             return;
         }
-        IConnection? conn = connection;
-        if (conn == null)
+        if (connection == null)
         {
             return;
         }
         byte[] packed = GameSnapshot.Take(out GameSnapshot.Stats stats);
+        int count = SendWorldChunks(expectedSnapshotId, packed, tickManager.TicksGame);
+        TestAutomation.Note($"lockstep: snapshot for player {request.PlayerId} at tick {tickManager.TicksGame}: {stats}, {count} chunks sent; reloading it here too");
+        // Отправитель загружает тот же снимок, что и остальные.
+        state = State.Loading;
+        gameLoadedPending = false;
+        GameSnapshot.Apply(packed);
+    }
+
+    /// <summary>
+    /// Отдаю ли мир по этой команде: v4 — номер в <c>Payload</c> (назначил сервер по пингу); без назначения
+    /// (сервер v3) — прежнее правило: хост сессии в игре или ключ теста.
+    /// </summary>
+    private static bool IAmWorldSender(CommandOrderedMessage command)
+    {
+        int? assigned = WorldSnapshotOrder.Sender(command.Payload);
+        return assigned.HasValue ? assigned.Value == PlayerId : IsSnapshotSender;
+    }
+
+    /// <summary>Куски мира на сервер (формат — байт <see cref="SnapshotFormat"/> и сжатый снимок). Возвращает число кусков.</summary>
+    private static int SendWorldChunks(int snapshotId, byte[] packed, int tick)
+    {
+        IConnection? conn = connection;
+        if (conn == null)
+        {
+            return 0;
+        }
         byte[] data = new byte[packed.Length + 1];
         data[0] = SnapshotFormat;
         Buffer.BlockCopy(packed, 0, data, 1, packed.Length);
@@ -572,19 +600,31 @@ public static class LockstepClient
             Buffer.BlockCopy(data, offset, part, 0, length);
             conn.Send(new SnapshotChunkMessage
             {
-                SnapshotId = expectedSnapshotId,
+                SnapshotId = snapshotId,
                 MapId = ProtocolIds.WorldMapId,
-                Tick = tickManager.TicksGame,
+                Tick = tick,
                 ChunkIndex = i,
                 ChunkCount = count,
                 Data = part,
             });
         }
-        TestAutomation.Note($"lockstep: snapshot for player {request.PlayerId} at tick {tickManager.TicksGame}: {stats}, {count} chunks sent; reloading it here too");
-        // Отправитель загружает тот же снимок, что и остальные.
-        state = State.Loading;
-        gameLoadedPending = false;
-        GameSnapshot.Apply(packed);
+        return count;
+    }
+
+    /// <summary>
+    /// v4, автосохранение: сервер поставил в общий порядок «сохранить мир». Отдающий снимает мир и шлёт серверу;
+    /// никто ничего не перезагружает, игра не останавливается.
+    /// </summary>
+    private static void SaveWorldForServer(CommandOrderedMessage command)
+    {
+        if (!IAmWorldSender(command))
+        {
+            return;
+        }
+        int tick = Find.TickManager.TicksGame;
+        byte[] packed = GameSnapshot.Take(out GameSnapshot.Stats stats);
+        int count = SendWorldChunks(WorldSnapshotOrder.SnapshotId(command.Seq), packed, tick);
+        TestAutomation.Note($"lockstep: autosave #{command.Seq} at tick {tick}: {stats}, {count} chunks sent to the server");
     }
 
     // Куски копятся при любом состоянии: отстающий клиент может получить их раньше, чем дойдёт до просьбы в общем порядке.
