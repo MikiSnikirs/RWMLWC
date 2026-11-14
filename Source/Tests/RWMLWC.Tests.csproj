@@ -15,7 +15,7 @@
     <!-- Тесты не зависят от клиента и файлов игры, поэтому идут в CI. -->
     <ProjectReference Include="../Shared/RWMLWC.Shared.csproj" />
     <ProjectReference Include="../Net/RWMLWC.Net.csproj" />
-    <!-- Сервер запускается тестом TST-012 отдельным процессом; ссылка только задаёт порядок сборки. -->
-    <ProjectReference Include="../Server/RWMLWC.Server.csproj" ReferenceOutputAssembly="false" />
+    <!-- Сервер: классы сессии для TST-013; TST-012 ещё и запускает его отдельным процессом. -->
+    <ProjectReference Include="../Server/RWMLWC.Server.csproj" />
   </ItemGroup>
 </Project>
