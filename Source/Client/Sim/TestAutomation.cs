@@ -65,6 +65,9 @@ public static class TestAutomation
     private static bool automationActive;
     // Шаги сценария, которые действуют как игрок: (тик, действие), по возрастанию тика.
     private static readonly Queue<(int tick, string name, Action act)> sessionSteps = new Queue<(int, string, Action)>();
+
+    // Дополнительное условие шага (по имени): шаг ждёт, пока условие не выполнится, даже если его тик уже наступил.
+    private static readonly Dictionary<string, Func<bool>> stepGates = new Dictionary<string, Func<bool>>();
     private static byte[]? snapshotToApply;
     private static bool snapshotDone;
     private static bool reloadPending;
@@ -276,19 +279,26 @@ public static class TestAutomation
         }
         activeConfig = cfg;
         sessionSteps.Clear();
+        stepGates.Clear();
         if (cfg.scenario == "access")
         {
             // T-033: c2 (issuer=0) занимает карту и выдаёт права; c1 (issuer=1) пробует действовать.
             if (cfg.issuer)
             {
                 sessionSteps.Enqueue((startTick + 500, "access: designate without rights", () => AccessTry("designate, no rights", ScenarioDesignate)));
-                sessionSteps.Enqueue((startTick + 900, "access: designate with Build", () => AccessTry("designate, Build", ScenarioDesignate)));
-                sessionSteps.Enqueue((startTick + 1000, "access: draft with Build", () => AccessTry("draft, Build", GizmoDraft)));
+                sessionSteps.Enqueue((startTick + 2000, "access: designate with Build", () => AccessTry("designate, Build", ScenarioDesignate)));
+                sessionSteps.Enqueue((startTick + 2100, "access: draft with Build", () => AccessTry("draft, Build", GizmoDraft)));
+                // Права приходят вне общего порядка команд, а клиенты идут по тикам не вровень.
+                // Поэтому шаг «с правами» ждёт не только своего тика, но и самих прав; выдача стоит
+                // с запасом в 1000 тиков после попытки «без прав» (в прогоне агента B отстающий c1
+                // получил права раньше, чем дошёл до своей первой попытки).
+                stepGates["access: designate with Build"] = () =>
+                    RWMLWC.Client.Maps.MapAccess.MyLevel((Find.CurrentMap ?? Find.Maps[0]).uniqueID) >= RWMLWC.Shared.Protocol.PermissionLevel.Build;
             }
             else
             {
                 sessionSteps.Enqueue((startTick + 300, "access: claim", AccessClaim));
-                sessionSteps.Enqueue((startTick + 700, "access: grant Build", AccessGrantBuild));
+                sessionSteps.Enqueue((startTick + 1500, "access: grant Build", AccessGrantBuild));
             }
         }
         if (cfg.issuer && cfg.scenario == "tabs")
@@ -441,6 +451,10 @@ public static class TestAutomation
     {
         WanderCamera();
         if (sessionSteps.Count == 0 || Current.Game == null || Find.TickManager.TicksGame < sessionSteps.Peek().tick)
+        {
+            return;
+        }
+        if (stepGates.TryGetValue(sessionSteps.Peek().name, out Func<bool>? gate) && !gate())
         {
             return;
         }
@@ -768,18 +782,39 @@ public static class TestAutomation
     private static void DesyncBreak()
     {
         Map map = Find.CurrentMap ?? Find.Maps[0];
-        // Одно лишнее число из Rand карты: со следующего хеша поле rand у этого клиента другое.
-        MapRandContext.BeginTick();
-        try
+        MapSimState? sim = MapSimState.For(map);
+        MapStateHash before = MapStateHasher.Compute(map);
+
+        // Порча в двух независимых местах, оба входят в хеш карты:
+        //  1) счётчик Rand карты сдвигается на единицу прямо в её сохранённом состоянии;
+        //  2) у одной постройки отнимается единица прочности.
+        // Первая версия брала лишнее число через Rand.Value между тиками, и хеши у клиентов
+        // остались одинаковыми (прогон TST-034 у агента B) — причина не найдена, поэтому теперь
+        // состояние меняется напрямую, а в журнал пишутся хеши до и после.
+        if (sim != null)
         {
-            MapRandContext.Enter(map);
-            float wasted = Rand.Value;
-            Note($"desync: took one extra Rand value on map {map.uniqueID} at tick {Find.TickManager.TicksGame} ({wasted})");
+            if (!sim.randInitialized)
+            {
+                sim.randState = sim.InitialRandState();
+                sim.randInitialized = true;
+            }
+            unchecked
+            {
+                sim.randState += 1UL << 32;
+            }
         }
-        finally
+        Thing? victim = map.listerThings.AllThings
+            .Where(t => t.def.category == ThingCategory.Building && t.def.useHitPoints && t.HitPoints > 1)
+            .OrderBy(t => t.thingIDNumber)
+            .FirstOrDefault();
+        if (victim != null)
         {
-            MapRandContext.EndTick();
+            victim.HitPoints -= 1;
         }
+
+        MapStateHash after = MapStateHasher.Compute(map);
+        Note($"desync: broke map {map.uniqueID} at tick {Find.TickManager.TicksGame}: rand {before.rand:X16} -> {after.rand:X16}, "
+            + $"victim {(victim != null ? victim.ThingID : "none")}, total {before.total:X16} -> {after.total:X16}, changed={before.total != after.total}");
     }
 
     // --- сценарий gizmo (T-021): нажатия кнопок выделенных объектов, приказ атаки, меню ---

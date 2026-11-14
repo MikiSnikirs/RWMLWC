@@ -179,7 +179,22 @@ public static class MapStateHasher
     //
     // Поворот пешек входит: при включённой раздельной симуляции он обновляется по тикам
     // (см. TickDrivenRotation), а не по кадрам, как в игре.
-    internal static int StableRotation(Thing t) => t.def.randomizeRotationOnSpawn ? 0 : t.Rotation.AsInt;
+    //
+    // У двери 1×1 поворот ставит отрисовка (Building_Door.DoorPreDraw), то есть он меняется в тот кадр,
+    // когда дверь впервые попала в камеру игрока. На симуляцию он не влияет (стены вокруг двери
+    // проверяются только у больших дверей), поэтому в хеш идёт 0. Найдено агентом B (TST-018 с камерой).
+    internal static int StableRotation(Thing t)
+    {
+        if (t.def.randomizeRotationOnSpawn)
+        {
+            return 0;
+        }
+        if (t is RimWorld.Building_Door && t.def.size == IntVec2.One)
+        {
+            return 0;
+        }
+        return t.Rotation.AsInt;
+    }
 
     /// <summary>
     /// Диагностика: дописывает строки о вещах, у которых поворот изменился с прошлого вызова.
