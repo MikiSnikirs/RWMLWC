@@ -114,6 +114,7 @@ internal static class NetTestHarness
 
     private static async Task HostAsync()
     {
+        Write(await SteamNet.WaitForRelayAsync(TimeSpan.FromSeconds(30)));
         var (server, thumb) = await StartEchoServerAsync();
         var bridge = new SteamBridge("127.0.0.1", server.LocalEndPoint.Port, thumb, Write);
         // Слушающий сокет открываем в главном потоке.
@@ -129,9 +130,22 @@ internal static class NetTestHarness
 
     private static async Task JoinAsync(ulong host)
     {
-        Write($"подключаюсь к {host} через Steam...");
+        Write(await SteamNet.WaitForRelayAsync(TimeSpan.FromSeconds(30)));
         var sw = Stopwatch.StartNew();
-        SteamConnection c1 = await SteamNet.ConnectAsync(host, TimeSpan.FromSeconds(60));
+        SteamConnection? c1 = null;
+        for (int attempt = 1; c1 == null; attempt++)
+        {
+            Write($"подключаюсь к хосту через Steam, попытка {attempt}...");
+            try
+            {
+                c1 = await SteamNet.ConnectAsync(host, TimeSpan.FromSeconds(60));
+            }
+            catch (Exception e) when (attempt < 10)
+            {
+                Write($"попытка {attempt} не удалась: {e.Message}");
+                await Task.Delay(5000);
+            }
+        }
         Write($"соединение установлено за {sw.ElapsedMilliseconds} мс");
         await RunChecksAsync(c1, "join");
         c1.Close("проверка переподключения");
