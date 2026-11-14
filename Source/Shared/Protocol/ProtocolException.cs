@@ -26,4 +26,10 @@ public static class ProtocolLimits
 
     /// <summary>Максимум частей хеша карты в одном сообщении.</summary>
     public const int MaxHashParts = 256;
+
+    /// <summary>Карт в таблице прав (в игре не больше 127).</summary>
+    public const int MaxMaps = 128;
+
+    /// <summary>Выданных прав на одну карту.</summary>
+    public const int MaxGrantsPerMap = 32;
 }
