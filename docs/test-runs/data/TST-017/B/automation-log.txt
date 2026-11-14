@@ -1,0 +1,15 @@
+2026-11-14 06:45:16 autoload: loading save 'Поселение5'
+2026-11-14 06:45:26 run started: #0, tick=14998, scenario=none, ticks=10000, trace=True, quit=True, file=hash-20261114-064526.txt
+2026-11-14 06:47:37 run finished: file=hash-20261114-064526.txt
+2026-11-14 06:47:37 queue: restarting game for run #1 (raid)
+2026-11-14 06:47:52 autoload: loading save 'Поселение5'
+2026-11-14 06:48:01 run started: #1, tick=14998, scenario=raid, ticks=10000, trace=True, quit=True, file=hash-20261114-064801.txt
+2026-11-14 06:48:01 scenario raid: executed=True, faction=Ошойван
+2026-11-14 06:49:47 run finished: file=hash-20261114-064801.txt
+2026-11-14 06:49:47 queue: restarting game for run #2 (twomaps)
+2026-11-14 06:50:01 autoload: loading save 'Поселение5'
+2026-11-14 06:50:11 run started: #2, tick=14998, scenario=twomaps, ticks=10000, trace=True, quit=True, file=hash-20261114-065011.txt
+2026-11-14 06:50:20 scenario twomaps: tile=108263,0, new map id=1, frozen=False, maps now=2
+2026-11-14 06:50:39 run finished: file=hash-20261114-065011.txt
+2026-11-14 06:50:39 queue: finished
+2026-11-14 06:50:39 quitting game
