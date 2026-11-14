@@ -9,12 +9,22 @@ public struct MapStateHash
     public int thingCount;
     public int pawnCount;
     public ulong things;
+
+    // Части хеша вещей по отдельным свойствам: показывают, какое именно свойство разошлось.
+    public ulong thingIds;
+    public ulong thingDefs;
+    public ulong thingPos;
+    public ulong thingRot;
+    public ulong thingStack;
+    public ulong thingHp;
+
     public ulong pawns;
     public ulong rand;
     public ulong total;
 
     public override string ToString() =>
-        $"things={things:X16};pawns={pawns:X16};rand={rand:X16};total={total:X16};nThings={thingCount};nPawns={pawnCount}";
+        $"things={things:X16};pawns={pawns:X16};rand={rand:X16};total={total:X16};nThings={thingCount};nPawns={pawnCount}"
+        + $";tId={thingIds:X16};tDef={thingDefs:X16};tPos={thingPos:X16};tRot={thingRot:X16};tStack={thingStack:X16};tHp={thingHp:X16}";
 }
 
 /// <summary>
@@ -37,20 +47,42 @@ public static class MapStateHasher
         tmpThings.AddRange(map.listerThings.AllThings);
         tmpThings.Sort(CompareThings);
         Fnv64 th = Fnv64.Create();
+        Fnv64 hId = Fnv64.Create();
+        Fnv64 hDef = Fnv64.Create();
+        Fnv64 hPos = Fnv64.Create();
+        Fnv64 hRot = Fnv64.Create();
+        Fnv64 hStack = Fnv64.Create();
+        Fnv64 hHp = Fnv64.Create();
         for (int i = 0; i < tmpThings.Count; i++)
         {
             Thing t = tmpThings[i];
-            th.Add(t.thingIDNumber);
-            th.Add((int)t.def.shortHash);
             IntVec3 pos = t.Position;
+            int def = t.def.shortHash;
+            int rot = t.Rotation.AsInt;
+            int hp = t.HitPoints;
+            th.Add(t.thingIDNumber);
+            th.Add(def);
             th.Add(pos.x);
             th.Add(pos.z);
-            th.Add(t.Rotation.AsInt);
+            th.Add(rot);
             th.Add(t.stackCount);
-            th.Add(t.HitPoints);
+            th.Add(hp);
+            hId.Add(t.thingIDNumber);
+            hDef.Add(def);
+            hPos.Add(pos.x);
+            hPos.Add(pos.z);
+            hRot.Add(rot);
+            hStack.Add(t.stackCount);
+            hHp.Add(hp);
         }
         result.thingCount = tmpThings.Count;
         result.things = th.Value;
+        result.thingIds = hId.Value;
+        result.thingDefs = hDef.Value;
+        result.thingPos = hPos.Value;
+        result.thingRot = hRot.Value;
+        result.thingStack = hStack.Value;
+        result.thingHp = hHp.Value;
         tmpThings.Clear();
 
         // Пешки: дополнительно то, что меняется каждый тик.
@@ -105,6 +137,29 @@ public static class MapStateHasher
         total.Add(result.rand);
         result.total = total.Value;
         return result;
+    }
+
+    /// <summary>
+    /// Построчный список вещей карты для сравнения двух запусков: номер;тип;x;z;поворот;стопка;прочность.
+    /// </summary>
+    public static void DumpThings(Map map, System.Text.StringBuilder sb)
+    {
+        tmpThings.Clear();
+        tmpThings.AddRange(map.listerThings.AllThings);
+        tmpThings.Sort(CompareThings);
+        for (int i = 0; i < tmpThings.Count; i++)
+        {
+            Thing t = tmpThings[i];
+            IntVec3 pos = t.Position;
+            sb.Append(t.thingIDNumber).Append(';')
+              .Append(t.def.defName).Append(';')
+              .Append(pos.x).Append(';')
+              .Append(pos.z).Append(';')
+              .Append(t.Rotation.AsInt).Append(';')
+              .Append(t.stackCount).Append(';')
+              .Append(t.HitPoints).Append('\n');
+        }
+        tmpThings.Clear();
     }
 
     private static int CompareThings(Thing a, Thing b) => a.thingIDNumber.CompareTo(b.thingIDNumber);
