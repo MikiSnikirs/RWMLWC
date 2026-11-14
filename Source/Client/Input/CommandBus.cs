@@ -36,6 +36,9 @@ public static class CommandKinds
 
     /// <summary>Изменение отрядов: создать, переименовать, удалить, участники, перевод пешек (T-060).</summary>
     public const int SquadEdit = 9;
+
+    /// <summary>Режим отсутствия карты: стазис, автопилот, управляющий (T-072).</summary>
+    public const int AbsenceMode = 10;
 }
 
 /// <summary>
@@ -210,6 +213,9 @@ public static class CommandBus
                     break;
                 case CommandKinds.SquadEdit:
                     RWMLWC.Client.Maps.Squads.Execute(map, ref reader);
+                    break;
+                case CommandKinds.AbsenceMode:
+                    RWMLWC.Client.Maps.AbsenceModes.Execute(map, ref reader);
                     break;
                 default:
                     Failed++;
