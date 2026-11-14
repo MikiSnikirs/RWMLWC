@@ -32,4 +32,23 @@ public static class ProtocolLimits
 
     /// <summary>Выданных прав на одну карту.</summary>
     public const int MaxGrantsPerMap = 32;
+
+    /// <summary>Игроков в списке состава сессии (вместе с ушедшими).</summary>
+    public const int MaxPlayersInList = 256;
+
+    /// <summary>Не чаще одного <c>Notice Desync</c> на карту за столько тиков.</summary>
+    public const int DesyncNoticeIntervalTicks = 600;
+
+    /// <summary>Длина сообщения чата в символах; длиннее — сервер обрезает.</summary>
+    public const int MaxChatChars = 500;
+
+    /// <summary>Не больше стольких сообщений чата от игрока за <see cref="ChatWindowMs"/>; лишние сервер отбрасывает.</summary>
+    public const int MaxChatPerWindow = 5;
+    public const int ChatWindowMs = 5000;
+
+    /// <summary>Сервер шлёт <c>Ping</c> каждому игроку раз в столько мс.</summary>
+    public const int PingIntervalMs = 1000;
+
+    /// <summary>Не чаще раза в столько мс сервер рассылает <c>Players</c> из-за изменения пинга.</summary>
+    public const int PlayersRefreshMs = 2000;
 }
