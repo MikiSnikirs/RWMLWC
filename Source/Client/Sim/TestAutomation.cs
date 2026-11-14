@@ -249,6 +249,14 @@ public static class TestAutomation
         }
         activeConfig = cfg;
         sessionSteps.Clear();
+        if (cfg.issuer && cfg.scenario == "rightclick")
+        {
+            sessionSteps.Enqueue((startTick + 300, "rightclick: draft", GizmoDraft));
+            sessionSteps.Enqueue((startTick + 400, "rightclick: move", RightClickMove));
+            sessionSteps.Enqueue((startTick + 600, "rightclick: undraft", GizmoDraft));
+            sessionSteps.Enqueue((startTick + 700, "rightclick: item", RightClickItem));
+            sessionSteps.Enqueue((startTick + 800, "rightclick: menu option", GizmoMenuOption));
+        }
         if (cfg.issuer && cfg.scenario == "designate")
         {
             sessionSteps.Enqueue((startTick + 300, "designate", ScenarioDesignate));
@@ -305,6 +313,7 @@ public static class TestAutomation
                     break;
                 case "designate":
                 case "gizmo":
+                case "rightclick":
                     break; // срабатывают позже, из кадра (SessionFrame): приказы идут как ввод игрока
                 case "snap-save":
                 case "snap-reload":
@@ -419,6 +428,50 @@ public static class TestAutomation
         Note($"gizmo: plant menu of zone {zone.ID} ({((Zone_Growing)zone).GetPlantDefToGrow()?.defName}): sent={sent}");
     }
 
+    // --- сценарий rightclick (T-022): правый щелчок по карте ---
+
+    private static void RightClickMove()
+    {
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        Pawn? pawn = gizmoPawn;
+        if (pawn == null || !pawn.Spawned)
+        {
+            Note("rightclick: move: no pawn");
+            return;
+        }
+        SelectOnly(pawn);
+        IntVec3 cell = CellFinder.StandableCellNear(pawn.Position + new IntVec3(4, 0, 4), map, 5f);
+        if (!cell.IsValid)
+        {
+            Note("rightclick: move: no standable cell");
+            return;
+        }
+        MapClickCommands.Send(map, cell.ToVector3Shifted());
+        Note($"rightclick: move {pawn.LabelShort} from {pawn.Position} to {cell}, drafted={pawn.Drafted}: sent");
+    }
+
+    private static void RightClickItem()
+    {
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        Pawn? pawn = gizmoPawn;
+        if (pawn == null || !pawn.Spawned)
+        {
+            Note("rightclick: item: no pawn");
+            return;
+        }
+        Thing? item = map.listerThings.ThingsInGroup(ThingRequestGroup.HaulableEver)
+            .Where(t => t.Spawned && !t.Fogged() && !t.IsForbidden(Faction.OfPlayer))
+            .OrderBy(t => t.Position.DistanceToSquared(pawn.Position)).ThenBy(t => t.thingIDNumber).FirstOrDefault();
+        if (item == null)
+        {
+            Note("rightclick: item: no item");
+            return;
+        }
+        SelectOnly(pawn);
+        MapClickCommands.Send(map, item.Position.ToVector3Shifted());
+        Note($"rightclick: item {item.LabelShort} (id {item.thingIDNumber}) at {item.Position} for {pawn.LabelShort}, drafted={pawn.Drafted}: sent");
+    }
+
     private static void GizmoMenuOption()
     {
         Map map = Find.CurrentMap ?? Find.Maps[0];
@@ -479,6 +532,9 @@ public static class TestAutomation
             string plants = string.Join(",", map.zoneManager.AllZones.Where(z => z is Zone_Growing).OrderBy(z => z.ID)
                 .Select(z => ((Zone_Growing)z).GetPlantDefToGrow()?.defName ?? "-"));
             Note($"summary: map{map.uniqueID} drafted={map.mapPawns.FreeColonistsSpawned.Count(p => p.Drafted)} forbidden={map.listerThings.ThingsInGroup(ThingRequestGroup.HaulableEver).Count(t => t.IsForbidden(Faction.OfPlayer))} plants=[{plants}]");
+            string jobs = string.Join(",", map.mapPawns.FreeColonistsSpawned.OrderBy(p => p.thingIDNumber)
+                .Select(p => p.thingIDNumber + ":" + (p.CurJobDef != null ? p.CurJobDef.defName : "-") + "@" + p.Position));
+            Note($"summary: map{map.uniqueID} jobs=[{jobs}]");
             Note($"summary: map{map.uniqueID} designations={map.designationManager.AllDesignations.Count} blueprints={map.listerThings.ThingsInGroup(ThingRequestGroup.Blueprint).Count} zones={map.zoneManager.AllZones.Count}; commands sent={LockstepClient.CommandsSent} executed={CommandBus.Executed} failed={CommandBus.Failed}");
         }
     }
