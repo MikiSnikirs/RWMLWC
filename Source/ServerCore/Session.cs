@@ -327,7 +327,7 @@ public sealed class Session
             (reason, reject) = (RejectReason.ProtocolMismatch, $"версия протокола клиента {hello.ProtocolVersion}, сервера {ProtocolInfo.ProtocolVersion}");
         else if (hello.ModId != ProtocolInfo.ModId)
             (reason, reject) = (RejectReason.ModMismatch, "чужой мод: " + hello.ModId);
-        else if (!string.IsNullOrEmpty(_options.Password) && hello.Password != _options.Password)
+        else if (!string.IsNullOrEmpty(_options.Password) && !PasswordMatches(hello.Password, _options.Password))
             (reason, reject) = (RejectReason.WrongPassword, string.IsNullOrEmpty(hello.Password) ? "на сервере пароль — укажите его" : "неверный пароль");
         else if (string.IsNullOrWhiteSpace(hello.PlayerName))
             (reason, reject) = (RejectReason.Other, "пустое имя игрока");
@@ -982,6 +982,14 @@ public sealed class Session
         }
         Speed = any ? speed : (byte)0;
         if (Speed == 0) _tickAccumulator = 0;
+    }
+
+    /// <summary>Сравнение пароля за постоянное время (не выдаёт по времени ответа, сколько символов совпало).</summary>
+    private static bool PasswordMatches(string? given, string expected)
+    {
+        byte[] a = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(given ?? ""));
+        byte[] b = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(expected));
+        return System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(a, b);
     }
 
     // ---- тревога (T-040) ----
