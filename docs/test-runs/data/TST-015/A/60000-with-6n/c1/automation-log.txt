@@ -1,0 +1,14 @@
+2026-11-14 19:44:16 autoload: loading save 'tst014'
+2026-11-14 19:44:24 lockstep: connecting to 127.0.0.1:63854 as 'c1'
+2026-11-14 19:44:25 lockstep: connected to quic:127.0.0.1:63854, Hello sent
+2026-11-14 19:44:26 lockstep: Welcome, playerId=1, serverTick=14998, seed=7
+2026-11-14 19:45:26 run started: #0, tick=14998, scenario=none, ticks=60000, trace=False, quit=True, file=hash-c1-20261114-194526.txt
+2026-11-14 19:48:12 summary: map0 drafted=0 forbidden=57 plants=[]
+2026-11-14 19:48:12 summary: map0 jobs=[231:GotoWander@(177, 0, 131),234:Wait_Wander@(204, 0, 131),239:Wait_Wander@(145, 0, 129)]
+2026-11-14 19:48:12 summary: map0 settings=29B89D30A34E3B1A
+2026-11-14 19:48:12 summary: squads= rejected=0 drafted=[]
+2026-11-14 19:48:12 summary: map0 designations=0 blueprints=0 zones=0; commands sent=0 executed=0 failed=0
+2026-11-14 19:48:12 run finished: file=hash-c1-20261114-194526.txt
+2026-11-14 19:48:12 queue: finished
+2026-11-14 19:48:12 lockstep: disconnect: прогон завершён
+2026-11-14 19:48:12 quitting game
