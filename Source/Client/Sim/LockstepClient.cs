@@ -74,6 +74,8 @@ public static class LockstepClient
     private static bool snapshotRequestSeen;
     private static readonly Dictionary<int, byte[]?[]> incomingSnapshots = new Dictionary<int, byte[]?[]>();
     private static bool gameLoadedPending;
+    private static bool forcePauseActive;
+    private static int speedBeforeForcePause;
 
     /// <summary>Для тестов с отдельным сервером: этот клиент отдаёт снимок (в обычной игре — тот, кто держит сессию).</summary>
     public static bool ForceSnapshotSender;
@@ -147,6 +149,7 @@ public static class LockstepClient
         snapshotRequestSeen = false;
         incomingSnapshots.Clear();
         gameLoadedPending = false;
+        forcePauseActive = false;
         MapAccess.Reset();
         connecting = connectingTask;
         state = State.Connecting;
@@ -280,6 +283,23 @@ public static class LockstepClient
 
         if (state == State.InSession && tickManager != null)
         {
+            // Окно, которое в одиночной игре останавливает время (торговля, выбор в письме, меню),
+            // в сессии просит паузу у сервера — для всех; закрылось — возвращаем прежнюю скорость.
+            bool forcePaused = tickManager.ForcePaused;
+            if (forcePaused && !forcePauseActive)
+            {
+                forcePauseActive = true;
+                speedBeforeForcePause = sentSpeed;
+                RequestSpeed(0);
+            }
+            else if (!forcePaused && forcePauseActive)
+            {
+                forcePauseActive = false;
+                if (speedBeforeForcePause > 0)
+                {
+                    RequestSpeed(speedBeforeForcePause);
+                }
+            }
             TestAutomation.SessionFrame();
             if (heldSpeed >= 0 && !Holding)
             {
