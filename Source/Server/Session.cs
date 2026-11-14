@@ -20,6 +20,12 @@ public sealed class SessionOptions
     public TimeSpan HelloTimeout = TimeSpan.FromSeconds(10);
 
     public int MaxPlayers = 8;
+
+    /// <summary>Хранилище сейвов (T-044); null — сервер копии мира не хранит.</summary>
+    public SaveStore? Store;
+
+    /// <summary>Предел размера одного собираемого снимка мира.</summary>
+    public long MaxSnapshotBytes = 512L * 1024 * 1024;
 }
 
 /// <summary>
@@ -43,6 +49,14 @@ public sealed class Session
     private readonly List<Player> _players = new();
     private readonly Dictionary<(int map, int tick), (int playerId, MapHashMessage hash)> _hashes = new();
     private readonly Action<string> _log;
+    // Права по картам (T-031). Номер игрока постоянен в сессии (возврат по имени), поэтому храним номера.
+    private readonly SortedDictionary<int, MapRights> _maps = new();
+
+    private sealed class MapRights
+    {
+        public int Owner;
+        public readonly SortedDictionary<int, PermissionLevel> Grants = new();
+    }
     private int _nextPlayerId = 1;
     private long _nextSeq = 1;
     private double _tickAccumulator;
@@ -53,6 +67,29 @@ public sealed class Session
         _options = options;
         _log = log ?? (_ => { });
         TickUpTo = options.StartTick;
+        SaveCopy? latest = options.Store?.Latest;
+        if (latest != null)
+        {
+            SaveWorldId = latest.WorldId;
+            SaveTick = latest.Tick;
+        }
+    }
+
+    /// <summary>Мир последней копии на сервере; 0 — копии нет.</summary>
+    public ulong SaveWorldId { get; private set; }
+
+    /// <summary>Тик последней копии на сервере; 0 — копии нет.</summary>
+    public int SaveTick { get; private set; }
+
+    // Сборка снимков мира из кусков: (игрок, номер снимка) → куски.
+    private readonly Dictionary<(int player, int snapshot), SnapshotAssembly> _assemblies = new();
+
+    private sealed class SnapshotAssembly
+    {
+        public required int Tick;
+        public required byte[]?[] Chunks;
+        public long Bytes;
+        public int Received;
     }
 
     /// <summary>
@@ -85,6 +122,10 @@ public sealed class Session
 
         /// <summary>Скорость, выбранная игроком. Новый игрок держит паузу, пока не пришлёт <c>SpeedRequest</c>.</summary>
         public byte RequestedSpeed { get; internal set; }
+
+        /// <summary>Мир и тик локальной копии сейва, о которых игрок сообщил в <c>Hello</c>.</summary>
+        public ulong SaveWorldId { get; internal set; }
+        public int SaveTick { get; internal set; }
     }
 
     private sealed class Pending
@@ -197,7 +238,18 @@ public sealed class Session
             _log($"вошёл игрок {player.Id} «{player.Name}» ({connection.Remote})");
         }
 
-        connection.Send(new WelcomeMessage { PlayerId = player.Id, ServerTick = TickUpTo, SessionSeed = _options.SessionSeed });
+        player.SaveWorldId = hello.SaveWorldId;
+        player.SaveTick = hello.SaveTick;
+        connection.Send(new WelcomeMessage
+        {
+            PlayerId = player.Id,
+            ServerTick = TickUpTo,
+            SessionSeed = _options.SessionSeed,
+            SaveWorldId = SaveWorldId,
+            SaveTick = SaveTick,
+        });
+        connection.Send(BuildPermissions());
+        CheckSaveVersion(player);
         // Новому игроку — текущее разрешение, остальным — новая скорость (новый игрок держит паузу).
         connection.Send(new TickMessage { TickUpTo = TickUpTo, Speed = Speed });
         UpdateSpeed();
@@ -211,6 +263,13 @@ public sealed class Session
         switch (m)
         {
             case CommandMessage c:
+                PermissionLevel had = LevelOf(player.Id, c.MapId);
+                if (had < c.Required)
+                {
+                    _log($"отклонена команда игрока {player.Id} #{c.ClientSeq} на карте {c.MapId}: нужно {c.Required}, есть {had}");
+                    player.Connection.Send(new CommandRejectedMessage { ClientSeq = c.ClientSeq, MapId = c.MapId, Required = c.Required, Had = had });
+                    break;
+                }
                 // Исполняется всеми после тика TickUpTo: ни один клиент ещё не ушёл дальше него,
                 // а Tick с большим номером будет разослан только после этой команды.
                 Broadcast(new CommandOrderedMessage
@@ -225,6 +284,19 @@ public sealed class Session
                 });
                 break;
 
+            case MapClaimMessage claim:
+                Claim(player, claim.MapId);
+                break;
+
+            case GrantPermissionMessage grant:
+                Grant(player, grant);
+                break;
+
+            case SnapshotAppliedMessage applied:
+                // Поток «снимок → все загружают → все подтвердили → тики дальше» — T-032/T-034/T-045.
+                _log($"игрок {player.Id}: снимок {applied.SnapshotId} применён, тик {applied.Tick}");
+                break;
+
             case SpeedRequestMessage s:
                 player.RequestedSpeed = Math.Min(s.Speed, (byte)4);
                 UpdateSpeed();
@@ -235,9 +307,11 @@ public sealed class Session
                 break;
 
             case SnapshotChunkMessage chunk:
-                // Пересылка снимка остальным; кому и когда — уточнят T-030/T-034.
+                // Пересылка снимка остальным; кому и когда — уточнят T-032/T-034/T-045.
                 foreach (Player other in _players)
                     if (other != player && other.Online) other.Connection.Send(chunk);
+                if (chunk.MapId == ProtocolIds.WorldMapId && _options.Store != null)
+                    CollectWorldSnapshot(player, chunk);
                 break;
 
             default:
@@ -263,6 +337,150 @@ public sealed class Session
             _log($"РАСХОЖДЕНИЕ карта {h.MapId} тик {h.Tick}: игрок {first.playerId} {first.hash.Total:X16}, игрок {player.Id} {h.Total:X16}");
             Desync?.Invoke(first.hash, first.playerId, h, player.Id);
         }
+    }
+
+    /// <summary>
+    /// Защита от запуска со старой копии (T-044): если у игрока копия того же мира с бо́льшим тиком,
+    /// сервер, вероятно, поднят со старого сейва — предупреждаем всех и пишем в лог. Соединение не рвём.
+    /// </summary>
+    private void CheckSaveVersion(Player player)
+    {
+        if (player.SaveWorldId == 0 || SaveWorldId == 0) return;
+        if (player.SaveWorldId != SaveWorldId)
+        {
+            string t = $"У игрока «{player.Name}» сейв другого мира ({player.SaveWorldId:X16}), на сервере — {SaveWorldId:X16}.";
+            _log("ВНИМАНИЕ: " + t);
+            player.Connection.Send(new NoticeMessage { Code = NoticeCode.DifferentWorld, Text = t });
+            return;
+        }
+        if (player.SaveTick > SaveTick)
+        {
+            string t = $"У игрока «{player.Name}» копия сейва новее, чем на сервере (тик {player.SaveTick} против {SaveTick}). " +
+                       "Похоже, сервер запущен со старой копии — продолжать с неё значит потерять прогресс.";
+            _log("ВНИМАНИЕ: " + t);
+            Broadcast(new NoticeMessage { Code = NoticeCode.NewerSaveOnClient, Text = t });
+        }
+    }
+
+    private void CollectWorldSnapshot(Player player, SnapshotChunkMessage chunk)
+    {
+        var key = (player.Id, chunk.SnapshotId);
+        if (!_assemblies.TryGetValue(key, out SnapshotAssembly? a))
+        {
+            if (chunk.ChunkCount > 65536) { _log($"игрок {player.Id}: снимок {chunk.SnapshotId} — слишком много кусков"); return; }
+            a = new SnapshotAssembly { Tick = chunk.Tick, Chunks = new byte[]?[chunk.ChunkCount] };
+            _assemblies[key] = a;
+        }
+        if (chunk.ChunkCount != a.Chunks.Length || chunk.Tick != a.Tick || a.Chunks[chunk.ChunkIndex] != null)
+        {
+            _log($"игрок {player.Id}: снимок {chunk.SnapshotId} — несогласованные куски, сборка сброшена");
+            _assemblies.Remove(key);
+            return;
+        }
+        a.Bytes += chunk.Data.Length;
+        if (a.Bytes > _options.MaxSnapshotBytes)
+        {
+            _log($"игрок {player.Id}: снимок {chunk.SnapshotId} больше {_options.MaxSnapshotBytes} байт, отброшен");
+            _assemblies.Remove(key);
+            return;
+        }
+        a.Chunks[chunk.ChunkIndex] = chunk.Data;
+        if (++a.Received < a.Chunks.Length) return;
+
+        _assemblies.Remove(key);
+        byte[] data = new byte[a.Bytes];
+        int offset = 0;
+        foreach (byte[]? part in a.Chunks)
+        {
+            Buffer.BlockCopy(part!, 0, data, offset, part!.Length);
+            offset += part.Length;
+        }
+        if (player.SaveWorldId == 0)
+        {
+            _log($"игрок {player.Id}: снимок мира без идентификатора мира (SaveWorldId = 0 в Hello) — не сохранён");
+            return;
+        }
+        try
+        {
+            SaveCopy copy = _options.Store!.Store(player.SaveWorldId, a.Tick, data);
+            SaveWorldId = copy.WorldId;
+            SaveTick = copy.Tick;
+            _log($"сохранена копия мира {copy.WorldId:X16}, тик {copy.Tick}, {copy.Size} байт, sha256 {copy.Sha256[..16]}");
+        }
+        catch (Exception e)
+        {
+            _log($"игрок {player.Id}: копия мира не сохранена: {e.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Уровень прав игрока на карте: мир и карта без владельца — полный для всех; владелец — полный;
+    /// остальные — выданный владельцем уровень или «нет доступа».
+    /// </summary>
+    public PermissionLevel LevelOf(int playerId, int mapId)
+    {
+        if (mapId == ProtocolIds.WorldMapId || !_maps.TryGetValue(mapId, out MapRights? rights)) return PermissionLevel.Full;
+        if (rights.Owner == playerId) return PermissionLevel.Full;
+        return rights.Grants.TryGetValue(playerId, out PermissionLevel level) ? level : PermissionLevel.None;
+    }
+
+    /// <summary>Владелец карты или 0, если карта свободна.</summary>
+    public int OwnerOf(int mapId) => _maps.TryGetValue(mapId, out MapRights? r) ? r.Owner : 0;
+
+    private void Claim(Player player, int mapId)
+    {
+        if (mapId == ProtocolIds.WorldMapId)
+        {
+            _log($"игрок {player.Id}: заявка на мир как на карту — отклонена");
+            return;
+        }
+        if (_maps.TryGetValue(mapId, out MapRights? existing))
+        {
+            if (existing.Owner != player.Id)
+                _log($"игрок {player.Id}: карта {mapId} уже принадлежит игроку {existing.Owner} — заявка отклонена");
+            player.Connection.Send(BuildPermissions());
+            return;
+        }
+        if (_maps.Count >= ProtocolLimits.MaxMaps)
+        {
+            _log($"игрок {player.Id}: заявка на карту {mapId} — достигнут предел карт");
+            return;
+        }
+        _maps[mapId] = new MapRights { Owner = player.Id };
+        _log($"карта {mapId} принадлежит игроку {player.Id} «{player.Name}»");
+        Broadcast(BuildPermissions());
+    }
+
+    private void Grant(Player player, GrantPermissionMessage g)
+    {
+        if (!_maps.TryGetValue(g.MapId, out MapRights? rights) || rights.Owner != player.Id)
+        {
+            _log($"игрок {player.Id}: выдача прав на карту {g.MapId} — не владелец, отклонено");
+            player.Connection.Send(BuildPermissions());
+            return;
+        }
+        if (g.PlayerId == player.Id || _players.All(p => p.Id != g.PlayerId))
+        {
+            _log($"игрок {player.Id}: выдача прав на карту {g.MapId} игроку {g.PlayerId} — нет такого игрока или это владелец");
+            return;
+        }
+        if (g.Level == PermissionLevel.None) rights.Grants.Remove(g.PlayerId);
+        else if (rights.Grants.Count < ProtocolLimits.MaxGrantsPerMap || rights.Grants.ContainsKey(g.PlayerId)) rights.Grants[g.PlayerId] = g.Level;
+        else return;
+        _log($"карта {g.MapId}: игрок {g.PlayerId} — {g.Level}");
+        Broadcast(BuildPermissions());
+    }
+
+    private PermissionsMessage BuildPermissions()
+    {
+        var msg = new PermissionsMessage();
+        foreach (var (mapId, rights) in _maps)
+        {
+            var m = new MapPermissions { MapId = mapId, OwnerPlayerId = rights.Owner };
+            foreach (var (pid, level) in rights.Grants) m.Grants.Add(new PermissionGrant(pid, level));
+            msg.Maps.Add(m);
+        }
+        return msg;
     }
 
     /// <summary>Правило меньшей скорости: игра идёт на минимальной из скоростей игроков в сети; пауза любого — пауза всех.</summary>
