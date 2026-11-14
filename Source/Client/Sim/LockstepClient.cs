@@ -99,7 +99,11 @@ public static class LockstepClient
     /// </summary>
     public static int HoldSeconds;
 
-    private static bool Holding => HoldSeconds > 0 && holdClock.IsRunning && holdClock.ElapsedMilliseconds < HoldSeconds * 1000L;
+    /// <summary>Тест двух машин: держать паузу, пока в сети не окажется столько игроков (0 — не ждать), но не дольше HoldSeconds.</summary>
+    public static int HoldUntilPlayers;
+
+    private static bool Holding => HoldSeconds > 0 && holdClock.IsRunning && holdClock.ElapsedMilliseconds < HoldSeconds * 1000L
+        && (HoldUntilPlayers <= 0 || System.Linq.Enumerable.Count(RWMLWC.Client.SessionView.SessionUi.Players, p => p.Online) < HoldUntilPlayers);
 
     private static readonly AccessTools.FieldRef<TickManager, int> ticksThisFrameRef =
         AccessTools.FieldRefAccess<TickManager, int>("ticksThisFrame");
