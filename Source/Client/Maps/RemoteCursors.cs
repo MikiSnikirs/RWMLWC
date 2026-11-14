@@ -16,6 +16,7 @@ namespace RWMLWC.Client.Maps;
 ///  - чужие (SessionUi.Cursors) рисуются на открытой карте стрелкой курсора игры в цвете игрока с именем под ней;
 ///    курсор, не обновлявшийся 3 секунды, не рисуется.
 /// </summary>
+[StaticConstructorOnStartup]
 public static class RemoteCursors
 {
     private const float HideAfterSeconds = 3f;
@@ -79,13 +80,13 @@ public static class RemoteCursors
     private static readonly Dictionary<int, Vector3> shown = new Dictionary<int, Vector3>();
 
     // Тот же курсор, что у самой игры (Verse.CustomCursor): стрелка, острие в точке (3, 3) текстуры.
-    private static Texture2D? cursorTex;
+    // Текстура грузится при старте игры в главном потоке (StaticConstructorOnStartup), как требует RimWorld.
+    private static readonly Texture2D cursorTex = ContentFinder<Texture2D>.Get("UI/Cursors/CursorCustom");
     private static readonly Vector2 Hotspot = new Vector2(3f, 3f);
 
     /// <summary>Чужие курсоры — стрелкой игры в цвете игрока, под ней имя на тёмной подложке. В интерфейсе, на перерисовке.</summary>
     internal static void Draw()
     {
-        cursorTex ??= ContentFinder<Texture2D>.Get("UI/Cursors/CursorCustom");
         int drawn = 0;
         float dt = Mathf.Min(Time.unscaledDeltaTime, 0.1f);
         foreach ((int playerId, Vector3 target) in Visible())
