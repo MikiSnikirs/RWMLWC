@@ -107,6 +107,7 @@ internal static class Program
             MaxLeadTicks = maxLead,
             AllowedNames = whitelist.Count > 0 ? whitelist : null,
             Password = settings.GetString("password"),
+            State = new SessionStateFile(Path.Combine(dataDir, "session.json")),
             AlarmSeconds = settings.GetInt("alarm_seconds", 45, 5, 600),
             AutosaveInterval = autosaveMinutes > 0 ? TimeSpan.FromMinutes(autosaveMinutes) : null,
         };
