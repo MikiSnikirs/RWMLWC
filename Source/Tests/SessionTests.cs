@@ -75,7 +75,8 @@ public class SessionTests
         Assert.Equal(StartTick, wa.ServerTick);
         // Сразу после Welcome — таблица прав и текущее разрешение тикать.
         Assert.IsType<PermissionsMessage>(a.Received[1]);
-        Assert.Equal(StartTick, Assert.IsType<TickMessage>(a.Received[2]).TickUpTo);
+        Assert.IsType<PlayersMessage>(a.Received[2]);
+        Assert.Equal(StartTick, Assert.IsType<TickMessage>(a.Received[3]).TickUpTo);
     }
 
     [Fact]
@@ -267,6 +268,80 @@ public class SessionTests
     }
 
     [Fact]
+    public void DesyncNoticeGoesToAllAtMostOncePerIntervalPerMap()
+    {
+        var (s, _) = NewSession();
+        TestClient a = Join(s, "A");
+        TestClient b = Join(s, "B");
+        void Pair(int map, int tick)
+        {
+            a.Conn.Send(new MapHashMessage { MapId = map, Tick = tick, Total = 1 });
+            b.Conn.Send(new MapHashMessage { MapId = map, Tick = tick, Total = 2 });
+        }
+        Pair(0, 15060);
+        Pair(0, 15120);                                            // та же карта, раньше интервала — без Notice
+        Pair(1, 15120);                                            // другая карта — свой Notice
+        Pair(0, 15060 + ProtocolLimits.DesyncNoticeIntervalTicks); // интервал прошёл
+        Step(s, 10, a, b);
+
+        foreach (TestClient c in new[] { a, b })
+        {
+            var notices = c.Received.OfType<NoticeMessage>().Where(n => n.Code == NoticeCode.Desync).Select(n => n.Text).ToList();
+            Assert.Equal(new[]
+            {
+                $"карта 0 тик 15060: игрок {a.PlayerId} ≠ игрок {b.PlayerId}",
+                $"карта 1 тик 15120: игрок {a.PlayerId} ≠ игрок {b.PlayerId}",
+                $"карта 0 тик {15060 + ProtocolLimits.DesyncNoticeIntervalTicks}: игрок {a.PlayerId} ≠ игрок {b.PlayerId}",
+            }, notices);
+        }
+    }
+
+    private static List<(int id, string name, bool online)> LastPlayers(TestClient c) =>
+        c.Received.OfType<PlayersMessage>().Last().Players.Select(p => (p.PlayerId, p.Name, p.Online)).ToList();
+
+    [Fact]
+    public void PlayersListFollowsJoinLeaveAndReturn()
+    {
+        var (s, _) = NewSession();
+        TestClient a = Join(s, "A");
+        Assert.Equal(new[] { (1, "A", true) }, LastPlayers(a));
+
+        TestClient b = Join(s, "B");
+        a.Drain();
+        Assert.Equal(new[] { (1, "A", true), (2, "B", true) }, LastPlayers(a));
+        Assert.Equal(new[] { (1, "A", true), (2, "B", true) }, LastPlayers(b));
+
+        b.Conn.Close("обрыв");
+        Step(s, 10, a);
+        Assert.Equal(new[] { (1, "A", true), (2, "B", false) }, LastPlayers(a));
+        int count = a.Received.OfType<PlayersMessage>().Count();
+        Step(s, 10, a);
+        Assert.Equal(count, a.Received.OfType<PlayersMessage>().Count()); // без изменений — не рассылается
+
+        TestClient b2 = Join(s, "B");
+        a.Drain();
+        Assert.Equal(new[] { (1, "A", true), (2, "B", true) }, LastPlayers(a));
+        Assert.Equal(new[] { (1, "A", true), (2, "B", true) }, LastPlayers(b2));
+    }
+
+    [Fact]
+    public void PlayerReturningBeforeLeaveIsNoticedStillGetsPlayers()
+    {
+        var (s, _) = NewSession();
+        TestClient a = Join(s, "A");
+        TestClient b = Join(s, "B");
+        b.Conn.Close("обрыв");
+        // Сервер ещё не прошёл Pump и не разослал уход — B уже вернулся.
+        var (client, server) = InMemoryConnection.CreatePair("B", "server");
+        s.Accept(server);
+        client.Send(new HelloMessage { PlayerName = "B", GameVersion = "1.7.5005", ModListHash = 7 });
+        s.Pump();
+        var b2 = new TestClient(client);
+        b2.Drain();
+        Assert.Equal(new[] { (1, "A", true), (2, "B", true) }, LastPlayers(b2));
+    }
+
+    [Fact]
     public void SnapshotChunkGoesToOthersOnly()
     {
         var (s, _) = NewSession();
@@ -320,5 +395,70 @@ public class SessionTests
         await run;
         a.Close("конец"); b.Close("конец");
         try { Directory.Delete(dir, true); } catch { }
+    }
+
+    [Fact]
+    public void PingIsAnsweredByTheConnectionItselfAndMeasured()
+    {
+        var (a, b) = InMemoryConnection.CreatePair();
+        Assert.Equal(-1, a.RoundTripMs);
+        a.SendPing();
+        Assert.True(a.RoundTripMs >= 0);
+        // Ни Ping, ни Pong до приложения не доходят.
+        Assert.False(a.TryReceive(out _));
+        Assert.False(b.TryReceive(out _));
+    }
+
+    [Fact]
+    public void ServerPingsPlayersAndSendsPingsInPlayers()
+    {
+        var (s, _) = NewSession();
+        TestClient a = Join(s, "A");
+        Assert.Equal(-1, a.Received.OfType<PlayersMessage>().Last().Players[0].PingMs);
+        Step(s, ProtocolLimits.PingIntervalMs, a);          // сервер отправил Ping, соединение в памяти ответило сразу
+        Step(s, ProtocolLimits.PlayersRefreshMs, a);        // пинг изменился (-1 → 0) — новый состав
+        PlayerInfo me = a.Received.OfType<PlayersMessage>().Last().Players.Single();
+        Assert.True(me.PingMs >= 0);
+        int count = a.Received.OfType<PlayersMessage>().Count();
+        Step(s, ProtocolLimits.PlayersRefreshMs, a);        // пинг тот же — не рассылается
+        Assert.Equal(count, a.Received.OfType<PlayersMessage>().Count());
+    }
+
+    [Fact]
+    public void ChatGoesToEveryoneWithAuthorTrimmedAndLimited()
+    {
+        var (s, _) = NewSession();
+        TestClient a = Join(s, "A");
+        TestClient b = Join(s, "B");
+        a.Conn.Send(new ChatMessage { PlayerId = 99, Text = "  привет  " });  // номер автора ставит сервер
+        a.Conn.Send(new ChatMessage { Text = "   " });                        // пустое — отбрасывается
+        b.Conn.Send(new ChatMessage { Text = new string('я', ProtocolLimits.MaxChatChars + 50) });
+        Step(s, 10, a, b);
+
+        foreach (TestClient c in new[] { a, b })
+        {
+            var chats = c.Received.OfType<ChatMessage>().ToList();
+            Assert.Equal(2, chats.Count);
+            Assert.Equal((a.PlayerId, "привет"), (chats[0].PlayerId, chats[0].Text));
+            Assert.Equal(b.PlayerId, chats[1].PlayerId);
+            Assert.Equal(ProtocolLimits.MaxChatChars, chats[1].Text.Length);
+        }
+    }
+
+    [Fact]
+    public void ChatFloodIsDropped()
+    {
+        var (s, log) = NewSession();
+        TestClient a = Join(s, "A");
+        for (int i = 0; i < ProtocolLimits.MaxChatPerWindow + 3; i++)
+            a.Conn.Send(new ChatMessage { Text = "спам " + i });
+        Step(s, 10, a);
+        Assert.Equal(ProtocolLimits.MaxChatPerWindow, a.Received.OfType<ChatMessage>().Count());
+        Assert.Contains(log, l => l.Contains("слишком часто"));
+
+        Step(s, ProtocolLimits.ChatWindowMs, a);  // окно прошло
+        a.Conn.Send(new ChatMessage { Text = "снова можно" });
+        Step(s, 10, a);
+        Assert.Equal("снова можно", a.Received.OfType<ChatMessage>().Last().Text);
     }
 }
