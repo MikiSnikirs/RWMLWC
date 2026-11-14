@@ -253,7 +253,9 @@ public static class TestAutomation
                     cfg.hostSession = value == "1";
                     break;
                 case "steamhost":
-                    cfg.steamAuto = value == "auto";
+                    // auto — найти среди друзей Steam; число — SteamID64 хоста (B: только в локальной метке, в журнал не пишется).
+                    cfg.steamAuto = value == "auto" || ulong.TryParse(value, out steamHostId);
+                    if (value == "auto") steamHostId = 0;
                     break;
                 case "tpf":
                     if (int.TryParse(value, out int tpf) && tpf >= 0)
@@ -1416,21 +1418,37 @@ public static class TestAutomation
 
     // Как «Присоединиться» в списке друзей Steam: хост объявляет rich presence connect = "+rwmlwc_join <SteamID>"
     // (SteamInvite.AdvertiseHost). SteamID берётся оттуда и никуда не записывается.
+    // Явный SteamID64 хоста из метки (steamhost=<число>); 0 — искать среди друзей.
+    private static ulong steamHostId;
+
     private static async System.Threading.Tasks.Task<RWMLWC.Net.IConnection> ConnectToHostingFriend()
     {
         await RWMLWC.Client.Net.SteamNet.WaitForRelayAsync(TimeSpan.FromSeconds(30)).ConfigureAwait(false);
+        int seenPlaying = -1;
         for (int attempt = 1; ; attempt++)
         {
-            ulong host = 0;
+            ulong host = steamHostId;
             int count = Steamworks.SteamFriends.GetFriendCount(Steamworks.EFriendFlags.k_EFriendFlagImmediate);
+            int playing = 0;
             for (int i = 0; i < count && host == 0; i++)
             {
                 Steamworks.CSteamID friend = Steamworks.SteamFriends.GetFriendByIndex(i, Steamworks.EFriendFlags.k_EFriendFlagImmediate);
+                // Без запроса Steam может не прислать rich presence друга (B, TST-080: автопоиск не находил хоста).
+                Steamworks.SteamFriends.RequestFriendRichPresence(friend);
+                if (Steamworks.SteamFriends.GetFriendGamePlayed(friend, out Steamworks.FriendGameInfo_t game) && game.m_gameID.AppID().m_AppId == 294100u)
+                {
+                    playing++;
+                }
                 string connect = Steamworks.SteamFriends.GetFriendRichPresence(friend, "connect") ?? "";
                 if (connect.StartsWith("+rwmlwc_join ", StringComparison.Ordinal) && ulong.TryParse(connect.Substring(13).Trim(), out ulong id))
                 {
                     host = id;
                 }
+            }
+            if (steamHostId == 0 && playing != seenPlaying)
+            {
+                seenPlaying = playing; // сколько друзей в RimWorld — без имён и номеров
+                Note($"entry: Steam friends in RimWorld: {playing}, hosting RWMLWC: {(host != 0 ? 1 : 0)}");
             }
             if (host != 0)
             {
@@ -1438,7 +1456,7 @@ public static class TestAutomation
                 {
                     return await RWMLWC.Client.Net.SteamNet.ConnectAsync(host, TimeSpan.FromSeconds(30)).ConfigureAwait(false);
                 }
-                catch (Exception) when (attempt < 10)
+                catch (Exception) when (attempt < (steamHostId != 0 ? 360 : 10)) // с явным номером ждём хоста до 30 минут
                 {
                 }
             }
