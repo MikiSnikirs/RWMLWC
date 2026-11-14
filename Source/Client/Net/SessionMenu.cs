@@ -4,6 +4,7 @@ using HarmonyLib;
 using RimWorld;
 using RWMLWC.Client.Sim;
 using Steamworks;
+using UnityEngine;
 using Verse;
 
 namespace RWMLWC.Client.Net;
@@ -29,6 +30,8 @@ internal static class SessionMenu
         {
             if (st == LockstepClient.State.Off)
                 yield return new ListableOption("Сетевая игра", () => Find.WindowStack.Add(new Dialog_NetworkGame()));
+            else // идёт подключение (вручную или автопрогоном): кнопку не прячем, показываем состояние и «Отменить»
+                yield return new ListableOption("Сетевая игра (подключение…)", () => Find.WindowStack.Add(new Dialog_Connecting()));
             yield break;
         }
         if (Current.ProgramState != ProgramState.Playing) yield break;
@@ -133,5 +136,43 @@ internal static class SteamInvite
         int space = rest.IndexOf(' ');
         if (space >= 0) rest = rest.Substring(0, space);
         return SteamJoin.TryParseSteamId(rest, out ulong id) ? id : 0;
+    }
+}
+
+/// <summary>Окно «идёт подключение» из главного меню: что происходит и «Отменить».</summary>
+public class Dialog_Connecting : Window
+{
+    public override Vector2 InitialSize => new Vector2(440f, 200f);
+
+    public Dialog_Connecting()
+    {
+        doCloseX = true;
+        closeOnClickedOutside = true;
+        absorbInputAroundWindow = true;
+    }
+
+    public override void DoWindowContents(Rect inRect)
+    {
+        var list = new Listing_Standard();
+        list.Begin(inRect);
+        Text.Font = GameFont.Medium;
+        list.Label("Сетевая игра");
+        Text.Font = GameFont.Small;
+        LockstepClient.State st = LockstepClient.CurrentState;
+        list.Label(st switch
+        {
+            LockstepClient.State.Off => LockstepClient.LastReject.Length > 0 ? "Отказ: " + LockstepClient.LastReject + "." : "Подключение завершилось.",
+            LockstepClient.State.Connecting => "Подключаюсь к хосту или серверу...",
+            LockstepClient.State.InSession => "В сессии.",
+            _ => "Сервер ответил, загружаю мир...",
+        });
+        if (st != LockstepClient.State.Off && list.ButtonText("Отменить"))
+        {
+            Reconnect.UserLeaving();
+            LockstepClient.Disconnect("игрок отменил подключение");
+            Close();
+        }
+        if (st == LockstepClient.State.Off && list.ButtonText("Закрыть")) Close();
+        list.End();
     }
 }
