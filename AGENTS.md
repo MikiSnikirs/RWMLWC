@@ -34,7 +34,7 @@
 | Зона | Каталоги | Агент |
 |---|---|---|
 | Симуляция, детерминизм, перехват ввода, карты | `Source/Client/Sim`, `Source/Client/Input`, `Source/Client/Maps` | A |
-| Сервер, протокол, транспорт, хранение сейвов | `Source/Server`, `Source/Shared`, `Source/Net`, `Source/Client/Net` | B |
+| Сервер, протокол, транспорт, хранение сейвов | `Source/Server`, `Source/ServerCore`, `Source/Shared`, `Source/Net`, `Source/Client/Net` | B |
 | Мир, торговля, режимы отсутствия | `Source/Client/World`, `Source/Client/Absence` | B |
 | Интерфейс мода | `Source/Client/UI` | тот, чья задача |
 | Свой файл задач | `tasks/A.md` / `tasks/B.md` | только владелец |
