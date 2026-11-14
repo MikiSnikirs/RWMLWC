@@ -1,0 +1,4 @@
+2026-11-15 01:17:29 entry: will connect to :0 in 20 s without a loaded game
+2026-11-15 01:17:49 entry: joining a Steam friend who hosts an RWMLWC session
+2026-11-15 01:17:49 lockstep: connecting to steam friend as 'friendB'
+2026-11-15 01:20:14 lockstep: connect FAILED: Соединение закрыто: Steam: проблема со связью: Timed out attempting to connect

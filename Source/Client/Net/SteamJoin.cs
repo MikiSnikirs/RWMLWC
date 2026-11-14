@@ -42,7 +42,7 @@ public static class SteamJoin
     public static void Start(ulong hostSteamId)
     {
         string name = SteamNet.Available ? SteamFriends.GetPersonaName() : "player";
-        LockstepClient.Connect(ConnectAsync(hostSteamId), "steam:" + hostSteamId, name);
+        LockstepClient.Connect(ConnectAsync(hostSteamId), "steam friend", name); // без SteamID: описание попадает в журналы
     }
 
     private static async Task<IConnection> ConnectAsync(ulong host)
