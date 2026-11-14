@@ -4,6 +4,7 @@ using System.Reflection;
 using HarmonyLib;
 using RimWorld;
 using Verse;
+using Verse.AI;
 
 namespace RWMLWC.Client.Sim;
 
@@ -98,6 +99,40 @@ internal static class Patch_CompAbilityEffect_Chunkskip_FindClosestChunks
         if (PerMapSim.Enabled)
         {
             ___lastChunkUpdateFrame = -1;
+        }
+    }
+}
+
+/// <summary>
+/// CompBiosculpterPod.CanReachRequiredIngredients(useCache: true) держит ответ 2 реальные секунды
+/// (Time.realtimeSinceStartup). Его зовёт ИИ пешки (JobGiver_GetAgeReversal → PawnCanUseNow), то есть
+/// симуляция: при разной скорости игры у игроков кэш давал бы разные ответы. В сессии кэш не используется.
+/// </summary>
+[HarmonyPatch(typeof(Pawn_JobTracker), nameof(Pawn_JobTracker.StartJob))]
+internal static class Patch_Pawn_JobTracker_StartJob_FrameCount
+{
+    /// <summary>
+    /// На паузе игра считает задание в счётчик «заданий за тик» (предохранитель «больше 10 — аварийное задание»)
+    /// только если прошлое выдано в том же кадре (lastJobGivenAtFrame == RealTime.frameCount). Команды игроков
+    /// в сессии исполняются на паузе у каждого в свои кадры — в сессии считаем всегда, одинаково у всех.
+    /// </summary>
+    private static void Prefix(ref int ___lastJobGivenAtFrame)
+    {
+        if (PerMapSim.Enabled && Find.TickManager.Paused)
+        {
+            ___lastJobGivenAtFrame = RealTime.frameCount;
+        }
+    }
+}
+
+[HarmonyPatch(typeof(CompBiosculpterPod), "CanReachRequiredIngredients")]
+internal static class Patch_CompBiosculpterPod_CanReachRequiredIngredients
+{
+    private static void Prefix(ref bool useCache)
+    {
+        if (PerMapSim.Enabled)
+        {
+            useCache = false;
         }
     }
 }
