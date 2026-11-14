@@ -117,7 +117,8 @@ internal static class HostedSessionDebug
         HostedSession.Start(Find.TickManager.TicksGame);
         RWMLWC.Client.Sim.LockstepClient.Connect("127.0.0.1", HostedSession.Port, HostedSession.Thumbprint, SteamNet.Available ? "host-" + SteamNet.MySteamId : "host");
         string id = SteamNet.Available ? SteamNet.MySteamId.ToString() : "(Steam недоступен)";
-        Messages.Message($"RWMLWC: сессия запущена. Другу — SteamID {id}", MessageTypeDefOf.PositiveEvent, false);
+        if (SteamNet.Available) UnityEngine.GUIUtility.systemCopyBuffer = id;
+        Messages.Message($"RWMLWC: сессия запущена. Другу — SteamID {id} (скопирован в буфер обмена)", MessageTypeDefOf.PositiveEvent, false);
     }
 
     [DebugAction("RWMLWC", "Stop hosted session", allowedGameStates = AllowedGameStates.Playing)]
