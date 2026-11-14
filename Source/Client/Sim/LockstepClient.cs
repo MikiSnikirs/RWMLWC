@@ -789,6 +789,8 @@ public static class LockstepClient
             message.Parts.Add(new HashPart("rand", hash.rand));
             conn.Send(message);
         }
+        // Уровень мира (T-073): карта, которая есть только у одного игрока, ни с чем выше не сравнится.
+        conn.Send(new MapHashMessage { MapId = ProtocolIds.WorldMapId, Tick = tick, Total = WorldStateHasher.Compute() });
     }
 
     /// <summary>Причина последнего отказа сервера (текст для игрока); пусто — отказа не было. Сбрасывается в <c>Connect</c>.</summary>
