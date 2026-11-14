@@ -76,8 +76,11 @@ if ($DenseFrom -ge 0 -and $DenseTo -gt $DenseFrom) { $arm += "densefrom=$DenseFr
 [IO.File]::WriteAllText((Join-Path $dir 'RWMLWC\automation-progress.txt'), '0')
 
 Step "Starting the game: queue $($Queue -join ','), $Ticks ticks each"
-$p = Start-Process $exe -ArgumentList "-savedatafolder=$dir" -WorkingDirectory $game -PassThru
+# Without taking focus from the person's own game (tools/StartQuiet.ps1).
+. (Join-Path $PSScriptRoot 'StartQuiet.ps1')
+$p = Start-GameQuiet $exe "-savedatafolder=$dir" $game
 Write-Host "pid $($p.Id), data $dir"
+[void](Show-GameQuiet $p)
 
 function GameProcs {
     @(Get-CimInstance Win32_Process -Filter "Name='RimWorld.exe'" -ErrorAction SilentlyContinue |
