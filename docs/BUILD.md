@@ -56,3 +56,17 @@ mklink /J "C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\RWMLWC" "
 1. Включите Harmony и RWMLWC в списке модов, Harmony выше.
 2. Перезапустите игру.
 3. В логе должна быть строка `[RWMLWC] загружен, протокол v1` (до T-011 было `v0`) и не должно быть красных ошибок от мода.
+
+## Проверка без .NET SDK
+
+Для машины, где нет SDK и нельзя запустить игру (облачная сессия агента A). Нужны: PowerShell 7.6 или новее (в нём есть компилятор Roslyn и среда .NET 10), папка игры и `0Harmony.dll` для 1.7.
+
+```
+pwsh tools/check-compile.ps1 -Game <папка RimWorld> -Harmony <путь к 0Harmony.dll> -Emit out/RWMLWC.Check.dll
+pwsh tools/check-patches.ps1 -Game <папка RimWorld> -Harmony <путь к 0Harmony.dll> -Assembly out/RWMLWC.Check.dll
+```
+
+- `check-compile.ps1` — компилирует `Shared`, `Net`, `ServerCore`, `Client` одной сборкой по тем же библиотекам игры и печатает ошибки компилятора.
+- `check-patches.ps1` — загружает сборку игры, Harmony и мод (без запуска игры) и ставит все патчи: находит несуществующий метод, неверное имя параметра в префиксе, изменившееся имя приватного поля.
+
+Чего это **не** заменяет: настоящую сборку (`dotnet build RWMLWC.slnx`: четыре сборки, тесты) и любой прогон в игре. В журналах такой результат пишется как «проверено компилятором» и «патчи ставятся», а не «собрано» и не «работает».
