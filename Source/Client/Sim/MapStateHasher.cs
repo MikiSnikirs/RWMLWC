@@ -58,7 +58,7 @@ public static class MapStateHasher
             Thing t = tmpThings[i];
             IntVec3 pos = t.Position;
             int def = t.def.shortHash;
-            int rot = t.Rotation.AsInt;
+            int rot = StableRotation(t);
             int hp = t.HitPoints;
             th.Add(t.thingIDNumber);
             th.Add(def);
@@ -155,12 +155,17 @@ public static class MapStateHasher
               .Append(t.def.defName).Append(';')
               .Append(pos.x).Append(';')
               .Append(pos.z).Append(';')
-              .Append(t.Rotation.AsInt).Append(';')
+              .Append(StableRotation(t)).Append(';')
               .Append(t.stackCount).Append(';')
               .Append(t.HitPoints).Append('\n');
         }
         tmpThings.Clear();
     }
+
+    // У типов с randomizeRotationOnSpawn (обломки камня и шлака) игра заново выбирает случайный поворот
+    // при каждом появлении вещи, включая загрузку сейва, причём из Rand, засеянного системными часами.
+    // Поворот таких вещей не является состоянием симуляции и в хеш не входит.
+    private static int StableRotation(Thing t) => t.def.randomizeRotationOnSpawn ? 0 : t.Rotation.AsInt;
 
     private static int CompareThings(Thing a, Thing b) => a.thingIDNumber.CompareTo(b.thingIDNumber);
 

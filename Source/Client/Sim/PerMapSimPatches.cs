@@ -100,9 +100,48 @@ internal static class Patch_Map_MapPostTick
 [HarmonyPatch(typeof(TickManager), nameof(TickManager.DoSingleTick))]
 internal static class Patch_TickManager_DoSingleTick
 {
-    // Точка «строго перед тиком»: здесь стартует тестовый прогон, заказанный при загрузке сейва.
     private static void Prefix()
     {
+        // Точка «строго перед тиком»: здесь стартует тестовый прогон, заказанный при загрузке сейва.
         HashRecorder.BeforeTick();
+        if (PerMapSim.Enabled)
+        {
+            MapRandContext.BeginTick();
+            RandTracer.BeginTick();
+        }
+    }
+
+    private static void Finalizer()
+    {
+        if (MapRandContext.InTick)
+        {
+            MapRandContext.EndTick();
+        }
+    }
+}
+
+// Трассировка вызовов Rand для поиска источника расхождения. Value и Int — единственные
+// два места в игре, где сдвигается счётчик генератора.
+[HarmonyPatch(typeof(Rand), nameof(Rand.Value), MethodType.Getter)]
+internal static class Patch_Rand_Value
+{
+    private static void Prefix()
+    {
+        if (RandTracer.Active)
+        {
+            RandTracer.Record();
+        }
+    }
+}
+
+[HarmonyPatch(typeof(Rand), nameof(Rand.Int), MethodType.Getter)]
+internal static class Patch_Rand_Int
+{
+    private static void Prefix()
+    {
+        if (RandTracer.Active)
+        {
+            RandTracer.Record();
+        }
     }
 }

@@ -91,8 +91,7 @@ public sealed class HashRecorder : GameComponent
     /// </summary>
     public void StartDeterminismRun(int durationTicks)
     {
-        PerMapSim.Enabled = true;
-        MapRandContext.ExitToGlobal();
+        PerMapSim.SetEnabled(true);
         MapRandContext.SetGlobalState(TestGlobalRandState);
 
         List<Map> maps = Find.Maps;
@@ -114,6 +113,7 @@ public sealed class HashRecorder : GameComponent
         string stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
         filePath = Path.Combine(dir, "hash-" + stamp + ".txt");
         DumpThingsAtStart(dir, stamp);
+        RandTracer.Start(Path.Combine(dir, "randtrace-" + stamp + ".txt"), startTick, DenseTicks);
         buffer.Clear();
         buffer.AppendLine($"# RWMLWC determinism run; startTick={startTick}; duration={durationTicks}; interval={Interval}; sessionSeed={PerMapSim.SessionSeed}");
         recording = true;
@@ -127,6 +127,7 @@ public sealed class HashRecorder : GameComponent
             return;
         }
         recording = false;
+        RandTracer.Stop();
         Flush();
     }
 

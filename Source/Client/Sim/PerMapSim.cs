@@ -15,7 +15,24 @@ namespace RWMLWC.Client.Sim;
 public static class PerMapSim
 {
     /// <summary>Включает раздельную симуляцию. Пока включается только отладочным действием.</summary>
-    public static bool Enabled;
+    public static bool Enabled { get; private set; }
+
+    public static void SetEnabled(bool enabled)
+    {
+        if (enabled == Enabled)
+        {
+            return;
+        }
+        if (enabled)
+        {
+            MapRandContext.OnEnabled();
+        }
+        else
+        {
+            MapRandContext.OnDisabled();
+        }
+        Enabled = enabled;
+    }
 
     /// <summary>
     /// Общая для сессии добавка к начальному состоянию Rand карт.
