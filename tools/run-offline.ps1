@@ -62,6 +62,10 @@ if (Test-Path -LiteralPath $pf) {
     $node = $px.PrefsData.SelectSingleNode('runInBackground')
     if (-not $node) { $node = $px.CreateElement('runInBackground'); [void]$px.PrefsData.AppendChild($node) }
     $node.InnerText = 'True'
+    # Test instances are silent (the person may be playing something else meanwhile).
+    $vol = $px.PrefsData.SelectSingleNode('volumeMaster')
+    if (-not $vol) { $vol = $px.CreateElement('volumeMaster'); [void]$px.PrefsData.AppendChild($vol) }
+    $vol.InnerText = '0'
     $px.Save($pf)
 }
 Set-TestWindow $pf (0)   # RWMLWC_TEST_MONITOR: windows on another monitor (tools/TestWindow.ps1)
@@ -74,8 +78,12 @@ if ($DenseFrom -ge 0 -and $DenseTo -gt $DenseFrom) { $arm += "densefrom=$DenseFr
 [IO.File]::WriteAllText((Join-Path $dir 'RWMLWC\automation-progress.txt'), '0')
 
 Step "Starting the game: queue $($Queue -join ','), $Ticks ticks each"
-$p = Start-Process $exe -ArgumentList "-savedatafolder=$dir" -WorkingDirectory $game -PassThru
+# Without taking focus from the person's own game (tools/StartQuiet.ps1).
+. (Join-Path $PSScriptRoot 'StartQuiet.ps1')
+[RwmlwcQuiet]::Guard()   # remember the person's window before the game takes it
+$p = Start-GameQuiet $exe "-savedatafolder=$dir" $game
 Write-Host "pid $($p.Id), data $dir"
+[void](Show-GameQuiet $p)
 
 function GameProcs {
     @(Get-CimInstance Win32_Process -Filter "Name='RimWorld.exe'" -ErrorAction SilentlyContinue |
@@ -87,12 +95,12 @@ $log = Join-Path $dir 'RWMLWC\automation-log.txt'
 $deadline = (Get-Date).AddMinutes($TimeoutMin)
 $finished = $false
 while ((Get-Date) -lt $deadline) {
-    Start-Sleep -Seconds 3
+    Wait-GuardingFocus 3
     $finished = (Test-Path $log) -and (Select-String -Path $log -Pattern 'queue: finished' -Quiet)
     if ($finished -and (GameProcs).Count -eq 0) { break }
     # A restart has a short gap with no process; give up only when there is none for a while.
     if (-not $finished -and (GameProcs).Count -eq 0) {
-        Start-Sleep -Seconds 20
+        Wait-GuardingFocus 20
         if ((GameProcs).Count -eq 0 -and -not (Select-String -Path $log -Pattern 'queue: finished' -Quiet)) { break }
     }
 }

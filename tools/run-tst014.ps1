@@ -117,6 +117,10 @@ for ($c = 1; $c -le $Clients; $c++) {
         $node = $px.PrefsData.SelectSingleNode('runInBackground')
         if (-not $node) { $node = $px.CreateElement('runInBackground'); [void]$px.PrefsData.AppendChild($node) }
         $node.InnerText = 'True'
+        # Test instances are silent (the person may be playing something else meanwhile).
+        $vol = $px.PrefsData.SelectSingleNode('volumeMaster')
+        if (-not $vol) { $vol = $px.CreateElement('volumeMaster'); [void]$px.PrefsData.AppendChild($vol) }
+        $vol.InnerText = '0'
         $px.Save($pf)
     }
     Set-TestWindow $pf ($c - 1)   # RWMLWC_TEST_MONITOR: windows on another monitor (tools/TestWindow.ps1)
@@ -150,13 +154,18 @@ for ($c = 1; $c -le $Clients; $c++) {
     if ($DenseFrom -ge 0 -and $DenseTo -gt $DenseFrom) { $arm += "densefrom=$DenseFrom"; $arm += "denseto=$DenseTo" }
     [IO.File]::WriteAllLines((Join-Path $dir 'RWMLWC\arm-determinism-run.txt'), $arm)
     [IO.File]::WriteAllText((Join-Path $dir 'RWMLWC\automation-progress.txt'), '0')
-    $procs += Start-Process $exe -ArgumentList "-savedatafolder=$dir" -WorkingDirectory $game -PassThru
+    # Without taking focus from the person's own game (tools/StartQuiet.ps1).
+    . (Join-Path $PSScriptRoot 'StartQuiet.ps1')
+    [RwmlwcQuiet]::Guard()   # remember the person's window before the game takes it
+    $procs += Start-GameQuiet $exe "-savedatafolder=$dir" $game
     Write-Host "client c$c pid $($procs[-1].Id), data $dir"
 }
+foreach ($p in $procs) { [void](Show-GameQuiet $p) }
 
 Step "Waiting for the game to close itself (up to $TimeoutMin min)"
 $deadline = (Get-Date).AddMinutes($TimeoutMin)
-while ((Get-Date) -lt $deadline -and ($procs | Where-Object { -not $_.HasExited })) { Start-Sleep -Seconds 2 }
+while ((Get-Date) -lt $deadline -and ($procs | Where-Object { -not $_.HasExited })) { Wait-GuardingFocus 2 }
+Write-Host "focus given back to your window: $([RwmlwcQuiet]::Restored) time(s)"
 $timedOut = $false
 foreach ($p in $procs) {
     if (-not $p.HasExited) { $timedOut = $true; Stop-Process -Id $p.Id -Force }
