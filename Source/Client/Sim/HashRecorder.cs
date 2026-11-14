@@ -15,6 +15,9 @@ public sealed class HashRecorder : GameComponent
 {
     public const int Interval = 250;
 
+    /// <summary>Первые тики прогона замеряются каждый тик: так видно, на каком тике началось расхождение.</summary>
+    public const int DenseTicks = 300;
+
     /// <summary>Фиксированное глобальное состояние Rand для тестового прогона.</summary>
     public const ulong TestGlobalRandState = 0x0000000052574D4CUL; // seed "RWML", счётчик 0
 
@@ -108,7 +111,9 @@ public sealed class HashRecorder : GameComponent
         endTick = startTick + durationTicks;
         string dir = Path.Combine(GenFilePaths.SaveDataFolderPath, "RWMLWC");
         Directory.CreateDirectory(dir);
-        filePath = Path.Combine(dir, "hash-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".txt");
+        string stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
+        filePath = Path.Combine(dir, "hash-" + stamp + ".txt");
+        DumpThingsAtStart(dir, stamp);
         buffer.Clear();
         buffer.AppendLine($"# RWMLWC determinism run; startTick={startTick}; duration={durationTicks}; interval={Interval}; sessionSeed={PerMapSim.SessionSeed}");
         recording = true;
@@ -132,7 +137,8 @@ public sealed class HashRecorder : GameComponent
             return;
         }
         int tick = Find.TickManager.TicksGame;
-        if ((tick - startTick) % Interval == 0)
+        int elapsed = tick - startTick;
+        if (elapsed <= DenseTicks || elapsed % Interval == 0)
         {
             WriteSample();
         }
@@ -141,6 +147,25 @@ public sealed class HashRecorder : GameComponent
             Stop();
             Log.Message("[RWMLWC] determinism run finished: " + filePath);
             Messages.Message("[RWMLWC] determinism run finished", RimWorld.MessageTypeDefOf.NeutralEvent, false);
+        }
+    }
+
+    // Полный список вещей на старте: по нему видно, что именно отличается сразу после загрузки.
+    private static void DumpThingsAtStart(string dir, string stamp)
+    {
+        try
+        {
+            List<Map> maps = Find.Maps;
+            for (int i = 0; i < maps.Count; i++)
+            {
+                StringBuilder sb = new StringBuilder();
+                MapStateHasher.DumpThings(maps[i], sb);
+                File.WriteAllText(Path.Combine(dir, $"things-{stamp}-map{maps[i].uniqueID}.txt"), sb.ToString());
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error("[RWMLWC] не удалось записать список вещей: " + ex);
         }
     }
 
