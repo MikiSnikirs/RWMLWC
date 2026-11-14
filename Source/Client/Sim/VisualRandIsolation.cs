@@ -31,19 +31,63 @@ internal static class VisualRandIsolation
         // сейва в работающей игре крик животного прозвучал на тике, где в свежем процессе его не было.
         ("Verse.Sound.SoundStarter", "PlayOneShot"),
         ("Verse.Sound.SoundStarter", "TrySpawnSustainer"),
+
+        // Вспышки и мошки (flecks, motes): пыль из-под ног, дым выстрела, искры, надписи над головой.
+        // Игра создаёт их из тика и тут же берёт для них числа из Rand, но только если
+        // GenView.ShouldSpawnMotesAt вернул true — а он проверяет, что карта открыта у игрока
+        // (map == Find.CurrentMap), а для части эффектов ещё и что клетка в кадре камеры; мошки
+        // к тому же ограничены счётчиком, который зависит от их времени жизни в реальных секундах.
+        // У двух игроков, смотрящих на разные карты, число вызовов Rand в тике было бы разным.
+        // «*» — все открытые статические методы класса. См. docs/research/sim.md, 6ж.
+        ("RimWorld.FleckMaker", "*"),
+        ("RimWorld.MoteMaker", "*"),
+        ("Verse.FleckManager", "CreateFleck"),
+        ("Verse.Mote", ".ctor"),
+        ("Verse.Effecter", "EffectTick"),
+        ("Verse.Effecter", "Trigger"),
+        ("RimWorld.CompFleckEmitterLongTerm", "CompTick"),
+        ("Verse.LavaFXComponent", "MapComponentTick"),
+
+        // Крик животного: звучит, только если животное в кадре камеры. Решение принимается в тике,
+        // а само действие — только звук. Внутри изолированного кода камера настоящая (см. SimCamera).
+        ("Verse.Pawn_CallTracker", "TryDoCall"),
     };
+
+    /// <summary>Сейчас выполняется изолированный визуальный код (вложенность). Для SimCamera.</summary>
+    public static int Depth { get; private set; }
 
     private static IEnumerable<MethodBase> TargetMethods()
     {
         foreach ((string type, string method) target in Targets)
         {
             System.Type? type = AccessTools.TypeByName(target.type);
-            MethodInfo? found = type == null ? null : AccessTools.Method(type, target.method);
-            if (found != null)
+            int count = 0;
+            if (type != null)
             {
-                yield return found;
+                const BindingFlags declared = BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
+                if (target.method == ".ctor")
+                {
+                    foreach (ConstructorInfo ctor in type.GetConstructors(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
+                    {
+                        count++;
+                        yield return ctor;
+                    }
+                }
+                else
+                {
+                    // Все перегрузки с этим именем; «*» — все открытые статические методы.
+                    foreach (MethodInfo method in type.GetMethods(declared))
+                    {
+                        bool match = target.method == "*" ? method.IsStatic && method.IsPublic : method.Name == target.method;
+                        if (match && !method.IsAbstract && !method.IsGenericMethodDefinition && method.GetMethodBody() != null)
+                        {
+                            count++;
+                            yield return method;
+                        }
+                    }
+                }
             }
-            else
+            if (count == 0)
             {
                 Log.Warning($"[RWMLWC] VisualRandIsolation: не найден {target.type}.{target.method}");
             }
@@ -57,6 +101,7 @@ internal static class VisualRandIsolation
         {
             Rand.PushState();
             RandTracer.PushSuppress();
+            Depth++;
         }
     }
 
@@ -64,6 +109,7 @@ internal static class VisualRandIsolation
     {
         if (__state)
         {
+            Depth--;
             RandTracer.PopSuppress();
             Rand.PopState();
         }
