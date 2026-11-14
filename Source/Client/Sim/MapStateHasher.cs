@@ -38,6 +38,8 @@ public static class MapStateHasher
     private static readonly List<Thing> tmpThings = new List<Thing>();
     private static readonly List<Pawn> tmpPawns = new List<Pawn>();
 
+    private static readonly System.Predicate<Thing> IsPresentationOnly = thing => thing is Mote;
+
     public static MapStateHash Compute(Map map)
     {
         MapStateHash result = default;
@@ -45,6 +47,8 @@ public static class MapStateHasher
         // Вещи: порядок в списках игры зависит от истории, поэтому сортируем по номеру.
         tmpThings.Clear();
         tmpThings.AddRange(map.listerThings.AllThings);
+        // Мошки (Mote) — вещи только для показа: есть они или нет, зависит от камеры и реального времени.
+        tmpThings.RemoveAll(IsPresentationOnly);
         tmpThings.Sort(CompareThings);
         Fnv64 th = Fnv64.Create();
         Fnv64 hId = Fnv64.Create();
@@ -151,6 +155,8 @@ public static class MapStateHasher
     {
         tmpThings.Clear();
         tmpThings.AddRange(map.listerThings.AllThings);
+        // Мошки (Mote) — вещи только для показа: есть они или нет, зависит от камеры и реального времени.
+        tmpThings.RemoveAll(IsPresentationOnly);
         tmpThings.Sort(CompareThings);
         for (int i = 0; i < tmpThings.Count; i++)
         {
@@ -184,6 +190,8 @@ public static class MapStateHasher
         bool first = lastRot.Count == 0;
         tmpThings.Clear();
         tmpThings.AddRange(map.listerThings.AllThings);
+        // Мошки (Mote) — вещи только для показа: есть они или нет, зависит от камеры и реального времени.
+        tmpThings.RemoveAll(IsPresentationOnly);
         tmpThings.Sort(CompareThings);
         for (int i = 0; i < tmpThings.Count; i++)
         {
