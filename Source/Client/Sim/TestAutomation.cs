@@ -1439,7 +1439,7 @@ public static class TestAutomation
                 {
                     return await RWMLWC.Client.Net.SteamNet.ConnectAsync(host, TimeSpan.FromSeconds(30)).ConfigureAwait(false);
                 }
-                catch (Exception) when (attempt < 10)
+                catch (Exception) when (attempt < (steamHostId != 0 ? 360 : 10)) // с явным номером ждём хоста до 30 минут
                 {
                 }
             }
