@@ -157,7 +157,28 @@ public sealed class Session
                 Handle(player, m);
         }
 
+        BroadcastPlayersIfChanged();
         UpdateSpeed();
+    }
+
+    // Состав, разосланный последним: номер и «в сети» каждого игрока. Уход замечается здесь же, в Pump.
+    private string _lastRoster = "";
+
+    private bool BroadcastPlayersIfChanged()
+    {
+        string roster = string.Join(",", _players.Select(p => p.Online ? p.Id.ToString() : "-" + p.Id));
+        if (roster == _lastRoster) return false;
+        _lastRoster = roster;
+        Broadcast(BuildPlayers());
+        return true;
+    }
+
+    private PlayersMessage BuildPlayers()
+    {
+        var msg = new PlayersMessage();
+        foreach (Player p in _players)
+            msg.Players.Add(new PlayerInfo(p.Id, p.Name, p.Online));
+        return msg;
     }
 
     /// <summary>Продвинуть общие часы на прошедшее реальное время и разослать разрешение тикать.</summary>
@@ -249,6 +270,9 @@ public sealed class Session
             SaveTick = SaveTick,
         });
         connection.Send(BuildPermissions());
+        // Состав: всем в сети, включая нового (он идёт сразу после Welcome и Permissions). Если игрок вернулся
+        // раньше, чем сервер заметил его уход, состав не изменился — тогда только ему.
+        if (!BroadcastPlayersIfChanged()) connection.Send(BuildPlayers());
         CheckSaveVersion(player);
         // Новому игроку — текущее разрешение, остальным — новая скорость (новый игрок держит паузу).
         connection.Send(new TickMessage { TickUpTo = TickUpTo, Speed = Speed });
@@ -320,6 +344,9 @@ public sealed class Session
         }
     }
 
+    // Тик последнего Notice Desync по каждой карте.
+    private readonly Dictionary<int, int> _desyncNoticeTick = new();
+
     private void CompareHash(Player player, MapHashMessage h)
     {
         var key = (h.MapId, h.Tick);
@@ -336,6 +363,15 @@ public sealed class Session
         {
             _log($"РАСХОЖДЕНИЕ карта {h.MapId} тик {h.Tick}: игрок {first.playerId} {first.hash.Total:X16}, игрок {player.Id} {h.Total:X16}");
             Desync?.Invoke(first.hash, first.playerId, h, player.Id);
+            if (!_desyncNoticeTick.TryGetValue(h.MapId, out int last) || h.Tick - last >= ProtocolLimits.DesyncNoticeIntervalTicks || h.Tick < last)
+            {
+                _desyncNoticeTick[h.MapId] = h.Tick;
+                Broadcast(new NoticeMessage
+                {
+                    Code = NoticeCode.Desync,
+                    Text = $"карта {h.MapId} тик {h.Tick}: игрок {first.playerId} ≠ игрок {player.Id}",
+                });
+            }
         }
     }
 

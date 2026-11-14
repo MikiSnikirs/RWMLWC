@@ -24,6 +24,7 @@ public enum MessageType : ushort
     CommandRejected = 13,
     Notice = 14,
     SnapshotApplied = 15,
+    Players = 16,
 }
 
 /// <summary>
@@ -506,6 +507,11 @@ public enum NoticeCode : ushort
     NewerSaveOnClient = 1,
     /// <summary>У игрока копия другого мира.</summary>
     DifferentWorld = 2,
+    /// <summary>
+    /// Хеши карты у игроков разошлись (v3, для T-034). Текст: «карта M тик T: игрок X ≠ игрок Y».
+    /// Сервер шлёт всем игрокам в сети, не чаще раза в <see cref="ProtocolLimits.DesyncNoticeIntervalTicks"/> тиков на карту.
+    /// </summary>
+    Desync = 3,
 }
 
 /// <summary>Сервер → клиенту: предупреждение или сведение для показа игроку; соединение не рвёт.</summary>
@@ -551,4 +557,40 @@ public sealed class SnapshotAppliedMessage : Message
         SnapshotId = r.ReadInt32(),
         Tick = r.ReadInt32(),
     };
+}
+
+/// <summary>Игрок сессии в сообщении <see cref="PlayersMessage"/>.</summary>
+public readonly record struct PlayerInfo(int PlayerId, string Name, bool Online);
+
+/// <summary>
+/// Сервер → клиентам: состав сессии (v3). Все игроки, которые когда-либо входили, по возрастанию номера:
+/// ушедший остаётся в списке с <c>Online = false</c> (его номер и права сохраняются до его возвращения).
+/// Рассылается всем в сети при входе, возврате и уходе любого игрока; новый игрок получает его сразу после <c>Welcome</c>.
+/// </summary>
+public sealed class PlayersMessage : Message
+{
+    public override MessageType Type => MessageType.Players;
+
+    public List<PlayerInfo> Players = new();
+
+    public override void Write(PacketWriter w)
+    {
+        if (Players.Count > ProtocolLimits.MaxPlayersInList) throw new ProtocolException($"Игроков больше {ProtocolLimits.MaxPlayersInList}");
+        w.WriteInt32(Players.Count);
+        foreach (PlayerInfo p in Players)
+        {
+            w.WriteInt32(p.PlayerId);
+            w.WriteString(p.Name);
+            w.WriteBool(p.Online);
+        }
+    }
+
+    internal static PlayersMessage Read(ref PacketReader r)
+    {
+        var msg = new PlayersMessage();
+        int n = r.ReadCount(ProtocolLimits.MaxPlayersInList, 9);
+        for (int i = 0; i < n; i++)
+            msg.Players.Add(new PlayerInfo(r.ReadInt32(), r.ReadString(), r.ReadBool()));
+        return msg;
+    }
 }

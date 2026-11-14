@@ -32,4 +32,10 @@ public static class ProtocolLimits
 
     /// <summary>Выданных прав на одну карту.</summary>
     public const int MaxGrantsPerMap = 32;
+
+    /// <summary>Игроков в списке состава сессии (вместе с ушедшими).</summary>
+    public const int MaxPlayersInList = 256;
+
+    /// <summary>Не чаще одного <c>Notice Desync</c> на карту за столько тиков.</summary>
+    public const int DesyncNoticeIntervalTicks = 600;
 }
