@@ -23,6 +23,14 @@ public class ProtocolRoundTripTests
         yield return new object[] { new SnapshotChunkMessage { SnapshotId = 9, MapId = 0, Tick = 777, ChunkIndex = 2, ChunkCount = 3, Data = new byte[ProtocolLimits.SnapshotChunkBytes] } };
         yield return new object[] { new MapHashMessage { MapId = 0, Tick = 15250, Total = ulong.MaxValue, Parts = { new("things", 1), new("pawns", 0xABCDEF), new("rand", 0) } } };
         yield return new object[] { new MapHashMessage { MapId = 5, Tick = 0 } };
+        yield return new object[] { new CommandMessage { ClientSeq = 2, MapId = 1, Kind = 3, Required = PermissionLevel.Build, Payload = new byte[] { 7 } } };
+        yield return new object[] { new MapClaimMessage { MapId = 4 } };
+        yield return new object[] { new GrantPermissionMessage { MapId = 4, PlayerId = 2, Level = PermissionLevel.Observer } };
+        yield return new object[] { new PermissionsMessage() };
+        yield return new object[] { new PermissionsMessage { Maps = {
+            new MapPermissions { MapId = 0, OwnerPlayerId = 1, Grants = { new(2, PermissionLevel.Build), new(3, PermissionLevel.Full) } },
+            new MapPermissions { MapId = 7, OwnerPlayerId = 2 } } } };
+        yield return new object[] { new CommandRejectedMessage { ClientSeq = 9, MapId = 0, Required = PermissionLevel.Full, Had = PermissionLevel.Build } };
     }
 
     [Theory]
@@ -124,6 +132,14 @@ public class ProtocolRoundTripTests
     }
 
     [Fact]
+    public void BadPermissionLevelIsRejected()
+    {
+        byte[] body = ProtocolCodec.EncodeBody(new GrantPermissionMessage { Level = PermissionLevel.Full });
+        body[^1] = 4;
+        Assert.Throws<ProtocolException>(() => ProtocolCodec.DecodeBody(body));
+    }
+
+    [Fact]
     public void BadSnapshotChunkIndexIsRejected()
     {
         byte[] body = ProtocolCodec.EncodeBody(new SnapshotChunkMessage { ChunkIndex = 3, ChunkCount = 3 });
@@ -152,6 +168,15 @@ public class ProtocolRoundTripTests
                     break;
                 case List<HashPart> el:
                     Assert.Equal(el, (List<HashPart>)a!);
+                    break;
+                case List<MapPermissions> em:
+                    var am = (List<MapPermissions>)a!;
+                    Assert.Equal(em.Count, am.Count);
+                    for (int i = 0; i < em.Count; i++)
+                    {
+                        Assert.Equal((em[i].MapId, em[i].OwnerPlayerId), (am[i].MapId, am[i].OwnerPlayerId));
+                        Assert.Equal(em[i].Grants, am[i].Grants);
+                    }
                     break;
                 default:
                     Assert.Equal(e, a);

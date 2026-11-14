@@ -1,4 +1,4 @@
-# Протокол (v0, `ProtocolVersion = 1`)
+# Протокол (`ProtocolVersion = 2`)
 
 Код: `Source/Shared/Protocol/`. Тесты: `Source/Tests/ProtocolRoundTripTests.cs` (TST-011).
 Изменение любого сообщения повышает `ProtocolVersion` и идёт через запись КОНТРАКТ в `AGENT_LOG.md`.
@@ -24,12 +24,16 @@ uint16 тип     — MessageType
 | 1 | `Hello` | клиент → сервер | `ProtocolVersion`, `ModId`, `GameVersion`, `PlayerName`, `ModListHash` (u64) |
 | 2 | `Welcome` | сервер → клиент | `PlayerId`, `ServerTick`, `SessionSeed` (u32) |
 | 3 | `Reject` | сервер → клиент | `Reason` (`RejectReason`), `Detail` |
-| 4 | `Command` | клиент → сервер | `ClientSeq`, `MapId`, `Kind`, `Payload` |
+| 4 | `Command` | клиент → сервер | `ClientSeq`, `MapId`, `Kind`, `Required` (`PermissionLevel`, с v2), `Payload` |
 | 5 | `CommandOrdered` | сервер → все | `Seq` (i64), `Tick`, `PlayerId`, `ClientSeq`, `MapId`, `Kind`, `Payload` |
 | 6 | `Tick` | сервер → все | `TickUpTo`, `Speed` (0 — пауза, 1..4 — `TimeSpeed`) |
 | 7 | `SpeedRequest` | клиент → сервер | `Speed` |
 | 8 | `SnapshotChunk` | в обе стороны | `SnapshotId`, `MapId`, `Tick`, `ChunkIndex`, `ChunkCount`, `Data` |
 | 9 | `MapHash` | клиент → сервер | `MapId`, `Tick`, `Total` (u64), `Parts` — список (имя, u64) |
+| 10 | `MapClaim` | клиент → сервер | `MapId` — «карта моя» (v2) |
+| 11 | `GrantPermission` | клиент → сервер | `MapId`, `PlayerId`, `Level`; `None` — отзыв (v2) |
+| 12 | `Permissions` | сервер → все | список карт: `MapId`, `OwnerPlayerId`, выданные права (`PlayerId`, `Level`) (v2) |
+| 13 | `CommandRejected` | сервер → автору | `ClientSeq`, `MapId`, `Required`, `Had` (v2) |
 
 `MapId` — `Map.uniqueID`; `-1` (`ProtocolIds.WorldMapId`) — уровень мира.
 
@@ -66,3 +70,15 @@ uint16 тип     — MessageType
 - **Команды.** Общий `Seq` без пропусков; игроки обрабатываются по возрастанию номера, команды каждого — в порядке прихода. Принимаются и на паузе.
 - **Хеши.** `MapHash` сравниваются по `(MapId, Tick)`, при несовпадении `Total` — запись в лог и событие `Session.Desync` (реакция — T-034).
 - **Снимки.** `SnapshotChunk` пересылается всем остальным игрокам в сети.
+
+## Права на карты (T-031, v2)
+
+Уровни `PermissionLevel`: `None` (0) — нет доступа, `Observer` (1) — видит, команд не отдаёт, `Build` (2) — разметка и чертежи, `Full` (3) — всё.
+
+- Карта получает владельца по `MapClaim`: свободная — заявителю, занятая — заявка отклоняется (в ответ — текущая таблица). Мир (`MapId = -1`) владельца не имеет.
+- Уровень игрока на карте: мир и карта без владельца — `Full` для всех; владелец — `Full`; остальные — выданный владельцем уровень или `None`.
+- `GrantPermission` принимается только от владельца; `Level = None` — отзыв.
+- Команда принимается, если уровень автора на её карте ≥ `Command.Required`. Иначе автору — `CommandRejected`, остальным ничего не уходит, `Seq` не расходуется.
+- Отзыв действует с первой команды, обработанной после него. Порядок внутри одного прохода сервера — по номеру игрока, поэтому отзыв владельца и команда гостя в одном проходе: сначала отзыв, если номер владельца меньше.
+- `Permissions` (вся таблица) уходит новому игроку сразу после `Welcome` и всем — при каждом изменении. Права хранятся по номеру игрока и переживают его переподключение.
+- **Не сделано:** снятие владения и передача авторитета (T-032); что видит гость с `Observer`/`None` (пересылка снимков по правам) — T-033.
