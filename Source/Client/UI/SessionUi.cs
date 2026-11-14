@@ -202,6 +202,7 @@ public class Dialog_Session : Window
                 Find.WindowStack.Add(new Dialog_ChooseColor());
             y += 22f;
         }
+        y = AbsenceRow(inRect, y + 4f);
         y += 4f;
         Widgets.DrawLineHorizontal(inRect.x, y, inRect.width);
         y += 6f;
@@ -244,6 +245,52 @@ public class Dialog_Session : Window
         {
             Send();
         }
+    }
+
+    private static string AbsenceLabel(RWMLWC.Client.Maps.AbsenceMode mode) => mode switch
+    {
+        RWMLWC.Client.Maps.AbsenceMode.Autopilot => "Автопилот",
+        RWMLWC.Client.Maps.AbsenceMode.Manager => "Управляющий",
+        _ => "Стазис",
+    };
+
+    private static string AbsenceDescription(RWMLWC.Client.Maps.AbsenceMode mode) => mode switch
+    {
+        RWMLWC.Client.Maps.AbsenceMode.Autopilot => "Пешки живут по расписанию и приоритетам; крупных угроз на карту нет.",
+        RWMLWC.Client.Maps.AbsenceMode.Manager => "Как автопилот, и друг управляет картой по правам «только пока меня нет» (выдаются в окне «Карты и права»).",
+        _ => "Карта ждёт вас. Пока сделано: крупных угроз на карту нет; остановка времени карты — в разработке (T-043).",
+    };
+
+    /// <summary>
+    /// «Пока меня нет» для текущей карты (T-041): режим отсутствия хранится в сейве (команда A, <c>AbsenceModes</c>).
+    /// Менять может хозяин карты по таблице прав сервера; у карты без хозяина — любой (первый выбравший станет её хозяином для симуляции).
+    /// </summary>
+    private static float AbsenceRow(Rect inRect, float y)
+    {
+        Map? map = Find.CurrentMap;
+        if (map == null || !LockstepClient.InSession) return y;
+        int owner = RWMLWC.Client.Maps.MapAccess.OwnerOf(map.uniqueID);
+        bool mine = owner == 0 || owner == LockstepClient.PlayerId;
+        RWMLWC.Client.Maps.AbsenceMode mode = RWMLWC.Client.Maps.AbsenceModes.Get(map);
+        Rect label = new Rect(inRect.x, y + 3f, inRect.width - 150f, 22f);
+        Widgets.Label(label, "Пока меня нет (эта карта): " + AbsenceLabel(mode));
+        TooltipHandler.TipRegion(label, AbsenceDescription(mode));
+        Rect button = new Rect(inRect.xMax - 140f, y, 140f, 26f);
+        if (!mine)
+        {
+            TooltipHandler.TipRegion(button, "Режим выбирает хозяин карты: " + SessionUi.NameOf(owner));
+        }
+        if (Widgets.ButtonText(button, "Изменить", active: mine) && mine)
+        {
+            var options = new List<FloatMenuOption>();
+            foreach (RWMLWC.Client.Maps.AbsenceMode m in new[] { RWMLWC.Client.Maps.AbsenceMode.Stasis, RWMLWC.Client.Maps.AbsenceMode.Autopilot, RWMLWC.Client.Maps.AbsenceMode.Manager })
+            {
+                RWMLWC.Client.Maps.AbsenceMode chosen = m;
+                options.Add(new FloatMenuOption(AbsenceLabel(m) + " — " + AbsenceDescription(m), () => RWMLWC.Client.Maps.AbsenceModes.Set(map, chosen)));
+            }
+            Find.WindowStack.Add(new FloatMenu(options));
+        }
+        return y + 30f;
     }
 
     private static float CopyRow(Rect inRect, float y, string label, string value)
@@ -419,6 +466,7 @@ internal static class ChatSelfTest
     private static bool? _enabled;
     private static readonly System.Diagnostics.Stopwatch Clock = new();
     private static int _sent;
+    private static bool _absenceSet;
     private static int _loggedLines;
     private static long _nextLogMs;
 
@@ -446,9 +494,16 @@ internal static class ChatSelfTest
             Write("color: first was taken, asked " + RWMLWC.Client.Maps.Squads.Palette[1].ToString("X6"));
         }
         if (ms > 6000) SessionUi.SendCursor(0, 10f + (ms / 100 % 50), 20f + LockstepClient.PlayerId);
+        if (!_absenceSet && ms > 8000 && LockstepClient.PlayerId == 1 && Find.CurrentMap != null)
+        {
+            _absenceSet = true;
+            RWMLWC.Client.Maps.AbsenceModes.Set(Find.CurrentMap, RWMLWC.Client.Maps.AbsenceMode.Autopilot);
+            Write("absence: set Autopilot for map " + Find.CurrentMap.uniqueID);
+        }
         if (ms < _nextLogMs) return;
         _nextLogMs = ms + 1000;
         Write(SessionUi.StatusLine() + " | players: " + string.Join(", ", SessionUi.Players.Select(p => $"{p.PlayerId}:{p.Name}:{(p.Online ? "on" : "off")}:{p.PingMs}:{p.Color:X6}"))
+            + " | absence: " + (Find.CurrentMap != null ? RWMLWC.Client.Maps.AbsenceModes.Get(Find.CurrentMap).ToString() : "-")
             + " | cursors: " + string.Join(", ", SessionUi.Cursors.Select(c => $"{c.Key}@{c.Value.MapId}:{c.Value.X:0.#},{c.Value.Z:0.#}")));
         var lines = SessionUi.ChatLines;
         for (; _loggedLines < lines.Count; _loggedLines++)
