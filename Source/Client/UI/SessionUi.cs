@@ -179,17 +179,23 @@ public class Dialog_Session : Window
         // Ввод.
         Rect inputRect = new Rect(inRect.x, inRect.yMax - inputH, inRect.width - 110f, inputH);
         Rect sendRect = new Rect(inRect.xMax - 100f, inRect.yMax - inputH, 100f, inputH);
-        bool enter = Event.current.type == EventType.KeyDown
-                     && (Event.current.keyCode == KeyCode.Return || Event.current.keyCode == KeyCode.KeypadEnter)
-                     && GUI.GetNameOfFocusedControl() == InputControl;
         GUI.SetNextControlName(InputControl);
         _input = Widgets.TextField(inputRect, _input, ProtocolLimits.MaxChatChars);
-        bool canSend = LockstepClient.InSession;
-        if ((Widgets.ButtonText(sendRect, "Отправить", active: canSend) || enter) && canSend)
+        if (Widgets.ButtonText(sendRect, "Отправить", active: LockstepClient.InSession))
         {
-            if (SessionUi.SendChat(_input)) _input = "";
-            if (enter) Event.current.Use();
+            Send();
         }
+    }
+
+    private void Send()
+    {
+        if (SessionUi.SendChat(_input)) _input = "";
+    }
+
+    // Enter окно игры по умолчанию считает «принять и закрыть»; здесь он отправляет сообщение.
+    public override void OnAcceptKeyPressed()
+    {
+        Send();
     }
 }
 
@@ -223,7 +229,8 @@ internal static class Patch_MapInterface_SessionStatus
         if (SessionUi.Unread > 0) line += $" · чат: {SessionUi.Unread}";
         Text.Font = GameFont.Tiny;
         Vector2 size = Text.CalcSize(line);
-        Rect r = new Rect(UI.screenWidth - size.x - 12f, UI.screenHeight - 35f - 80f - size.y, size.x + 8f, size.y + 2f);
+        // Левее кнопок скорости (они занимают правые ~140 пикселей над рядом значков).
+        Rect r = new Rect(UI.screenWidth - 150f - size.x - 8f, UI.screenHeight - 165f, size.x + 8f, size.y + 2f);
         Widgets.DrawBoxSolid(r, new Color(0f, 0f, 0f, 0.45f));
         Text.Anchor = TextAnchor.MiddleCenter;
         Widgets.Label(r, line);

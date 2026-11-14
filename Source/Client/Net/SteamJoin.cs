@@ -90,7 +90,7 @@ public class Dialog_SteamJoin : Window
     private string _input = "";
     private bool _started;
 
-    public override Vector2 InitialSize => new Vector2(520f, 270f);
+    public override Vector2 InitialSize => new Vector2(520f, 220f);
 
     public Dialog_SteamJoin(ulong hostSteamId = 0, bool autoStart = false)
     {
