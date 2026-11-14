@@ -64,6 +64,8 @@ public static class ProtocolCodec
             MessageType.Chat => ChatMessage.Read(ref r),
             MessageType.ChooseColor => ChooseColorMessage.Read(ref r),
             MessageType.Cursor => CursorMessage.Read(ref r),
+            MessageType.PlayerState => PlayerStateMessage.Read(ref r),
+            MessageType.Alarm => AlarmMessage.Read(ref r),
             _ => throw new ProtocolException($"Неизвестный тип сообщения: {(ushort)type}"),
         };
         r.EnsureEnd();

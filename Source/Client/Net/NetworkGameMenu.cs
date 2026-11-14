@@ -86,7 +86,8 @@ public class Dialog_ServerJoin : Window
     private string _name;
     private bool _started;
 
-    public override Vector2 InitialSize => new Vector2(560f, 260f);
+    public override Vector2 InitialSize => new Vector2(560f, 310f);
+    private string _password = "";
 
     public Dialog_ServerJoin()
     {
@@ -115,6 +116,8 @@ public class Dialog_ServerJoin : Window
         _code = list.TextEntry(_code);
         list.Label("Ваше имя в игре:");
         _name = list.TextEntry(_name);
+        list.Label("Пароль (если сервер его требует):");
+        _password = list.TextEntry(_password);
 
         bool valid = ConnectionCode.TryParse(_code, out string host, out int port, out string thumb);
         LockstepClient.State st = LockstepClient.CurrentState;
@@ -125,6 +128,7 @@ public class Dialog_ServerJoin : Window
             if (Widgets.ButtonText(list.GetRect(32f), "Подключиться", active: ready) && ready && st == LockstepClient.State.Off)
             {
                 _started = true;
+                LockstepClient.ConnectPassword = _password;
                 LockstepClient.Connect(host, port, thumb, _name.Trim());
             }
         }
@@ -133,7 +137,7 @@ public class Dialog_ServerJoin : Window
             list.Label(st switch
             {
                 LockstepClient.State.InSession => "В сессии, игрок " + LockstepClient.PlayerId + ". Окно можно закрыть.",
-                LockstepClient.State.Off => "Подключение не состоялось: сервер недоступен, отказал или имя уже занято. Подробности — в логе игры (строки RWMLWC).",
+                LockstepClient.State.Off => "Подключение не состоялось: сервер недоступен или отказал (пароль, имя, версия). Подробности — в логе игры (строки RWMLWC).",
                 LockstepClient.State.Connecting => "Подключаюсь...",
                 _ => "Сервер ответил, загружаю мир...",
             });

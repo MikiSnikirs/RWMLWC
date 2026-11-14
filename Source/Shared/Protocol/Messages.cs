@@ -30,6 +30,8 @@ public enum MessageType : ushort
     Chat = 19,
     ChooseColor = 20,
     Cursor = 21,
+    PlayerState = 22,
+    Alarm = 23,
 }
 
 /// <summary>
@@ -58,6 +60,8 @@ public enum RejectReason : byte
     ModListMismatch = 4,
     ServerFull = 5,
     NameTaken = 6,
+    /// <summary>Пароль сервера не указан или неверен (v6).</summary>
+    WrongPassword = 7,
 }
 
 /// <summary>Константы полей.</summary>
@@ -131,6 +135,8 @@ public sealed class HelloMessage : Message
     public ulong SaveWorldId;
     /// <summary>Игровой тик, на котором снята локальная копия сейва (T-044, v2); 0 — нет. Больше тик того же мира — новее копия.</summary>
     public int SaveTick;
+    /// <summary>Пароль сервера (v6); пусто — без пароля.</summary>
+    public string Password = "";
 
     public override void Write(PacketWriter w)
     {
@@ -141,18 +147,26 @@ public sealed class HelloMessage : Message
         w.WriteUInt64(ModListHash);
         w.WriteUInt64(SaveWorldId);
         w.WriteInt32(SaveTick);
+        w.WriteString(Password);
     }
 
-    internal static HelloMessage Read(ref PacketReader r) => new()
+    internal static HelloMessage Read(ref PacketReader r)
     {
-        ProtocolVersion = r.ReadInt32(),
-        ModId = r.ReadString(),
-        GameVersion = r.ReadString(),
-        PlayerName = r.ReadString(),
-        ModListHash = r.ReadUInt64(),
-        SaveWorldId = r.ReadUInt64(),
-        SaveTick = r.ReadInt32(),
-    };
+        var msg = new HelloMessage
+        {
+            ProtocolVersion = r.ReadInt32(),
+            ModId = r.ReadString(),
+            GameVersion = r.ReadString(),
+            PlayerName = r.ReadString(),
+            ModListHash = r.ReadUInt64(),
+            SaveWorldId = r.ReadUInt64(),
+            SaveTick = r.ReadInt32(),
+        };
+        // Пароль — с v6. У старого клиента его нет: читаем, только если байты остались, чтобы сервер
+        // ответил понятным отказом «другая версия протокола», а не разрывом из-за нехватки данных.
+        if (r.Remaining > 0) msg.Password = r.ReadString();
+        return msg;
+    }
 }
 
 /// <summary>Сервер → клиент: подключение принято.</summary>
@@ -611,8 +625,9 @@ public sealed class SnapshotAppliedMessage : Message
 /// <summary>
 /// <paramref name="PingMs"/> — время туда-обратно до сервера в мс; -1 — ещё не измерено или игрок не в сети.
 /// <paramref name="Color"/> — цвет игрока 0xRRGGBB (v5); 0 — ещё не выбран.
+/// <paramref name="Idle"/> — игрок в сети, но отошёл (v6): его скорость не учитывается.
 /// </summary>
-public readonly record struct PlayerInfo(int PlayerId, string Name, bool Online, int PingMs, int Color = PlayerColors.None);
+public readonly record struct PlayerInfo(int PlayerId, string Name, bool Online, int PingMs, int Color = PlayerColors.None, bool Idle = false);
 
 /// <summary>
 /// Сервер → клиентам: состав сессии (v3). Все игроки, которые когда-либо входили, по возрастанию номера:
@@ -637,15 +652,16 @@ public sealed class PlayersMessage : Message
             w.WriteBool(p.Online);
             w.WriteInt32(p.PingMs);
             w.WriteInt32(p.Color);
+            w.WriteBool(p.Idle);
         }
     }
 
     internal static PlayersMessage Read(ref PacketReader r)
     {
         var msg = new PlayersMessage();
-        int n = r.ReadCount(ProtocolLimits.MaxPlayersInList, 17);
+        int n = r.ReadCount(ProtocolLimits.MaxPlayersInList, 18);
         for (int i = 0; i < n; i++)
-            msg.Players.Add(new PlayerInfo(r.ReadInt32(), r.ReadString(), r.ReadBool(), r.ReadInt32(), r.ReadInt32()));
+            msg.Players.Add(new PlayerInfo(r.ReadInt32(), r.ReadString(), r.ReadBool(), r.ReadInt32(), r.ReadInt32(), r.ReadBool()));
         return msg;
     }
 }
@@ -750,5 +766,52 @@ public sealed class CursorMessage : Message
         MapId = r.ReadInt32(),
         X = BitConverter.Int32BitsToSingle(r.ReadInt32()),
         Z = BitConverter.Int32BitsToSingle(r.ReadInt32()),
+    };
+}
+
+/// <summary>
+/// Клиент → сервер (v6, T-040): игрок отошёл или вернулся. Отошедший — нет ввода дольше заданного клиентом времени;
+/// его выбор скорости сервер не учитывает (если отошли все — учитывает всех).
+/// </summary>
+public sealed class PlayerStateMessage : Message
+{
+    public override MessageType Type => MessageType.PlayerState;
+
+    public bool Idle;
+
+    public override void Write(PacketWriter w) => w.WriteBool(Idle);
+
+    internal static PlayerStateMessage Read(ref PacketReader r) => new() { Idle = r.ReadBool() };
+}
+
+/// <summary>
+/// Тревога (v6, T-040). Клиент → сервер: на карте <see cref="MapId"/> крупная угроза (<see cref="Text"/> — заголовок письма).
+/// Сервер решает: если хозяин карты отошёл (или карта без хозяина и кто-то отошёл), ставит общую паузу на
+/// <see cref="Seconds"/> и рассылает тревогу всем (сервер → все: <see cref="PlayerId"/> — хозяин карты, кого зовут).
+/// Пауза снимается раньше, когда тот вернулся. Повтор по той же карте — не чаще раза в <see cref="ProtocolLimits.AlarmRepeatSeconds"/>.
+/// </summary>
+public sealed class AlarmMessage : Message
+{
+    public override MessageType Type => MessageType.Alarm;
+
+    public int MapId;
+    public int PlayerId;
+    public int Seconds;
+    public string Text = "";
+
+    public override void Write(PacketWriter w)
+    {
+        w.WriteInt32(MapId);
+        w.WriteInt32(PlayerId);
+        w.WriteInt32(Seconds);
+        w.WriteString(Text);
+    }
+
+    internal static AlarmMessage Read(ref PacketReader r) => new()
+    {
+        MapId = r.ReadInt32(),
+        PlayerId = r.ReadInt32(),
+        Seconds = r.ReadInt32(),
+        Text = r.ReadString(),
     };
 }
