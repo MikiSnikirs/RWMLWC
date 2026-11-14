@@ -25,12 +25,16 @@ public static class FieldWatch
     {
         public string key = "";
         public Func<object?, object[], object?> target = (_, _) => null;
+
+        /// <summary>Наблюдать только за этими полями (остальные — личные настройки вида, их не передаём).</summary>
+        public HashSet<string>? only;
     }
 
     public struct State
     {
         public object? target;
         public object?[]? before;
+        public HashSet<string>? only;
         public object? previousAmbient;
         public bool active;
     }
@@ -44,7 +48,7 @@ public static class FieldWatch
     /// <summary>Объект, за которым сейчас наблюдает метод отрисовки (для меню, открытых из него).</summary>
     public static object? AmbientTarget => ambientTarget;
 
-    private static void Add(Type type, string method, Func<object?, object[], object?> target)
+    private static void Add(Type type, string method, Func<object?, object[], object?> target, params string[] only)
     {
         MethodInfo? found = AccessTools.Method(type, method);
         if (found == null)
@@ -52,7 +56,12 @@ public static class FieldWatch
             Log.Warning($"[RWMLWC] поля: не найден метод {type.FullName}.{method}");
             return;
         }
-        watches[found] = new Watch { key = type.FullName + "." + method, target = target };
+        watches[found] = new Watch
+        {
+            key = type.FullName + "." + method,
+            target = target,
+            only = only.Length > 0 ? new HashSet<string>(only) : null,
+        };
     }
 
     private static void RegisterAll()
@@ -69,6 +78,10 @@ public static class FieldWatch
         Add(typeof(HostilityResponseModeUtility), nameof(HostilityResponseModeUtility.DrawResponseButton), (_, args) => (args[1] as Pawn)?.playerSettings);
         // Вкладка пленника/гостя: уровень медпомощи.
         Add(typeof(ITab_Pawn_Visitor), "FillTab", (_, _) => (Find.Selector.SingleSelectedThing as Pawn)?.playerSettings);
+        // Общие переключатели, от которых зависит симуляция. Остальные поля PlaySettings — что показывать
+        // на экране; это личное дело каждого игрока, хотя и лежит в сейве.
+        Add(typeof(PlaySettings), nameof(PlaySettings.DoPlaySettingsGlobalControls), (_, _) => Find.PlaySettings, "autoHomeArea", "autoRebuild");
+        Add(typeof(MainTabWindow_Work), "DoManualPrioritiesCheckbox", (_, _) => Find.PlaySettings, "useWorkPriorities");
     }
 
     // ---------- наблюдение ----------
@@ -112,7 +125,7 @@ public static class FieldWatch
     // Сравнить с запомненным; изменения вернуть назад и отправить командами.
     // Все изменения одного объекта уходят вместе или не уходят вовсе: поля бывают связаны
     // (способ хранения в счёте и склад для него).
-    private static void SendChanges(object target, object?[] before)
+    private static void SendChanges(object target, object?[] before, HashSet<string>? only = null)
     {
         List<(byte depth, FieldInfo field)> fields = FieldsOf(target.GetType());
         List<PacketWriter>? commands = null;
@@ -121,6 +134,10 @@ public static class FieldWatch
         for (int i = 0; i < fields.Count && i < before.Length; i++)
         {
             (byte depth, FieldInfo field) = fields[i];
+            if (only != null && !only.Contains(field.Name))
+            {
+                continue;
+            }
             object? now = field.GetValue(target);
             if (Equals(now, before[i]))
             {
@@ -195,8 +212,9 @@ public static class FieldWatch
         __state.active = true;
         __state.target = target;
         __state.before = Snapshot(target);
+        __state.only = watch.only;
         __state.previousAmbient = ambientTarget;
-        ambientTarget = target;
+        ambientTarget = watch.only == null ? target : ambientTarget; // меню под наблюдением — только для объектов целиком
     }
 
     private static void Finalizer(State __state)
@@ -208,7 +226,7 @@ public static class FieldWatch
         ambientTarget = __state.previousAmbient;
         try
         {
-            SendChanges(__state.target, __state.before);
+            SendChanges(__state.target, __state.before, __state.only);
         }
         catch (Exception ex)
         {
@@ -273,6 +291,23 @@ public static class FieldWatch
             throw new InvalidOperationException("поля: значение не того типа для " + name);
         }
         field.SetValue(target, value);
+        AfterSet(target, name);
+    }
+
+    // То, что интерфейс делает сразу после записи поля.
+    private static void AfterSet(object target, string fieldName)
+    {
+        if (target is PlaySettings && fieldName == "useWorkPriorities")
+        {
+            // Как MainTabWindow_Work.DoManualPrioritiesCheckbox.
+            foreach (Pawn pawn in PawnsFinder.AllMapsWorldAndTemporary_Alive)
+            {
+                if (pawn.Faction == Faction.OfPlayer && pawn.workSettings != null)
+                {
+                    pawn.workSettings.Notify_UseWorkPrioritiesChanged();
+                }
+            }
+        }
     }
 
     public static void PatchAll(Harmony harmony)
