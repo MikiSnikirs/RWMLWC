@@ -413,6 +413,29 @@ public static class TestAutomation
                 RWMLWC.Client.Maps.Squads.Rename(map, 2, "Чужие");
                 RWMLWC.Client.Maps.Squads.SetColor(map, 2, RWMLWC.Client.Maps.Squads.Palette[3]);
             })));
+            // Для проверки глазами: окно «Отряды» открыто, камера на пешке «Беты» (кольца цвета), она выделена.
+            sessionSteps.Enqueue((startTick + 2300, "squads: show window", () => SquadsStep(map =>
+            {
+                Pawn? pawn = map.mapPawns.FreeColonistsSpawned.OrderBy(p => p.thingIDNumber).FirstOrDefault();
+                if (pawn != null)
+                {
+                    SelectOnly(pawn);
+                    // Пешка левее центра экрана: окно справа её не закроет, кольца видны.
+                    Find.CameraDriver.SetRootPosAndSize(pawn.Position.ToVector3Shifted() + new UnityEngine.Vector3(10f, 0f, 0f), 14f);
+                    List<Gizmo> gizmos = pawn.GetGizmos().ToList();
+                    Note($"squads: {pawn.LabelShort} gizmos: commands {gizmos.Count(g => g is Command)}, disabled {gizmos.Count(g => g is Command && g.Disabled)}"
+                        + $", draft disabled={gizmos.OfType<Command_Toggle>().FirstOrDefault(t => t.hotKey == KeyBindingDefOf.Command_ColonistDraft)?.Disabled}");
+                }
+                RWMLWC.Client.Maps.Dialog_Squads window = new RWMLWC.Client.Maps.Dialog_Squads();
+                Find.WindowStack.Add(window);
+                window.windowRect.x = Verse.UI.screenWidth - window.windowRect.width - 8f;
+            })));
+            // Снимок окна игрой самой (внешний захват экрана окно Vulkan без фокуса не видит): папка Screenshots данных c1.
+            sessionSteps.Enqueue((startTick + 2400, "squads: screenshot", () =>
+            {
+                ScreenshotTaker.TakeNonSteamShot("squads-look");
+                Note("squads: screenshot saved to " + GenFilePaths.ScreenshotFolderPath);
+            }));
         }
         if (cfg.issuer && cfg.scenario == "gizmo")
         {

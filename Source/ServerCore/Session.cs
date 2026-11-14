@@ -47,6 +47,12 @@ public sealed class SessionOptions
     /// </summary>
     public int MaxLeadTicks;
 
+    /// <summary>
+    /// Белый список имён (T-067, без учёта регистра); null или пусто — пускать всех. Имя игрок задаёт сам, поэтому
+    /// это защита от случайных людей, а не от того, кто знает имя из списка.
+    /// </summary>
+    public ISet<string>? AllowedNames;
+
     /// <summary>Сколько ждать хеши остальных игроков, чтобы выбрать отдающего из большинства при расхождении.</summary>
     public TimeSpan MajorityWait = TimeSpan.FromSeconds(2);
 }
@@ -314,6 +320,8 @@ public sealed class Session
             (reason, reject) = (RejectReason.ModMismatch, "чужой мод: " + hello.ModId);
         else if (string.IsNullOrWhiteSpace(hello.PlayerName))
             (reason, reject) = (RejectReason.Other, "пустое имя игрока");
+        else if (_options.AllowedNames is { Count: > 0 } allowed && !allowed.Contains(hello.PlayerName.Trim()))
+            (reason, reject) = (RejectReason.Other, $"имени «{hello.PlayerName}» нет в списке игроков этого сервера");
         else if (_gameVersion != null && hello.GameVersion != _gameVersion)
             (reason, reject) = (RejectReason.GameVersionMismatch, $"версия игры {hello.GameVersion}, в сессии {_gameVersion}");
         else if (_modListHash != null && hello.ModListHash != _modListHash)
