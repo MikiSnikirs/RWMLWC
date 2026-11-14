@@ -73,8 +73,9 @@ public class SessionTests
         Assert.Equal(2, wb.PlayerId);
         Assert.Equal(0xABCDEFu, wa.SessionSeed);
         Assert.Equal(StartTick, wa.ServerTick);
-        // Сразу после Welcome — текущее разрешение тикать.
-        Assert.Equal(StartTick, Assert.IsType<TickMessage>(a.Received[1]).TickUpTo);
+        // Сразу после Welcome — таблица прав и текущее разрешение тикать.
+        Assert.IsType<PermissionsMessage>(a.Received[1]);
+        Assert.Equal(StartTick, Assert.IsType<TickMessage>(a.Received[2]).TickUpTo);
     }
 
     [Fact]
