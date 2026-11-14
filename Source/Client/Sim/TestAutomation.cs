@@ -21,6 +21,7 @@ namespace RWMLWC.Client.Sim;
 ///                        когда очередь пройдена, метка считается выключенной;
 ///   ticks=10000        — длительность прогона;
 ///   trace=0|1          — писать ли трассировку Rand (большой файл);
+///   traceframes=7      — глубина цепочки вызовов в трассировке (больше — видно, кто вызвал, но файл крупнее);
 ///   densefrom=0, denseto=300 — окно (в тиках от старта), где хеш пишется каждый тик и идёт трассировка;
 ///   perprocess=1       — между прогонами очереди перезапускать игру, а не перезагружать сейв;
 ///   snapat=2000        — тик от старта, на котором сценарии snap-save и snap-reload снимают снимок игры;
@@ -40,6 +41,7 @@ public static class TestAutomation
         public int queueIndex;
         public int ticks = HashRecorder.AutoRunTicks;
         public bool trace = true;
+        public int traceFrames = 7;
         public int denseFrom;
         public int denseTo = HashRecorder.DenseTicks;
         public bool perProcess;
@@ -50,6 +52,10 @@ public static class TestAutomation
         public string playerName = "player";
         public int holdSec;
         public bool issuer;
+        public bool snapSender;
+        public bool cameraWander;
+        public bool desync;
+        public int connectDelaySec;
         public bool quit;
     }
 
@@ -57,10 +63,11 @@ public static class TestAutomation
     private static string? pendingScenario;
     private static bool quitWhenDone;
     private static bool automationActive;
-    private static int designateAtTick = -1;
+    // Шаги сценария, которые действуют как игрок: (тик, действие), по возрастанию тика.
+    private static readonly Queue<(int tick, string name, Action act)> sessionSteps = new Queue<(int, string, Action)>();
 
-    /// <summary>Через столько тиков после начала прогона сценарий designate отдаёт свои приказы.</summary>
-    private const int DesignateAfterTicks = 300;
+    // Дополнительное условие шага (по имени): шаг ждёт, пока условие не выполнится, даже если его тик уже наступил.
+    private static readonly Dictionary<string, Func<bool>> stepGates = new Dictionary<string, Func<bool>>();
     private static byte[]? snapshotToApply;
     private static bool snapshotDone;
     private static bool reloadPending;
@@ -173,6 +180,21 @@ public static class TestAutomation
                 case "thumbprint":
                     cfg.thumbprint = value;
                     break;
+                case "desync":
+                    cfg.desync = value == "1";
+                    break;
+                case "camera":
+                    cfg.cameraWander = value == "1";
+                    break;
+                case "snapsender":
+                    cfg.snapSender = value == "1";
+                    break;
+                case "connectdelay":
+                    if (int.TryParse(value, out int connectDelay) && connectDelay >= 0)
+                    {
+                        cfg.connectDelaySec = connectDelay;
+                    }
+                    break;
                 case "issuer":
                     cfg.issuer = value == "1";
                     break;
@@ -201,6 +223,12 @@ public static class TestAutomation
                     break;
                 case "perprocess":
                     cfg.perProcess = value == "1";
+                    break;
+                case "traceframes":
+                    if (int.TryParse(value, out int frames) && frames >= 1 && frames <= 64)
+                    {
+                        cfg.traceFrames = frames;
+                    }
                     break;
                 case "trace":
                     cfg.trace = value != "0";
@@ -250,7 +278,81 @@ public static class TestAutomation
             Find.TickManager.CurTimeSpeed = TimeSpeed.Superfast;
         }
         activeConfig = cfg;
-        designateAtTick = cfg.scenario == "designate" && cfg.issuer ? startTick + DesignateAfterTicks : -1;
+        sessionSteps.Clear();
+        stepGates.Clear();
+        if (cfg.scenario == "access")
+        {
+            // T-033: c2 (issuer=0) занимает карту и выдаёт права; c1 (issuer=1) пробует действовать.
+            if (cfg.issuer)
+            {
+                sessionSteps.Enqueue((startTick + 500, "access: designate without rights", () => AccessTry("designate, no rights", ScenarioDesignate)));
+                sessionSteps.Enqueue((startTick + 2000, "access: designate with Build", () => AccessTry("designate, Build", ScenarioDesignate)));
+                sessionSteps.Enqueue((startTick + 2100, "access: draft with Build", () => AccessTry("draft, Build", GizmoDraft)));
+                // Права приходят вне общего порядка команд, а клиенты идут по тикам не вровень.
+                // Поэтому шаг «с правами» ждёт не только своего тика, но и самих прав; выдача стоит
+                // с запасом в 1000 тиков после попытки «без прав» (в прогоне агента B отстающий c1
+                // получил права раньше, чем дошёл до своей первой попытки).
+                stepGates["access: designate with Build"] = () =>
+                    RWMLWC.Client.Maps.MapAccess.MyLevel((Find.CurrentMap ?? Find.Maps[0]).uniqueID) >= RWMLWC.Shared.Protocol.PermissionLevel.Build;
+            }
+            else
+            {
+                sessionSteps.Enqueue((startTick + 300, "access: claim", AccessClaim));
+                sessionSteps.Enqueue((startTick + 1500, "access: grant Build", AccessGrantBuild));
+            }
+        }
+        if (cfg.issuer && cfg.scenario == "tabs")
+        {
+            sessionSteps.Enqueue((startTick + 300, "tabs: work priority", TabsWorkPriority));
+            sessionSteps.Enqueue((startTick + 400, "tabs: schedule", TabsSchedule));
+            sessionSteps.Enqueue((startTick + 500, "tabs: outfit policy", TabsOutfit));
+            sessionSteps.Enqueue((startTick + 600, "tabs: allowed area", TabsArea));
+            sessionSteps.Enqueue((startTick + 700, "tabs: research", TabsResearch));
+            sessionSteps.Enqueue((startTick + 800, "tabs: add bill", TabsAddBill));
+            sessionSteps.Enqueue((startTick + 900, "tabs: suspend bill", TabsSuspendBill));
+            sessionSteps.Enqueue((startTick + 1000, "tabs: medical care", TabsMedCare));
+            sessionSteps.Enqueue((startTick + 1100, "tabs: storage filter", TabsStorageFilter));
+            sessionSteps.Enqueue((startTick + 1200, "tabs: storage priority", TabsStoragePriority));
+        }
+        if (cfg.desync && cfg.scenario == "desync")
+        {
+            // T-034: этот клиент нарочно портит своё состояние.
+            sessionSteps.Enqueue((startTick + 600, "desync: break map rand", DesyncBreak));
+        }
+        if (cfg.scenario == "ui")
+        {
+            // T-024: интерфейс во время прогона не должен менять симуляцию. Без сессии, один процесс.
+            sessionSteps.Enqueue((startTick + 200, "ui: select pawn", UiSelectPawn));
+            sessionSteps.Enqueue((startTick + 500, "ui: tab Architect", () => UiTab("Architect")));
+            sessionSteps.Enqueue((startTick + 800, "ui: tab Work", () => UiTab("Work")));
+            sessionSteps.Enqueue((startTick + 1100, "ui: tab Research", () => UiTab("Research")));
+            sessionSteps.Enqueue((startTick + 1400, "ui: tab Quests", () => UiTab("Quests")));
+            sessionSteps.Enqueue((startTick + 1700, "ui: tab Factions", () => UiTab("Factions")));
+            sessionSteps.Enqueue((startTick + 2000, "ui: info card", UiInfoCard));
+            sessionSteps.Enqueue((startTick + 2300, "ui: select item", UiSelectItem));
+            sessionSteps.Enqueue((startTick + 2600, "ui: close all", UiCloseAll));
+        }
+        if (cfg.issuer && cfg.scenario == "rightclick")
+        {
+            sessionSteps.Enqueue((startTick + 300, "rightclick: draft", GizmoDraft));
+            sessionSteps.Enqueue((startTick + 400, "rightclick: move", RightClickMove));
+            sessionSteps.Enqueue((startTick + 600, "rightclick: undraft", GizmoDraft));
+            sessionSteps.Enqueue((startTick + 700, "rightclick: item", RightClickItem));
+            sessionSteps.Enqueue((startTick + 800, "rightclick: menu option", GizmoMenuOption));
+        }
+        if (cfg.issuer && cfg.scenario == "designate")
+        {
+            sessionSteps.Enqueue((startTick + 300, "designate", ScenarioDesignate));
+        }
+        if (cfg.issuer && cfg.scenario == "gizmo")
+        {
+            sessionSteps.Enqueue((startTick + 300, "gizmo: draft", GizmoDraft));
+            sessionSteps.Enqueue((startTick + 400, "gizmo: forbid", GizmoForbid));
+            sessionSteps.Enqueue((startTick + 500, "gizmo: attack", GizmoAttack));
+            sessionSteps.Enqueue((startTick + 600, "gizmo: plant menu", GizmoPlantMenu));
+            sessionSteps.Enqueue((startTick + 700, "gizmo: menu option", GizmoMenuOption));
+        }
+        RandTracer.MaxFrames = cfg.traceFrames;
         snapshotDone = false;
         snapshotToApply = null;
         Note($"run started: #{cfg.queueIndex}, tick={startTick}, scenario={cfg.scenario}, ticks={cfg.ticks}, trace={cfg.trace}, quit={cfg.quit}, file={Path.GetFileName(hashFile)}");
@@ -267,6 +369,7 @@ public static class TestAutomation
         if (cfg.serverHost != null && LockstepClient.CurrentState == LockstepClient.State.Off)
         {
             LockstepClient.HoldSeconds = cfg.holdSec;
+            LockstepClient.ForceSnapshotSender = cfg.snapSender;
             LockstepClient.Connect(cfg.serverHost, cfg.serverPort, cfg.thumbprint, cfg.playerName);
         }
     }
@@ -293,8 +396,14 @@ public static class TestAutomation
                 case "twomaps-freeze":
                     ScenarioSecondMap(true);
                     break;
+                case "ui":
+                case "access":
+                case "tabs":
+                case "desync":
                 case "designate":
-                    break; // срабатывает позже, из кадра (SessionFrame): приказы идут как ввод игрока
+                case "gizmo":
+                case "rightclick":
+                    break; // срабатывают позже, из кадра (SessionFrame): приказы идут как ввод игрока
                 case "snap-save":
                 case "snap-reload":
                     break; // срабатывают позже, на тике snapat (BeforeTickDuringRun)
@@ -310,23 +419,532 @@ public static class TestAutomation
         }
     }
 
-    /// <summary>Раз в кадр в сессии, между тиками: сценарии, которые действуют как игрок.</summary>
-    public static void SessionFrame()
+    // Камера этого клиента «гуляет»: раз в 150 тиков прыгает в случайное место карты и меняет приближение.
+    // У двух экземпляров игры на одной машине камеры иначе одинаковы, и зависимость симуляции
+    // от камеры (docs/research/sim.md, 6з) такой тест не поймал бы.
+    private static readonly System.Random cameraRandom = new System.Random();
+    private static int nextCameraJumpTick;
+    private static int cameraJumps;
+
+    private static void WanderCamera()
     {
-        if (designateAtTick < 0 || Current.Game == null || Find.TickManager.TicksGame < designateAtTick)
+        Config? cfg = activeConfig;
+        if (cfg == null || !cfg.cameraWander || Current.Game == null || Find.CurrentMap == null)
         {
             return;
         }
-        designateAtTick = -1;
+        int tick = Find.TickManager.TicksGame;
+        if (tick < nextCameraJumpTick)
+        {
+            return;
+        }
+        nextCameraJumpTick = tick + 150;
+        Map map = Find.CurrentMap;
+        IntVec3 cell = new IntVec3(cameraRandom.Next(5, map.Size.x - 5), 0, cameraRandom.Next(5, map.Size.z - 5));
+        float size = 11f + (float)cameraRandom.NextDouble() * 49f;
+        Find.CameraDriver.SetRootPosAndSize(cell.ToVector3Shifted(), size);
+        cameraJumps++;
+    }
+
+    /// <summary>Раз в кадр в сессии, между тиками: сценарии, которые действуют как игрок.</summary>
+    public static void SessionFrame()
+    {
+        WanderCamera();
+        if (sessionSteps.Count == 0 || Current.Game == null || Find.TickManager.TicksGame < sessionSteps.Peek().tick)
+        {
+            return;
+        }
+        if (stepGates.TryGetValue(sessionSteps.Peek().name, out Func<bool>? gate) && !gate())
+        {
+            return;
+        }
+        (int _, string name, Action act) = sessionSteps.Dequeue();
         try
         {
-            ScenarioDesignate();
+            act();
         }
         catch (Exception ex)
         {
-            Note("scenario 'designate' FAILED: " + ex);
-            Log.Error("[RWMLWC] сценарий designate упал: " + ex);
+            Note("step '" + name + "' FAILED: " + ex);
+            Log.Error("[RWMLWC] шаг сценария " + name + " упал: " + ex);
         }
+    }
+
+    // --- сценарий ui (T-024): окна и выделение во время прогона ---
+
+    private static void UiSelectPawn()
+    {
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        Pawn? pawn = map.mapPawns.FreeColonistsSpawned.OrderBy(p => p.thingIDNumber).FirstOrDefault();
+        if (pawn != null)
+        {
+            SelectOnly(pawn);
+        }
+        Note("ui: selected " + (pawn != null ? pawn.LabelShort : "nobody"));
+    }
+
+    private static void UiTab(string defName)
+    {
+        MainButtonDef? tab = DefDatabase<MainButtonDef>.GetNamedSilentFail(defName);
+        if (tab == null)
+        {
+            Note("ui: no tab " + defName);
+            return;
+        }
+        Find.MainTabsRoot.SetCurrentTab(tab, false);
+        Note("ui: opened tab " + defName);
+    }
+
+    private static void UiInfoCard()
+    {
+        Find.MainTabsRoot.EscapeCurrentTab(false);
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        Pawn? pawn = map.mapPawns.FreeColonistsSpawned.OrderBy(p => p.thingIDNumber).FirstOrDefault();
+        if (pawn != null)
+        {
+            Find.WindowStack.Add(new Dialog_InfoCard(pawn));
+        }
+        Note("ui: info card " + (pawn != null ? pawn.LabelShort : "nobody"));
+    }
+
+    private static void UiSelectItem()
+    {
+        Find.WindowStack.TryRemove(typeof(Dialog_InfoCard), false);
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        Thing? item = map.listerThings.ThingsInGroup(ThingRequestGroup.HaulableEver)
+            .Where(t => t.Spawned && !t.Fogged()).OrderBy(t => t.thingIDNumber).FirstOrDefault();
+        if (item != null)
+        {
+            SelectOnly(item);
+        }
+        Note("ui: selected item " + (item != null ? item.LabelShort : "none"));
+    }
+
+    private static void UiCloseAll()
+    {
+        Find.MainTabsRoot.EscapeCurrentTab(false);
+        Find.Selector.ClearSelection();
+        Note("ui: closed");
+    }
+
+    // --- сценарий tabs (T-023): те же вызовы, что делают вкладки «Работа», «Расписание», «Назначения» ---
+
+    private static Pawn? FirstColonist()
+    {
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        return map.mapPawns.FreeColonistsSpawned.OrderBy(p => p.thingIDNumber).FirstOrDefault();
+    }
+
+    private static void TabsWorkPriority()
+    {
+        Pawn? pawn = FirstColonist();
+        if (pawn == null || pawn.workSettings == null || !pawn.workSettings.EverWork)
+        {
+            Note("tabs: work: no colonist");
+            return;
+        }
+        WorkTypeDef? work = DefDatabase<WorkTypeDef>.AllDefsListForReading.OrderBy(w => w.defName).FirstOrDefault(w => !pawn.WorkTypeIsDisabled(w));
+        if (work == null)
+        {
+            Note("tabs: work: no work type");
+            return;
+        }
+        int before = pawn.workSettings.GetPriority(work);
+        int after = before == 0 ? 3 : 0;
+        int sentBefore = LockstepClient.CommandsSent;
+        pawn.workSettings.SetPriority(work, after);
+        Note($"tabs: work {work.defName} of {pawn.LabelShort}: {before} -> {after}, sent={LockstepClient.CommandsSent - sentBefore}, value now={pawn.workSettings.GetPriority(work)}");
+    }
+
+    private static void TabsSchedule()
+    {
+        Pawn? pawn = FirstColonist();
+        if (pawn == null || pawn.timetable == null)
+        {
+            Note("tabs: schedule: no colonist");
+            return;
+        }
+        TimeAssignmentDef before = pawn.timetable.GetAssignment(5);
+        TimeAssignmentDef after = before == TimeAssignmentDefOf.Work ? TimeAssignmentDefOf.Joy : TimeAssignmentDefOf.Work;
+        int sentBefore = LockstepClient.CommandsSent;
+        pawn.timetable.SetAssignment(5, after);
+        Note($"tabs: schedule hour 5 of {pawn.LabelShort}: {before.defName} -> {after.defName}, sent={LockstepClient.CommandsSent - sentBefore}");
+    }
+
+    private static void TabsOutfit()
+    {
+        Pawn? pawn = FirstColonist();
+        if (pawn == null || pawn.outfits == null)
+        {
+            Note("tabs: outfit: no colonist");
+            return;
+        }
+        ApparelPolicy? other = Current.Game.outfitDatabase.AllOutfits.OrderBy(o => o.id).FirstOrDefault(o => o != pawn.outfits.CurrentApparelPolicy);
+        if (other == null)
+        {
+            Note("tabs: outfit: only one policy");
+            return;
+        }
+        int sentBefore = LockstepClient.CommandsSent;
+        pawn.outfits.CurrentApparelPolicy = other;
+        Note($"tabs: outfit of {pawn.LabelShort} -> policy {other.id}, sent={LockstepClient.CommandsSent - sentBefore}");
+    }
+
+    private static void TabsArea()
+    {
+        Pawn? pawn = FirstColonist();
+        if (pawn == null || pawn.playerSettings == null)
+        {
+            Note("tabs: area: no colonist");
+            return;
+        }
+        Area? area = pawn.Map.areaManager.AllAreas.Where(a => a is Area_Allowed).OrderBy(a => a.ID).FirstOrDefault();
+        Area? target = pawn.playerSettings.AreaRestrictionInPawnCurrentMap == area ? null : area;
+        int sentBefore = LockstepClient.CommandsSent;
+        pawn.playerSettings.AreaRestrictionInPawnCurrentMap = target;
+        Note($"tabs: allowed area of {pawn.LabelShort} -> {(target != null ? target.ID.ToString() : "none")}, sent={LockstepClient.CommandsSent - sentBefore}");
+    }
+
+    private static void TabsResearch()
+    {
+        ResearchProjectDef? current = Find.ResearchManager.GetProject();
+        ResearchProjectDef? other = DefDatabase<ResearchProjectDef>.AllDefsListForReading.OrderBy(p => p.defName)
+            .FirstOrDefault(p => p != current && p.CanStartNow);
+        if (other == null)
+        {
+            Note("tabs: research: nothing to start");
+            return;
+        }
+        int sentBefore = LockstepClient.CommandsSent;
+        Find.ResearchManager.SetCurrentProject(other);
+        Note($"tabs: research {(current != null ? current.defName : "-")} -> {other.defName}, sent={LockstepClient.CommandsSent - sentBefore}");
+    }
+
+    private static Building_WorkTable? FirstWorkTable()
+    {
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        return map.listerBuildings.AllBuildingsColonistOfClass<Building_WorkTable>()
+            .Where(t => t.def.AllRecipes.Any(r => r.AvailableNow)).OrderBy(t => t.thingIDNumber).FirstOrDefault();
+    }
+
+    private static void TabsAddBill()
+    {
+        Building_WorkTable? table = FirstWorkTable();
+        if (table == null)
+        {
+            Note("tabs: add bill: no work table in this save");
+            return;
+        }
+        RecipeDef recipe = table.def.AllRecipes.First(r => r.AvailableNow);
+        int sentBefore = LockstepClient.CommandsSent;
+        // Как вкладка «Счета»: сначала создаётся счёт, потом добавляется.
+        table.billStack.AddBill(recipe.MakeNewBill());
+        Note($"tabs: add bill {recipe.defName} to {table.LabelShort} (id {table.thingIDNumber}), bills before={table.billStack.Count}, sent={LockstepClient.CommandsSent - sentBefore}");
+    }
+
+    private static void TabsSuspendBill()
+    {
+        Building_WorkTable? table = FirstWorkTable();
+        if (table == null || table.billStack.Count == 0)
+        {
+            Note("tabs: suspend bill: no bill");
+            return;
+        }
+        Bill bill = table.billStack[table.billStack.Count - 1];
+        int sentBefore = LockstepClient.CommandsSent;
+        // Как строка счёта в списке: запись прямо в поле, под наблюдением FieldWatch.
+        FieldWatch.RunWatched(bill, () => bill.suspended = !bill.suspended);
+        Note($"tabs: suspend bill {bill.recipe.defName} on {table.LabelShort}, sent={LockstepClient.CommandsSent - sentBefore}, value now={bill.suspended}");
+    }
+
+    private static void TabsMedCare()
+    {
+        Pawn? pawn = FirstColonist();
+        if (pawn == null || pawn.playerSettings == null)
+        {
+            Note("tabs: medical care: no colonist");
+            return;
+        }
+        MedicalCareCategory before = pawn.playerSettings.medCare;
+        MedicalCareCategory after = before == MedicalCareCategory.Best ? MedicalCareCategory.NoMeds : MedicalCareCategory.Best;
+        int sentBefore = LockstepClient.CommandsSent;
+        FieldWatch.RunWatched(pawn.playerSettings, () => pawn.playerSettings.medCare = after);
+        Note($"tabs: medical care of {pawn.LabelShort}: {before} -> {after}, sent={LockstepClient.CommandsSent - sentBefore}");
+    }
+
+    private static Zone_Stockpile? FirstStockpile()
+    {
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        return map.zoneManager.AllZones.OfType<Zone_Stockpile>().OrderBy(z => z.ID).FirstOrDefault();
+    }
+
+    private static void TabsStorageFilter()
+    {
+        Zone_Stockpile? zone = FirstStockpile();
+        if (zone == null)
+        {
+            Note("tabs: storage filter: no stockpile in this save");
+            return;
+        }
+        bool before = zone.settings.filter.Allows(ThingDefOf.WoodLog);
+        int sentBefore = LockstepClient.CommandsSent;
+        zone.settings.filter.SetAllow(ThingDefOf.WoodLog, !before);
+        Note($"tabs: storage filter of zone {zone.ID}: wood {before} -> {!before}, sent={LockstepClient.CommandsSent - sentBefore}, value now={zone.settings.filter.Allows(ThingDefOf.WoodLog)}");
+    }
+
+    private static void TabsStoragePriority()
+    {
+        Zone_Stockpile? zone = FirstStockpile();
+        if (zone == null)
+        {
+            Note("tabs: storage priority: no stockpile in this save");
+            return;
+        }
+        StoragePriority before = zone.settings.Priority;
+        StoragePriority after = before == StoragePriority.Critical ? StoragePriority.Low : StoragePriority.Critical;
+        int sentBefore = LockstepClient.CommandsSent;
+        zone.settings.Priority = after;
+        Note($"tabs: storage priority of zone {zone.ID}: {before} -> {after}, sent={LockstepClient.CommandsSent - sentBefore}");
+    }
+
+    private static string SettingsDigest(Map map)
+    {
+        Fnv64 hash = Fnv64.Create();
+        foreach (Zone_Stockpile zone in map.zoneManager.AllZones.OfType<Zone_Stockpile>().OrderBy(z => z.ID))
+        {
+            hash.Add(zone.ID);
+            hash.Add((int)zone.settings.Priority);
+            hash.Add(zone.settings.filter.Allows(ThingDefOf.WoodLog));
+        }
+        ResearchProjectDef? project = Find.ResearchManager.GetProject();
+        hash.Add(project != null ? (int)project.shortHash : -1);
+        foreach (Building_WorkTable table in map.listerBuildings.AllBuildingsColonistOfClass<Building_WorkTable>().OrderBy(t => t.thingIDNumber))
+        {
+            hash.Add(table.thingIDNumber);
+            foreach (Bill bill in table.billStack.Bills)
+            {
+                hash.Add((int)bill.recipe.shortHash);
+                hash.Add(bill.suspended);
+            }
+        }
+        foreach (Pawn pawn in map.mapPawns.FreeColonistsSpawned.OrderBy(p => p.thingIDNumber))
+        {
+            hash.Add(pawn.thingIDNumber);
+            if (pawn.workSettings != null && pawn.workSettings.EverWork)
+            {
+                foreach (WorkTypeDef work in DefDatabase<WorkTypeDef>.AllDefsListForReading.OrderBy(w => w.defName))
+                {
+                    hash.Add(pawn.workSettings.GetPriority(work));
+                }
+            }
+            if (pawn.timetable != null)
+            {
+                for (int hour = 0; hour < 24; hour++)
+                {
+                    hash.Add((int)pawn.timetable.GetAssignment(hour).shortHash);
+                }
+            }
+            hash.Add(pawn.outfits?.CurrentApparelPolicy?.id ?? -1);
+            hash.Add(pawn.playerSettings?.AreaRestrictionInPawnCurrentMap?.ID ?? -1);
+            hash.Add(pawn.playerSettings != null ? (int)pawn.playerSettings.medCare : -1);
+        }
+        return hash.Value.ToString("X16");
+    }
+
+    // --- сценарий access (T-033): владелец карты и права ---
+
+    private static void AccessClaim()
+    {
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        RWMLWC.Client.Maps.MapAccess.Claim(map);
+        Note($"access: player {LockstepClient.PlayerId} claims map {map.uniqueID}");
+    }
+
+    private static void AccessGrantBuild()
+    {
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        int other = LockstepClient.PlayerId == 1 ? 2 : 1;
+        RWMLWC.Client.Maps.MapAccess.Grant(map.uniqueID, other, RWMLWC.Shared.Protocol.PermissionLevel.Build);
+        Note($"access: owner of map {map.uniqueID} is {RWMLWC.Client.Maps.MapAccess.OwnerOf(map.uniqueID)}; granting Build to player {other}");
+    }
+
+    private static void AccessTry(string what, Action act)
+    {
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        int sentBefore = LockstepClient.CommandsSent;
+        Note($"access: try '{what}': my level on map {map.uniqueID} is {RWMLWC.Client.Maps.MapAccess.MyLevel(map.uniqueID)}, owner {RWMLWC.Client.Maps.MapAccess.OwnerOf(map.uniqueID)}");
+        act();
+        Note($"access: try '{what}': commands sent={LockstepClient.CommandsSent - sentBefore}");
+    }
+
+    // --- сценарий desync (T-034): искусственное расхождение ---
+
+    private static void DesyncBreak()
+    {
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        MapSimState? sim = MapSimState.For(map);
+        MapStateHash before = MapStateHasher.Compute(map);
+
+        // Порча в двух независимых местах, оба входят в хеш карты:
+        //  1) счётчик Rand карты сдвигается на единицу прямо в её сохранённом состоянии;
+        //  2) у одной постройки отнимается единица прочности.
+        // Первая версия брала лишнее число через Rand.Value между тиками, и хеши у клиентов
+        // остались одинаковыми (прогон TST-034 у агента B) — причина не найдена, поэтому теперь
+        // состояние меняется напрямую, а в журнал пишутся хеши до и после.
+        if (sim != null)
+        {
+            if (!sim.randInitialized)
+            {
+                sim.randState = sim.InitialRandState();
+                sim.randInitialized = true;
+            }
+            unchecked
+            {
+                sim.randState += 1UL << 32;
+            }
+        }
+        Thing? victim = map.listerThings.AllThings
+            .Where(t => t.def.category == ThingCategory.Building && t.def.useHitPoints && t.HitPoints > 1)
+            .OrderBy(t => t.thingIDNumber)
+            .FirstOrDefault();
+        if (victim != null)
+        {
+            victim.HitPoints -= 1;
+        }
+
+        MapStateHash after = MapStateHasher.Compute(map);
+        Note($"desync: broke map {map.uniqueID} at tick {Find.TickManager.TicksGame}: rand {before.rand:X16} -> {after.rand:X16}, "
+            + $"victim {(victim != null ? victim.ThingID : "none")}, total {before.total:X16} -> {after.total:X16}, changed={before.total != after.total}");
+    }
+
+    // --- сценарий gizmo (T-021): нажатия кнопок выделенных объектов, приказ атаки, меню ---
+
+    private static Pawn? gizmoPawn;
+
+    private static void SelectOnly(object obj)
+    {
+        Find.Selector.ClearSelection();
+        Find.Selector.Select(obj, false, false);
+    }
+
+    private static void GizmoDraft()
+    {
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        gizmoPawn = map.mapPawns.FreeColonistsSpawned.OrderBy(p => p.thingIDNumber).FirstOrDefault();
+        if (gizmoPawn == null)
+        {
+            Note("gizmo: draft: no colonist");
+            return;
+        }
+        SelectOnly(gizmoPawn);
+        bool sent = GizmoCommands.SendClick(map, gizmoPawn, g => g is Command_Toggle toggle && toggle.hotKey == KeyBindingDefOf.Command_ColonistDraft);
+        Note($"gizmo: draft {gizmoPawn.LabelShort} (id {gizmoPawn.thingIDNumber}): sent={sent}");
+    }
+
+    private static void GizmoForbid()
+    {
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        Thing? item = map.listerThings.ThingsInGroup(ThingRequestGroup.HaulableEver)
+            .Where(t => t.Spawned && !t.Fogged() && t.TryGetComp<CompForbiddable>() != null)
+            .OrderBy(t => t.thingIDNumber).FirstOrDefault();
+        if (item == null)
+        {
+            Note("gizmo: forbid: no item");
+            return;
+        }
+        SelectOnly(item);
+        bool sent = GizmoCommands.SendClick(map, item, g => g is Command_Toggle toggle && toggle.hotKey == KeyBindingDefOf.Command_ItemForbid);
+        Note($"gizmo: forbid {item.LabelShort} (id {item.thingIDNumber}, forbidden before={item.IsForbidden(Faction.OfPlayer)}): sent={sent}");
+    }
+
+    private static void GizmoAttack()
+    {
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        Pawn? pawn = gizmoPawn;
+        if (pawn == null || !pawn.Spawned)
+        {
+            Note("gizmo: attack: no pawn");
+            return;
+        }
+        Pawn? prey = map.mapPawns.AllPawnsSpawned
+            .Where(p => p.RaceProps.Animal && p.Faction == null && !p.Fogged())
+            .OrderBy(p => p.Position.DistanceToSquared(pawn.Position)).ThenBy(p => p.thingIDNumber).FirstOrDefault();
+        Verb? verb = pawn.TryGetAttackVerb(prey);
+        if (prey == null || verb == null)
+        {
+            Note("gizmo: attack: no target or verb");
+            return;
+        }
+        SelectOnly(pawn);
+        int before = LockstepClient.CommandsSent;
+        // Тот же вызов, что делает прицел после щелчка по цели; в сессии он перехватывается.
+        verb.OrderForceTarget(new LocalTargetInfo(prey));
+        Note($"gizmo: attack {prey.LabelShort} (id {prey.thingIDNumber}) by {pawn.LabelShort}, drafted={pawn.Drafted}: sent={LockstepClient.CommandsSent - before}");
+    }
+
+    private static void GizmoPlantMenu()
+    {
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        Zone? zone = map.zoneManager.AllZones.Where(z => z is Zone_Growing).OrderBy(z => z.ID).FirstOrDefault();
+        if (zone == null)
+        {
+            Note("gizmo: plant menu: no growing zone in this save");
+            return;
+        }
+        SelectOnly(zone);
+        bool sent = GizmoCommands.SendClick(map, zone, g => g.GetType().Name.Contains("SetPlantToGrow"));
+        Note($"gizmo: plant menu of zone {zone.ID} ({((Zone_Growing)zone).GetPlantDefToGrow()?.defName}): sent={sent}");
+    }
+
+    // --- сценарий rightclick (T-022): правый щелчок по карте ---
+
+    private static void RightClickMove()
+    {
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        Pawn? pawn = gizmoPawn;
+        if (pawn == null || !pawn.Spawned)
+        {
+            Note("rightclick: move: no pawn");
+            return;
+        }
+        SelectOnly(pawn);
+        IntVec3 cell = CellFinder.StandableCellNear(pawn.Position + new IntVec3(4, 0, 4), map, 5f);
+        if (!cell.IsValid)
+        {
+            Note("rightclick: move: no standable cell");
+            return;
+        }
+        MapClickCommands.Send(map, cell.ToVector3Shifted());
+        Note($"rightclick: move {pawn.LabelShort} from {pawn.Position} to {cell}, drafted={pawn.Drafted}: sent");
+    }
+
+    private static void RightClickItem()
+    {
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        Pawn? pawn = gizmoPawn;
+        if (pawn == null || !pawn.Spawned)
+        {
+            Note("rightclick: item: no pawn");
+            return;
+        }
+        Thing? item = map.listerThings.ThingsInGroup(ThingRequestGroup.HaulableEver)
+            .Where(t => t.Spawned && !t.Fogged() && !t.IsForbidden(Faction.OfPlayer))
+            .OrderBy(t => t.Position.DistanceToSquared(pawn.Position)).ThenBy(t => t.thingIDNumber).FirstOrDefault();
+        if (item == null)
+        {
+            Note("rightclick: item: no item");
+            return;
+        }
+        SelectOnly(pawn);
+        MapClickCommands.Send(map, item.Position.ToVector3Shifted());
+        Note($"rightclick: item {item.LabelShort} (id {item.thingIDNumber}) at {item.Position} for {pawn.LabelShort}, drafted={pawn.Drafted}: sent");
+    }
+
+    private static void GizmoMenuOption()
+    {
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        bool sent = VirtualUi.TestChooseFirstOption(map);
+        Note($"gizmo: first menu option: sent={sent}");
     }
 
     // Те же вызовы, что делает интерфейс: в сессии они перехватываются и уходят командами (T-020).
@@ -379,6 +997,17 @@ public static class TestAutomation
         }
         foreach (Map map in Find.Maps)
         {
+            string plants = string.Join(",", map.zoneManager.AllZones.Where(z => z is Zone_Growing).OrderBy(z => z.ID)
+                .Select(z => ((Zone_Growing)z).GetPlantDefToGrow()?.defName ?? "-"));
+            Note($"summary: map{map.uniqueID} drafted={map.mapPawns.FreeColonistsSpawned.Count(p => p.Drafted)} forbidden={map.listerThings.ThingsInGroup(ThingRequestGroup.HaulableEver).Count(t => t.IsForbidden(Faction.OfPlayer))} plants=[{plants}]");
+            string jobs = string.Join(",", map.mapPawns.FreeColonistsSpawned.OrderBy(p => p.thingIDNumber)
+                .Select(p => p.thingIDNumber + ":" + (p.CurJobDef != null ? p.CurJobDef.defName : "-") + "@" + p.Position));
+            Note($"summary: map{map.uniqueID} jobs=[{jobs}]");
+            if (cameraJumps > 0)
+            {
+                Note($"camera: this client moved its camera {cameraJumps} times during the run");
+            }
+            Note($"summary: map{map.uniqueID} settings={SettingsDigest(map)}");
             Note($"summary: map{map.uniqueID} designations={map.designationManager.AllDesignations.Count} blueprints={map.listerThings.ThingsInGroup(ThingRequestGroup.Blueprint).Count} zones={map.zoneManager.AllZones.Count}; commands sent={LockstepClient.CommandsSent} executed={CommandBus.Executed} failed={CommandBus.Failed}");
         }
     }
@@ -461,8 +1090,41 @@ public static class TestAutomation
         }
     }
 
+    // --- вход без мира (T-045): подключение из главного меню ---
+
+    private static Config? entryConnect;
+    private static readonly System.Diagnostics.Stopwatch entryClock = new System.Diagnostics.Stopwatch();
+
+    /// <summary>В метке задан сервер, но не задан сейв: подключиться из главного меню через connectdelay секунд.</summary>
+    public static void ScheduleEntryConnect(Config cfg)
+    {
+        entryConnect = cfg;
+        entryClock.Restart();
+        Note($"entry: will connect to {cfg.serverHost}:{cfg.serverPort} in {cfg.connectDelaySec} s without a loaded game");
+    }
+
+    /// <summary>Раз в кадр в главном меню.</summary>
+    public static void EntryFrame()
+    {
+        Config? cfg = entryConnect;
+        if (cfg == null || cfg.serverHost == null || entryClock.ElapsedMilliseconds < cfg.connectDelaySec * 1000L)
+        {
+            return;
+        }
+        entryConnect = null;
+        if (cfg.quit)
+        {
+            automationActive = true;
+        }
+        LockstepClient.Connect(cfg.serverHost, cfg.serverPort, cfg.thumbprint, cfg.playerName);
+    }
+
     public static void KeepRunning()
     {
+        if (!LockstepClient.OwnsTicking)
+        {
+            SessionFrame(); // шаги сценариев без сессии (ui)
+        }
         if (snapshotToApply != null)
         {
             byte[] data = snapshotToApply;
@@ -546,6 +1208,11 @@ public static class TestAutomationBoot
         try
         {
             TestAutomation.Config cfg = TestAutomation.Read();
+            if (cfg.armed && cfg.save == null && cfg.serverHost != null)
+            {
+                TestAutomation.ScheduleEntryConnect(cfg);
+                return;
+            }
             if (!cfg.armed || cfg.save == null)
             {
                 return;
