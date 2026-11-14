@@ -59,6 +59,9 @@ public static class ProtocolCodec
             MessageType.Notice => NoticeMessage.Read(ref r),
             MessageType.SnapshotApplied => SnapshotAppliedMessage.Read(ref r),
             MessageType.Players => PlayersMessage.Read(ref r),
+            MessageType.Ping => PingMessage.Read(ref r),
+            MessageType.Pong => PongMessage.Read(ref r),
+            MessageType.Chat => ChatMessage.Read(ref r),
             _ => throw new ProtocolException($"Неизвестный тип сообщения: {(ushort)type}"),
         };
         r.EnsureEnd();

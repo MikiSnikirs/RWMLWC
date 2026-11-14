@@ -11,7 +11,7 @@ public static class ProtocolInfo
     /// Версия протокола. 1 — протокол v0 (T-011): рукопожатие, команды, тик, снимок, хеш.
     /// 2 — права на карты (T-031): <c>Command.Required</c>, <c>MapClaim</c>, <c>GrantPermission</c>, <c>Permissions</c>, <c>CommandRejected</c>;
     /// версия сейва в <c>Hello</c>/<c>Welcome</c>, <c>Notice</c> (T-044); <c>SnapshotApplied</c> (поток снимка).
-/// 3 — состав сессии <c>Players</c>; <c>NoticeCode.Desync</c> (T-034).
+/// 3 — состав сессии <c>Players</c> (с пингом); <c>NoticeCode.Desync</c> (T-034); <c>Ping</c>/<c>Pong</c>, <c>Chat</c> (T-025).
     /// </summary>
     public const int ProtocolVersion = 3;
 

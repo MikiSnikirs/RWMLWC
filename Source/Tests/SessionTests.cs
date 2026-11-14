@@ -396,4 +396,69 @@ public class SessionTests
         a.Close("конец"); b.Close("конец");
         try { Directory.Delete(dir, true); } catch { }
     }
+
+    [Fact]
+    public void PingIsAnsweredByTheConnectionItselfAndMeasured()
+    {
+        var (a, b) = InMemoryConnection.CreatePair();
+        Assert.Equal(-1, a.RoundTripMs);
+        a.SendPing();
+        Assert.True(a.RoundTripMs >= 0);
+        // Ни Ping, ни Pong до приложения не доходят.
+        Assert.False(a.TryReceive(out _));
+        Assert.False(b.TryReceive(out _));
+    }
+
+    [Fact]
+    public void ServerPingsPlayersAndSendsPingsInPlayers()
+    {
+        var (s, _) = NewSession();
+        TestClient a = Join(s, "A");
+        Assert.Equal(-1, a.Received.OfType<PlayersMessage>().Last().Players[0].PingMs);
+        Step(s, ProtocolLimits.PingIntervalMs, a);          // сервер отправил Ping, соединение в памяти ответило сразу
+        Step(s, ProtocolLimits.PlayersRefreshMs, a);        // пинг изменился (-1 → 0) — новый состав
+        PlayerInfo me = a.Received.OfType<PlayersMessage>().Last().Players.Single();
+        Assert.True(me.PingMs >= 0);
+        int count = a.Received.OfType<PlayersMessage>().Count();
+        Step(s, ProtocolLimits.PlayersRefreshMs, a);        // пинг тот же — не рассылается
+        Assert.Equal(count, a.Received.OfType<PlayersMessage>().Count());
+    }
+
+    [Fact]
+    public void ChatGoesToEveryoneWithAuthorTrimmedAndLimited()
+    {
+        var (s, _) = NewSession();
+        TestClient a = Join(s, "A");
+        TestClient b = Join(s, "B");
+        a.Conn.Send(new ChatMessage { PlayerId = 99, Text = "  привет  " });  // номер автора ставит сервер
+        a.Conn.Send(new ChatMessage { Text = "   " });                        // пустое — отбрасывается
+        b.Conn.Send(new ChatMessage { Text = new string('я', ProtocolLimits.MaxChatChars + 50) });
+        Step(s, 10, a, b);
+
+        foreach (TestClient c in new[] { a, b })
+        {
+            var chats = c.Received.OfType<ChatMessage>().ToList();
+            Assert.Equal(2, chats.Count);
+            Assert.Equal((a.PlayerId, "привет"), (chats[0].PlayerId, chats[0].Text));
+            Assert.Equal(b.PlayerId, chats[1].PlayerId);
+            Assert.Equal(ProtocolLimits.MaxChatChars, chats[1].Text.Length);
+        }
+    }
+
+    [Fact]
+    public void ChatFloodIsDropped()
+    {
+        var (s, log) = NewSession();
+        TestClient a = Join(s, "A");
+        for (int i = 0; i < ProtocolLimits.MaxChatPerWindow + 3; i++)
+            a.Conn.Send(new ChatMessage { Text = "спам " + i });
+        Step(s, 10, a);
+        Assert.Equal(ProtocolLimits.MaxChatPerWindow, a.Received.OfType<ChatMessage>().Count());
+        Assert.Contains(log, l => l.Contains("слишком часто"));
+
+        Step(s, ProtocolLimits.ChatWindowMs, a);  // окно прошло
+        a.Conn.Send(new ChatMessage { Text = "снова можно" });
+        Step(s, 10, a);
+        Assert.Equal("снова можно", a.Received.OfType<ChatMessage>().Last().Text);
+    }
 }
