@@ -687,7 +687,11 @@ public static class TestAutomation
         Pawn? pawn = map.mapPawns.FreeColonistsSpawned.OrderBy(p => p.thingIDNumber).FirstOrDefault();
         if (pawn != null)
         {
-            Find.WindowStack.Add(new Dialog_InfoCard(pawn));
+            // Карточка ставит игру на паузу (forcePause): прогон без людей тогда стоит, пока её не закроют.
+            // Для проверки «интерфейс не меняет игру» пауза не нужна — открываем без неё.
+            Dialog_InfoCard card = new Dialog_InfoCard(pawn);
+            card.forcePause = false;
+            Find.WindowStack.Add(card);
         }
         Note("ui: info card " + (pawn != null ? pawn.LabelShort : "nobody"));
     }

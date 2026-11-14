@@ -1,0 +1,30 @@
+2026-11-14 23:40:55 autoload: loading save 'offline'
+2026-11-14 23:41:02 run started: #0, tick=14998, scenario=none, ticks=3000, trace=False, quit=True, file=hash-20261114-234102.txt
+2026-11-14 23:41:53 summary: map0 drafted=0 forbidden=56 plants=[]
+2026-11-14 23:41:53 summary: map0 jobs=[231:GotoWander@(138, 0, 120),234:GotoWander@(140, 0, 112),239:Wait_Wander@(139, 0, 106)]
+2026-11-14 23:41:53 summary: map0 settings=29B89D30A34E3B1A
+2026-11-14 23:41:53 summary: absence= offline=[]
+2026-11-14 23:41:53 summary: squads= rejected=0 drafted=[]
+2026-11-14 23:41:53 summary: map0 designations=0 blueprints=0 zones=0; commands sent=0 executed=0 failed=0
+2026-11-14 23:41:53 run finished: file=hash-20261114-234102.txt
+2026-11-14 23:41:53 queue: restarting game for run #1 (ui)
+2026-11-14 23:42:05 autoload: loading save 'offline'
+2026-11-14 23:42:12 run started: #1, tick=14998, scenario=ui, ticks=3000, trace=False, quit=True, file=hash-20261114-234212.txt
+2026-11-14 23:42:17 ui: selected Ross
+2026-11-14 23:42:22 ui: opened tab Architect
+2026-11-14 23:42:27 ui: opened tab Work
+2026-11-14 23:42:32 ui: opened tab Research
+2026-11-14 23:42:37 ui: opened tab Quests
+2026-11-14 23:42:42 ui: opened tab Factions
+2026-11-14 23:42:47 ui: info card Ross
+2026-11-14 23:42:52 ui: selected item серебро
+2026-11-14 23:42:57 ui: closed
+2026-11-14 23:43:04 summary: map0 drafted=0 forbidden=56 plants=[]
+2026-11-14 23:43:04 summary: map0 jobs=[231:GotoWander@(138, 0, 120),234:GotoWander@(140, 0, 112),239:Wait_Wander@(139, 0, 106)]
+2026-11-14 23:43:04 summary: map0 settings=29B89D30A34E3B1A
+2026-11-14 23:43:04 summary: absence= offline=[]
+2026-11-14 23:43:04 summary: squads= rejected=0 drafted=[]
+2026-11-14 23:43:04 summary: map0 designations=0 blueprints=0 zones=0; commands sent=0 executed=0 failed=0
+2026-11-14 23:43:04 run finished: file=hash-20261114-234212.txt
+2026-11-14 23:43:04 queue: finished
+2026-11-14 23:43:04 quitting game
