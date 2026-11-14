@@ -92,14 +92,14 @@ public static class SessionUi
     private static (int map, float x, float z) _lastCursor = (int.MinValue, 0, 0);
 
     /// <summary>
-    /// Отправить свой курсор (для T-050): не чаще 10 раз в секунду; при сдвиге больше 0,1 клетки или раз в 2 с.
+    /// Отправить свой курсор (для T-050): не чаще 10 раз в секунду; при сдвиге больше 0,05 клетки или раз в 2 с.
     /// mapId = <see cref="CursorMessage.NoCursor"/> — курсора нет (смотрю не на карту).
     /// </summary>
     public static void SendCursor(int mapId, float x, float z)
     {
         float now = Time.realtimeSinceStartup;
         if (now - _lastCursorSent < 1f / ProtocolLimits.MaxCursorsPerSecond) return;
-        bool moved = _lastCursor.map != mapId || Mathf.Abs(_lastCursor.x - x) > 0.1f || Mathf.Abs(_lastCursor.z - z) > 0.1f;
+        bool moved = _lastCursor.map != mapId || Mathf.Abs(_lastCursor.x - x) > 0.05f || Mathf.Abs(_lastCursor.z - z) > 0.05f;
         if (!moved && now - _lastCursorSent < 2f) return;
         if (LockstepClient.TrySend(new CursorMessage { MapId = mapId, X = x, Z = z }))
         {
