@@ -270,6 +270,10 @@ public static class TestAutomation
             sessionSteps.Enqueue((startTick + 400, "tabs: schedule", TabsSchedule));
             sessionSteps.Enqueue((startTick + 500, "tabs: outfit policy", TabsOutfit));
             sessionSteps.Enqueue((startTick + 600, "tabs: allowed area", TabsArea));
+            sessionSteps.Enqueue((startTick + 700, "tabs: research", TabsResearch));
+            sessionSteps.Enqueue((startTick + 800, "tabs: add bill", TabsAddBill));
+            sessionSteps.Enqueue((startTick + 900, "tabs: suspend bill", TabsSuspendBill));
+            sessionSteps.Enqueue((startTick + 1000, "tabs: medical care", TabsMedCare));
         }
         if (cfg.desync && cfg.scenario == "desync")
         {
@@ -528,9 +532,87 @@ public static class TestAutomation
         Note($"tabs: allowed area of {pawn.LabelShort} -> {(target != null ? target.ID.ToString() : "none")}, sent={LockstepClient.CommandsSent - sentBefore}");
     }
 
+    private static void TabsResearch()
+    {
+        ResearchProjectDef? current = Find.ResearchManager.GetProject();
+        ResearchProjectDef? other = DefDatabase<ResearchProjectDef>.AllDefsListForReading.OrderBy(p => p.defName)
+            .FirstOrDefault(p => p != current && p.CanStartNow);
+        if (other == null)
+        {
+            Note("tabs: research: nothing to start");
+            return;
+        }
+        int sentBefore = LockstepClient.CommandsSent;
+        Find.ResearchManager.SetCurrentProject(other);
+        Note($"tabs: research {(current != null ? current.defName : "-")} -> {other.defName}, sent={LockstepClient.CommandsSent - sentBefore}");
+    }
+
+    private static Building_WorkTable? FirstWorkTable()
+    {
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        return map.listerBuildings.AllBuildingsColonistOfClass<Building_WorkTable>()
+            .Where(t => t.def.AllRecipes.Any(r => r.AvailableNow)).OrderBy(t => t.thingIDNumber).FirstOrDefault();
+    }
+
+    private static void TabsAddBill()
+    {
+        Building_WorkTable? table = FirstWorkTable();
+        if (table == null)
+        {
+            Note("tabs: add bill: no work table in this save");
+            return;
+        }
+        RecipeDef recipe = table.def.AllRecipes.First(r => r.AvailableNow);
+        int sentBefore = LockstepClient.CommandsSent;
+        // Как вкладка «Счета»: сначала создаётся счёт, потом добавляется.
+        table.billStack.AddBill(recipe.MakeNewBill());
+        Note($"tabs: add bill {recipe.defName} to {table.LabelShort} (id {table.thingIDNumber}), bills before={table.billStack.Count}, sent={LockstepClient.CommandsSent - sentBefore}");
+    }
+
+    private static void TabsSuspendBill()
+    {
+        Building_WorkTable? table = FirstWorkTable();
+        if (table == null || table.billStack.Count == 0)
+        {
+            Note("tabs: suspend bill: no bill");
+            return;
+        }
+        Bill bill = table.billStack[table.billStack.Count - 1];
+        int sentBefore = LockstepClient.CommandsSent;
+        // Как строка счёта в списке: запись прямо в поле, под наблюдением FieldWatch.
+        FieldWatch.RunWatched(bill, () => bill.suspended = !bill.suspended);
+        Note($"tabs: suspend bill {bill.recipe.defName} on {table.LabelShort}, sent={LockstepClient.CommandsSent - sentBefore}, value now={bill.suspended}");
+    }
+
+    private static void TabsMedCare()
+    {
+        Pawn? pawn = FirstColonist();
+        if (pawn == null || pawn.playerSettings == null)
+        {
+            Note("tabs: medical care: no colonist");
+            return;
+        }
+        MedicalCareCategory before = pawn.playerSettings.medCare;
+        MedicalCareCategory after = before == MedicalCareCategory.Best ? MedicalCareCategory.NoMeds : MedicalCareCategory.Best;
+        int sentBefore = LockstepClient.CommandsSent;
+        FieldWatch.RunWatched(pawn.playerSettings, () => pawn.playerSettings.medCare = after);
+        Note($"tabs: medical care of {pawn.LabelShort}: {before} -> {after}, sent={LockstepClient.CommandsSent - sentBefore}");
+    }
+
     private static string SettingsDigest(Map map)
     {
         Fnv64 hash = Fnv64.Create();
+        ResearchProjectDef? project = Find.ResearchManager.GetProject();
+        hash.Add(project != null ? (int)project.shortHash : -1);
+        foreach (Building_WorkTable table in map.listerBuildings.AllBuildingsColonistOfClass<Building_WorkTable>().OrderBy(t => t.thingIDNumber))
+        {
+            hash.Add(table.thingIDNumber);
+            foreach (Bill bill in table.billStack.Bills)
+            {
+                hash.Add((int)bill.recipe.shortHash);
+                hash.Add(bill.suspended);
+            }
+        }
         foreach (Pawn pawn in map.mapPawns.FreeColonistsSpawned.OrderBy(p => p.thingIDNumber))
         {
             hash.Add(pawn.thingIDNumber);
@@ -550,6 +632,7 @@ public static class TestAutomation
             }
             hash.Add(pawn.outfits?.CurrentApparelPolicy?.id ?? -1);
             hash.Add(pawn.playerSettings?.AreaRestrictionInPawnCurrentMap?.ID ?? -1);
+            hash.Add(pawn.playerSettings != null ? (int)pawn.playerSettings.medCare : -1);
         }
         return hash.Value.ToString("X16");
     }
