@@ -24,6 +24,13 @@ internal static class VisualRandIsolation
         // Тени рыб (Odyssey): момент появления зависит от WaterBody.GetHashCode, который включает
         // адрес объекта и потому различается между запусками. Найдено трассировкой TST-010.
         ("Verse.FishShadowComponent", "MapComponentTick"),
+
+        // Звуки, запускаемые из тика (крики животных и т. п.). Будет ли звук сыгран, решает
+        // SoundSlotManager.CanPlayNow по реальному времени; сыгранный звук берёт числа из Rand
+        // (SubSoundDef.RandomizedResolvedGrain). Найдено трассировкой T-009: после перезагрузки
+        // сейва в работающей игре крик животного прозвучал на тике, где в свежем процессе его не было.
+        ("Verse.Sound.SoundStarter", "PlayOneShot"),
+        ("Verse.Sound.SoundStarter", "TrySpawnSustainer"),
     };
 
     private static IEnumerable<MethodBase> TargetMethods()
