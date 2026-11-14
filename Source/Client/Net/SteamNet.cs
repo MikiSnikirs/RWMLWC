@@ -76,6 +76,25 @@ public static class SteamNet
         }
     }
 
+    /// <summary>
+    /// Ждёт, пока Steam получит доступ к сети релеев (без неё P2P-подключение к другу не устанавливается).
+    /// Возвращает итоговое состояние для лога.
+    /// </summary>
+    public static async Task<string> WaitForRelayAsync(TimeSpan timeout)
+    {
+        Init();
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        while (true)
+        {
+            ESteamNetworkingAvailability a = SteamNetworkingUtils.GetRelayNetworkStatus(out SteamRelayNetworkStatus_t st);
+            if (a == ESteamNetworkingAvailability.k_ESteamNetworkingAvailability_Current)
+                return $"сеть релеев готова за {sw.ElapsedMilliseconds} мс";
+            if (sw.Elapsed > timeout)
+                return $"сеть релеев НЕ готова за {sw.ElapsedMilliseconds} мс: {a}, config {st.m_eAvailNetworkConfig}, relay {st.m_eAvailAnyRelay}, {st.m_debugMsg}";
+            await Task.Delay(250).ConfigureAwait(false);
+        }
+    }
+
     /// <summary>Подключиться к хосту по SteamID64. Завершается, когда соединение установлено.</summary>
     public static async Task<SteamConnection> ConnectAsync(ulong hostSteamId, TimeSpan timeout, CancellationToken ct = default)
     {
