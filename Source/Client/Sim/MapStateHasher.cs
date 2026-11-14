@@ -165,7 +165,12 @@ public static class MapStateHasher
     // У типов с randomizeRotationOnSpawn (обломки камня и шлака) игра заново выбирает случайный поворот
     // при каждом появлении вещи, включая загрузку сейва, причём из Rand, засеянного системными часами.
     // Поворот таких вещей не является состоянием симуляции и в хеш не входит.
-    internal static int StableRotation(Thing t) => t.def.randomizeRotationOnSpawn ? 0 : t.Rotation.AsInt;
+    //
+    // Поворот пешек тоже не входит: игра обновляет его в Pawn_RotationTracker.ProcessPostTickVisuals,
+    // который вызывается из Map.MapUpdate раз в кадр, а не раз в тик. Между запусками он меняется
+    // на тик раньше или позже. Это производная от задания и пути пешки, которые в хеше есть.
+    internal static int StableRotation(Thing t) =>
+        t.def.randomizeRotationOnSpawn || t is Pawn ? 0 : t.Rotation.AsInt;
 
     /// <summary>
     /// Диагностика: дописывает строки о вещах, у которых поворот изменился с прошлого вызова.
