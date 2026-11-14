@@ -83,6 +83,13 @@ public static class ProtocolIds
     /// </summary>
     public const int SaveWorldSnapshotKind = 101;
 
+    /// <summary>
+    /// Вид служебной команды «игрок в сети / не в сети» (v7, T-032): только от сервера, <c>PlayerId = 0</c>,
+    /// <c>Payload</c> — <see cref="PlayerPresence"/>. Все клиенты применяют её на одном тике: это состояние игры
+    /// (от него зависят режимы отсутствия, T-041/T-043).
+    /// </summary>
+    public const int PlayerPresenceKind = 102;
+
     /// <summary>Номер «игрока» для команд и сообщений самого сервера.</summary>
     public const int ServerPlayerId = 0;
 }
@@ -464,12 +471,18 @@ public sealed class GrantPermissionMessage : Message
     public int MapId;
     public int PlayerId;
     public PermissionLevel Level;
+    /// <summary>
+    /// «Управляющий» (v7, T-042): права действуют, только пока владелец не в сети, и снимаются,
+    /// когда он вернётся.
+    /// </summary>
+    public bool UntilReturn;
 
     public override void Write(PacketWriter w)
     {
         w.WriteInt32(MapId);
         w.WriteInt32(PlayerId);
         w.WriteByte((byte)Level);
+        w.WriteBool(UntilReturn);
     }
 
     internal static GrantPermissionMessage Read(ref PacketReader r) => new()
@@ -477,11 +490,12 @@ public sealed class GrantPermissionMessage : Message
         MapId = r.ReadInt32(),
         PlayerId = r.ReadInt32(),
         Level = CommandMessage.ReadLevel(ref r),
+        UntilReturn = r.ReadBool(),
     };
 }
 
-/// <summary>Выданные права на одной карте.</summary>
-public readonly record struct PermissionGrant(int PlayerId, PermissionLevel Level);
+/// <summary>Выданные права на одной карте. <paramref name="UntilReturn"/> — «управляющий» (v7): только пока владельца нет.</summary>
+public readonly record struct PermissionGrant(int PlayerId, PermissionLevel Level, bool UntilReturn = false);
 
 /// <summary>Владелец и выданные права одной карты.</summary>
 public sealed class MapPermissions
@@ -512,6 +526,7 @@ public sealed class PermissionsMessage : Message
             {
                 w.WriteInt32(g.PlayerId);
                 w.WriteByte((byte)g.Level);
+                w.WriteBool(g.UntilReturn);
             }
         }
     }
@@ -523,9 +538,9 @@ public sealed class PermissionsMessage : Message
         for (int i = 0; i < maps; i++)
         {
             var m = new MapPermissions { MapId = r.ReadInt32(), OwnerPlayerId = r.ReadInt32() };
-            int grants = r.ReadCount(ProtocolLimits.MaxGrantsPerMap, 5);
+            int grants = r.ReadCount(ProtocolLimits.MaxGrantsPerMap, 6);
             for (int j = 0; j < grants; j++)
-                m.Grants.Add(new PermissionGrant(r.ReadInt32(), CommandMessage.ReadLevel(ref r)));
+                m.Grants.Add(new PermissionGrant(r.ReadInt32(), CommandMessage.ReadLevel(ref r), r.ReadBool()));
             msg.Maps.Add(m);
         }
         return msg;
@@ -814,4 +829,23 @@ public sealed class AlarmMessage : Message
         Seconds = r.ReadInt32(),
         Text = r.ReadString(),
     };
+}
+
+/// <summary><c>Payload</c> команды <see cref="ProtocolIds.PlayerPresenceKind"/> (v7): номер игрока (int32) и «в сети» (bool).</summary>
+public static class PlayerPresence
+{
+    public static byte[] Encode(int playerId, bool online)
+    {
+        var w = new PacketWriter();
+        w.WriteInt32(playerId);
+        w.WriteBool(online);
+        return w.ToArray();
+    }
+
+    public static (int playerId, bool online)? Decode(byte[]? payload)
+    {
+        if (payload == null || payload.Length < 5) return null;
+        var r = new PacketReader(payload);
+        return (r.ReadInt32(), r.ReadBool());
+    }
 }

@@ -98,6 +98,8 @@ public sealed class Session
     {
         public int Owner;
         public readonly SortedDictionary<int, PermissionLevel> Grants = new();
+        /// <summary>Права «управляющего» (T-042): действуют, пока владельца нет в сети; снимаются при его возвращении.</summary>
+        public readonly HashSet<int> UntilReturn = new();
     }
     private int _nextPlayerId = 1;
     private long _nextSeq = 1;
@@ -226,8 +228,53 @@ public sealed class Session
         }
 
         BroadcastPlayersIfChanged();
+        AnnouncePresence();
         TryResolveResync();
         UpdateSpeed();
+    }
+
+    // Что последним объявлено в общем порядке командой 102 (T-032): игрок → в сети.
+    private readonly Dictionary<int, bool> _announcedOnline = new();
+
+    /// <summary>
+    /// «Игрок в сети / не в сети» как состояние игры (T-032): служебная команда 102 в общем порядке, когда
+    /// присутствие игрока изменилось (вход, возврат, уход, вылет по таймауту). Возвращение владельца снимает
+    /// права «управляющих» на его картах (T-042).
+    /// </summary>
+    private void AnnouncePresence()
+    {
+        foreach (Player p in _players)
+        {
+            bool online = p.Online;
+            if (_announcedOnline.TryGetValue(p.Id, out bool was) && was == online) continue;
+            _announcedOnline[p.Id] = online;
+            Broadcast(new CommandOrderedMessage
+            {
+                Seq = _nextSeq++,
+                Tick = TickUpTo,
+                PlayerId = ServerPlayerId,
+                MapId = ProtocolIds.WorldMapId,
+                Kind = ProtocolIds.PlayerPresenceKind,
+                Payload = PlayerPresence.Encode(p.Id, online),
+            });
+            _log($"игрок {p.Id} «{p.Name}» {(online ? "в сети" : "не в сети")} — с тика {TickUpTo} для всех");
+            if (online) DropManagersOf(p.Id);
+        }
+    }
+
+    /// <summary>Владелец вернулся — права «до моего возвращения» на его картах снимаются (T-042).</summary>
+    private void DropManagersOf(int ownerId)
+    {
+        bool changed = false;
+        foreach (var (mapId, rights) in _maps)
+        {
+            if (rights.Owner != ownerId || rights.UntilReturn.Count == 0) continue;
+            foreach (int pid in rights.UntilReturn) rights.Grants.Remove(pid);
+            _log($"карта {mapId}: владелец вернулся, права управляющих сняты ({string.Join(", ", rights.UntilReturn)})");
+            rights.UntilReturn.Clear();
+            changed = true;
+        }
+        if (changed) Broadcast(BuildPermissions());
     }
 
     // Часы сессии (сумма elapsed из Advance) — для пинга и ограничения чата.
@@ -661,7 +708,10 @@ public sealed class Session
     {
         if (mapId == ProtocolIds.WorldMapId || !_maps.TryGetValue(mapId, out MapRights? rights)) return PermissionLevel.Full;
         if (rights.Owner == playerId) return PermissionLevel.Full;
-        return rights.Grants.TryGetValue(playerId, out PermissionLevel level) ? level : PermissionLevel.None;
+        if (!rights.Grants.TryGetValue(playerId, out PermissionLevel level)) return PermissionLevel.None;
+        // «Управляющий» действует только в отсутствие владельца.
+        if (rights.UntilReturn.Contains(playerId) && _players.Any(p => p.Id == rights.Owner && p.Online)) return PermissionLevel.None;
+        return level;
     }
 
     /// <summary>Владелец карты или 0, если карта свободна.</summary>
@@ -707,7 +757,9 @@ public sealed class Session
         if (g.Level == PermissionLevel.None) rights.Grants.Remove(g.PlayerId);
         else if (rights.Grants.Count < ProtocolLimits.MaxGrantsPerMap || rights.Grants.ContainsKey(g.PlayerId)) rights.Grants[g.PlayerId] = g.Level;
         else return;
-        _log($"карта {g.MapId}: игрок {g.PlayerId} — {g.Level}");
+        if (g.Level != PermissionLevel.None && g.UntilReturn) rights.UntilReturn.Add(g.PlayerId);
+        else rights.UntilReturn.Remove(g.PlayerId);
+        _log($"карта {g.MapId}: игрок {g.PlayerId} — {g.Level}{(g.UntilReturn ? " (управляющий, до возвращения владельца)" : "")}");
         Broadcast(BuildPermissions());
     }
 
@@ -717,7 +769,7 @@ public sealed class Session
         foreach (var (mapId, rights) in _maps)
         {
             var m = new MapPermissions { MapId = mapId, OwnerPlayerId = rights.Owner };
-            foreach (var (pid, level) in rights.Grants) m.Grants.Add(new PermissionGrant(pid, level));
+            foreach (var (pid, level) in rights.Grants) m.Grants.Add(new PermissionGrant(pid, level, rights.UntilReturn.Contains(pid)));
             msg.Maps.Add(m);
         }
         return msg;
