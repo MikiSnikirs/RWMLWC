@@ -1,0 +1,23 @@
+2026-11-14 23:27:19 autoload: loading save 'offline'
+2026-11-14 23:27:24 lockstep: connecting to 127.0.0.1:49454 as 'hostA'
+2026-11-14 23:27:24 hostsession: open at tick 14998, steam=True, hold 1800 s
+2026-11-14 23:27:25 lockstep: connected to quic:127.0.0.1:49454, Hello sent
+2026-11-14 23:27:26 lockstep: Welcome, playerId=1, serverTick=14998, seed=7
+2026-11-14 23:27:26 presence: player 1 online
+2026-11-14 23:29:48 lockstep: hold is over, requesting speed 3
+2026-11-14 23:29:48 presence: player 2 online
+2026-11-14 23:29:49 lockstep: snapshot for player 2 at tick 14998: raw=15827685 bytes, packed=2604010 bytes (16.5%), save=643 ms, pack=20 ms, 14 chunks sent; reloading it here too
+2026-11-14 23:29:52 lockstep: snapshot loaded, tick 14998, serverTick=14998, perMapSim=True
+2026-11-14 23:30:00 run started: #0, tick=14998, scenario=none, ticks=8000, trace=False, quit=True, file=hash-20261114-233000.txt
+2026-11-14 23:30:25 presence: player 2 offline
+2026-11-14 23:30:31 summary: map0 drafted=0 forbidden=56 plants=[]
+2026-11-14 23:30:31 summary: map0 jobs=[231:Wait_Wander@(138, 0, 116),234:GotoWander@(137, 0, 116),239:GotoWander@(132, 0, 116)]
+2026-11-14 23:30:31 camera: this client moved its camera 53 times during the run
+2026-11-14 23:30:31 summary: map0 settings=29B89D30A34E3B1A
+2026-11-14 23:30:31 summary: absence= offline=[2]
+2026-11-14 23:30:31 summary: squads= rejected=0 drafted=[]
+2026-11-14 23:30:31 summary: map0 designations=0 blueprints=0 zones=0; commands sent=0 executed=0 failed=0
+2026-11-14 23:30:31 run finished: file=hash-20261114-233000.txt
+2026-11-14 23:30:31 queue: finished
+2026-11-14 23:30:31 lockstep: disconnect: прогон завершён
+2026-11-14 23:30:31 quitting game
