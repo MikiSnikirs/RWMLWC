@@ -34,6 +34,9 @@ public class ProtocolRoundTripTests
         yield return new object[] { new WelcomeMessage { PlayerId = 1, SaveWorldId = 77, SaveTick = int.MaxValue } };
         yield return new object[] { new NoticeMessage { Code = NoticeCode.NewerSaveOnClient, Text = "У игрока сейв новее" } };
         yield return new object[] { new SnapshotAppliedMessage { SnapshotId = 3, Tick = 20000 } };
+        yield return new object[] { new NoticeMessage { Code = NoticeCode.Desync, Text = "карта 0 тик 15060: игрок 1 ≠ игрок 2" } };
+        yield return new object[] { new PlayersMessage { Players = { new PlayerInfo(1, "Хост", true), new PlayerInfo(2, "B", false) } } };
+        yield return new object[] { new PlayersMessage() };
         yield return new object[] { new CommandRejectedMessage { ClientSeq = 9, MapId = 0, Required = PermissionLevel.Full, Had = PermissionLevel.Build } };
     }
 
@@ -169,6 +172,9 @@ public class ProtocolRoundTripTests
             {
                 case byte[] eb:
                     Assert.Equal(eb, (byte[])a!);
+                    break;
+                case List<PlayerInfo> ep:
+                    Assert.Equal(ep, (List<PlayerInfo>)a!);
                     break;
                 case List<HashPart> el:
                     Assert.Equal(el, (List<HashPart>)a!);

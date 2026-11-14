@@ -75,7 +75,8 @@ public class SessionTests
         Assert.Equal(StartTick, wa.ServerTick);
         // Сразу после Welcome — таблица прав и текущее разрешение тикать.
         Assert.IsType<PermissionsMessage>(a.Received[1]);
-        Assert.Equal(StartTick, Assert.IsType<TickMessage>(a.Received[2]).TickUpTo);
+        Assert.IsType<PlayersMessage>(a.Received[2]);
+        Assert.Equal(StartTick, Assert.IsType<TickMessage>(a.Received[3]).TickUpTo);
     }
 
     [Fact]
@@ -264,6 +265,80 @@ public class SessionTests
 
         Assert.Equal(new[] { (15200, b.PlayerId) }, desyncs);
         Assert.Contains(log, l => l.Contains("РАСХОЖДЕНИЕ"));
+    }
+
+    [Fact]
+    public void DesyncNoticeGoesToAllAtMostOncePerIntervalPerMap()
+    {
+        var (s, _) = NewSession();
+        TestClient a = Join(s, "A");
+        TestClient b = Join(s, "B");
+        void Pair(int map, int tick)
+        {
+            a.Conn.Send(new MapHashMessage { MapId = map, Tick = tick, Total = 1 });
+            b.Conn.Send(new MapHashMessage { MapId = map, Tick = tick, Total = 2 });
+        }
+        Pair(0, 15060);
+        Pair(0, 15120);                                            // та же карта, раньше интервала — без Notice
+        Pair(1, 15120);                                            // другая карта — свой Notice
+        Pair(0, 15060 + ProtocolLimits.DesyncNoticeIntervalTicks); // интервал прошёл
+        Step(s, 10, a, b);
+
+        foreach (TestClient c in new[] { a, b })
+        {
+            var notices = c.Received.OfType<NoticeMessage>().Where(n => n.Code == NoticeCode.Desync).Select(n => n.Text).ToList();
+            Assert.Equal(new[]
+            {
+                $"карта 0 тик 15060: игрок {a.PlayerId} ≠ игрок {b.PlayerId}",
+                $"карта 1 тик 15120: игрок {a.PlayerId} ≠ игрок {b.PlayerId}",
+                $"карта 0 тик {15060 + ProtocolLimits.DesyncNoticeIntervalTicks}: игрок {a.PlayerId} ≠ игрок {b.PlayerId}",
+            }, notices);
+        }
+    }
+
+    private static List<(int id, string name, bool online)> LastPlayers(TestClient c) =>
+        c.Received.OfType<PlayersMessage>().Last().Players.Select(p => (p.PlayerId, p.Name, p.Online)).ToList();
+
+    [Fact]
+    public void PlayersListFollowsJoinLeaveAndReturn()
+    {
+        var (s, _) = NewSession();
+        TestClient a = Join(s, "A");
+        Assert.Equal(new[] { (1, "A", true) }, LastPlayers(a));
+
+        TestClient b = Join(s, "B");
+        a.Drain();
+        Assert.Equal(new[] { (1, "A", true), (2, "B", true) }, LastPlayers(a));
+        Assert.Equal(new[] { (1, "A", true), (2, "B", true) }, LastPlayers(b));
+
+        b.Conn.Close("обрыв");
+        Step(s, 10, a);
+        Assert.Equal(new[] { (1, "A", true), (2, "B", false) }, LastPlayers(a));
+        int count = a.Received.OfType<PlayersMessage>().Count();
+        Step(s, 10, a);
+        Assert.Equal(count, a.Received.OfType<PlayersMessage>().Count()); // без изменений — не рассылается
+
+        TestClient b2 = Join(s, "B");
+        a.Drain();
+        Assert.Equal(new[] { (1, "A", true), (2, "B", true) }, LastPlayers(a));
+        Assert.Equal(new[] { (1, "A", true), (2, "B", true) }, LastPlayers(b2));
+    }
+
+    [Fact]
+    public void PlayerReturningBeforeLeaveIsNoticedStillGetsPlayers()
+    {
+        var (s, _) = NewSession();
+        TestClient a = Join(s, "A");
+        TestClient b = Join(s, "B");
+        b.Conn.Close("обрыв");
+        // Сервер ещё не прошёл Pump и не разослал уход — B уже вернулся.
+        var (client, server) = InMemoryConnection.CreatePair("B", "server");
+        s.Accept(server);
+        client.Send(new HelloMessage { PlayerName = "B", GameVersion = "1.7.5005", ModListHash = 7 });
+        s.Pump();
+        var b2 = new TestClient(client);
+        b2.Drain();
+        Assert.Equal(new[] { (1, "A", true), (2, "B", true) }, LastPlayers(b2));
     }
 
     [Fact]
