@@ -1,0 +1,24 @@
+2026-11-14 18:55:06 autoload: loading save 'tst014'
+2026-11-14 18:55:13 lockstep: connecting to 127.0.0.1:53199 as 'c2'
+2026-11-14 18:55:14 lockstep: connected to quic:127.0.0.1:53199, Hello sent
+2026-11-14 18:55:14 lockstep: Welcome, playerId=1, serverTick=14998, seed=7
+2026-11-14 18:56:14 run started: #0, tick=14998, scenario=squads, ticks=4000, trace=False, quit=True, file=hash-c2-20261114-185614.txt
+2026-11-14 18:56:18 squads: created 1 'Альфа' by player 2
+2026-11-14 18:56:18 squads: created 2 'Бета' by player 2
+2026-11-14 18:56:18 lockstep: player 2 asked for a snapshot at tick 16380; waiting for it
+2026-11-14 18:56:19 lockstep: snapshot 8 received, 2597984 bytes; loading
+2026-11-14 18:56:22 lockstep: snapshot loaded, tick 16380, serverTick=16424, perMapSim=True
+2026-11-14 18:56:22 resumed after snapshot reload at tick 16380, perMapSim=True
+2026-11-14 18:56:23 command #9: rejected: squad (Ross — пешка отряда «Бета»), author 2
+2026-11-14 18:57:22 lockstep: hold is over, requesting speed 3
+2026-11-14 18:57:24 command #11: rejected: squad (Oleg — пешка отряда «Бета»), author 2
+2026-11-14 18:57:30 summary: map0 drafted=1 forbidden=56 plants=[]
+2026-11-14 18:57:30 summary: map0 jobs=[231:Wait_Wander@(138, 0, 122),234:GotoWander@(136, 0, 131),239:Wait_Combat@(133, 0, 129)]
+2026-11-14 18:57:30 camera: this client moved its camera 25 times during the run
+2026-11-14 18:57:30 summary: map0 settings=29B89D30A34E3B1A
+2026-11-14 18:57:30 summary: squads=1:Альфа[2|]; 2:Бета[1|231,234] rejected=2 drafted=[239]
+2026-11-14 18:57:30 summary: map0 designations=0 blueprints=0 zones=0; commands sent=0 executed=10 failed=0
+2026-11-14 18:57:30 run finished: file=hash-c2-20261114-185614.txt
+2026-11-14 18:57:30 queue: finished
+2026-11-14 18:57:30 lockstep: disconnect: прогон завершён
+2026-11-14 18:57:30 quitting game
