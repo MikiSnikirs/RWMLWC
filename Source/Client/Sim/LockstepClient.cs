@@ -411,7 +411,7 @@ public static class LockstepClient
 
             default:
                 // Сообщения не про симуляцию (чат, состав сессии) — интерфейсу сессии (T-025, зона B).
-                RWMLWC.Client.UI.SessionUi.Receive(message);
+                RWMLWC.Client.SessionView.SessionUi.Receive(message);
                 break;
         }
     }
