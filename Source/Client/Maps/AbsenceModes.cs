@@ -29,6 +29,10 @@ public sealed class AbsenceModesComponent : GameComponent
     private Dictionary<int, AbsenceMode> modes = new Dictionary<int, AbsenceMode>();
     private List<int>? keysWork;
     private List<AbsenceMode>? valuesWork;
+    // Кто выбрал режим карты — её владелец для симуляции (окно даёт выбор только владельцу).
+    private Dictionary<int, int> owners = new Dictionary<int, int>();
+    private List<int>? ownerKeysWork;
+    private List<int>? ownerValuesWork;
 
     public AbsenceModesComponent(Game game)
     {
@@ -37,13 +41,22 @@ public sealed class AbsenceModesComponent : GameComponent
     public override void ExposeData()
     {
         Scribe_Collections.Look(ref modes, "rwmlwcAbsenceModes", LookMode.Value, LookMode.Value, ref keysWork, ref valuesWork);
+        Scribe_Collections.Look(ref owners, "rwmlwcAbsenceOwners", LookMode.Value, LookMode.Value, ref ownerKeysWork, ref ownerValuesWork);
         modes ??= new Dictionary<int, AbsenceMode>();
+        owners ??= new Dictionary<int, int>();
     }
+
+    /// <summary>Игрок, выбравший режим карты; 0 — не выбирали.</summary>
+    public int OwnerOf(int mapId) => owners.TryGetValue(mapId, out int player) ? player : 0;
 
     public AbsenceMode Get(int mapId) => modes.TryGetValue(mapId, out AbsenceMode mode) ? mode : AbsenceMode.Stasis;
 
-    internal void SetDirect(int mapId, AbsenceMode mode)
+    internal void SetDirect(int mapId, AbsenceMode mode, int playerId)
     {
+        if (playerId > 0)
+        {
+            owners[mapId] = playerId;
+        }
         if (mode == AbsenceMode.Stasis)
         {
             modes.Remove(mapId);
@@ -87,7 +100,7 @@ public static class AbsenceModes
             TestAutomation.Note($"absence: unknown mode {value}, skipped");
             return;
         }
-        Component?.SetDirect(map.uniqueID, (AbsenceMode)value);
+        Component?.SetDirect(map.uniqueID, (AbsenceMode)value, CommandBus.CurrentPlayerId);
         TestAutomation.Note($"absence: map {map.uniqueID} -> {(AbsenceMode)value} by player {CommandBus.CurrentPlayerId}");
     }
 }

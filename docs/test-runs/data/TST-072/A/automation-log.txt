@@ -1,0 +1,16 @@
+2026-11-14 22:39:55 autoload: loading save 'offline'
+2026-11-14 22:40:02 run started: #0, tick=14998, scenario=absence-raid, ticks=1500, trace=False, quit=True, file=hash-20261114-224002.txt
+2026-11-14 22:40:02 presence: player 7 offline
+2026-11-14 22:40:02 presence: RaidEnemy on map 0 skipped — owner 7 is offline
+2026-11-14 22:40:02 absence-raid: offline owner, raid fired=False
+2026-11-14 22:40:02 presence: player 7 online
+2026-11-14 22:40:02 absence-raid: owner back, raid fired=True
+2026-11-14 22:40:27 summary: map0 drafted=0 forbidden=56 plants=[]
+2026-11-14 22:40:27 summary: map0 jobs=[231:Wait_Wander@(123, 0, 117),234:Wait_Wander@(130, 0, 119),239:Wait_Wander@(139, 0, 119)]
+2026-11-14 22:40:27 summary: map0 settings=29B89D30A34E3B1A
+2026-11-14 22:40:27 summary: absence=0:Autopilot
+2026-11-14 22:40:27 summary: squads= rejected=0 drafted=[]
+2026-11-14 22:40:27 summary: map0 designations=0 blueprints=0 zones=0; commands sent=0 executed=0 failed=0
+2026-11-14 22:40:27 run finished: file=hash-20261114-224002.txt
+2026-11-14 22:40:27 queue: finished
+2026-11-14 22:40:27 quitting game
