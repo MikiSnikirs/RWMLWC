@@ -51,4 +51,7 @@ public static class ProtocolLimits
 
     /// <summary>Не чаще раза в столько мс сервер рассылает <c>Players</c> из-за изменения пинга.</summary>
     public const int PlayersRefreshMs = 2000;
+
+    /// <summary>Курсоров от игрока в секунду (v5); лишние сервер отбрасывает.</summary>
+    public const int MaxCursorsPerSecond = 10;
 }

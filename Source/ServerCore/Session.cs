@@ -173,6 +173,12 @@ public sealed class Session
 
         /// <summary>До какого тика игрок точно дошёл: Welcome с миром, SnapshotApplied, последний присланный хеш.</summary>
         public int LastTick { get; internal set; }
+
+        /// <summary>Цвет 0xRRGGBB из палитры (v5); -1 — не выбран. Сохраняется при переподключении, как имя.</summary>
+        public int Color { get; internal set; } = -1;
+
+        /// <summary>Когда (часы сессии, мс) пересылались курсоры игрока за последнюю секунду — для ограничения частоты.</summary>
+        internal Queue<double> CursorTimes { get; } = new();
     }
 
     private sealed class Pending
@@ -220,7 +226,7 @@ public sealed class Session
 
     private bool BroadcastPlayersIfChanged()
     {
-        string roster = string.Join(",", _players.Select(p => p.Online ? p.Id.ToString() : "-" + p.Id));
+        string roster = string.Join(",", _players.Select(p => (p.Online ? p.Id.ToString() : "-" + p.Id) + ":" + p.Color));
         if (roster == _lastRoster) return false;
         _lastRoster = roster;
         Broadcast(BuildPlayers());
@@ -231,7 +237,7 @@ public sealed class Session
     {
         var msg = new PlayersMessage();
         foreach (Player p in _players)
-            msg.Players.Add(new PlayerInfo(p.Id, p.Name, p.Online, p.Online ? p.Connection.RoundTripMs : -1));
+            msg.Players.Add(new PlayerInfo(p.Id, p.Name, p.Online, p.Online ? p.Connection.RoundTripMs : -1, p.Color));
         return msg;
     }
 
@@ -448,6 +454,14 @@ public sealed class Session
 
             case ChatMessage chat:
                 Chat(player, chat.Text);
+                break;
+
+            case ChooseColorMessage choose:
+                ChooseColor(player, choose.Color);
+                break;
+
+            case CursorMessage cursor:
+                ForwardCursor(player, cursor);
                 break;
 
             case SnapshotChunkMessage chunk:
@@ -858,6 +872,37 @@ public sealed class Session
             });
         }
         _log($"игроку {player.Id} отдан мир с сервера: тик {latest.Tick}, {data.Length} байт, {count} кусков");
+    }
+
+    /// <summary>Цвет игрока (v5): только из палитры и не занятый другим игроком этой сессии (в сети или нет).</summary>
+    private void ChooseColor(Player player, int color)
+    {
+        if (!PlayerColors.IsValid(color))
+        {
+            _log($"игрок {player.Id}: цвет {color:X6} не из палитры — отклонён");
+            return;
+        }
+        Player? owner = _players.FirstOrDefault(p => p != player && p.Color == color);
+        if (owner != null)
+        {
+            player.Connection.Send(new NoticeMessage { Code = NoticeCode.ColorTaken, Text = $"Цвет занят игроком «{owner.Name}»" });
+            return;
+        }
+        player.Color = color;
+        _log($"игрок {player.Id} «{player.Name}»: цвет {color:X6}");
+        BroadcastPlayersIfChanged();
+    }
+
+    /// <summary>Курсор (v5): переслать остальным в сети, не чаще MaxCursorsPerSecond от игрока. В общий порядок не входит.</summary>
+    private void ForwardCursor(Player player, CursorMessage cursor)
+    {
+        Queue<double> recent = player.CursorTimes;
+        while (recent.Count > 0 && _clockMs - recent.Peek() >= 1000) recent.Dequeue();
+        if (recent.Count >= ProtocolLimits.MaxCursorsPerSecond) return;
+        recent.Enqueue(_clockMs);
+        var forward = new CursorMessage { PlayerId = player.Id, MapId = cursor.MapId, X = cursor.X, Z = cursor.Z };
+        foreach (Player p in _players)
+            if (p != player && p.Online) p.Connection.Send(forward);
     }
 
     /// <summary>Сообщение в чат от сервера (консоль администратора).</summary>
