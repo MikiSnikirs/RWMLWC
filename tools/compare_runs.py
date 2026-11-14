@@ -131,6 +131,11 @@ def compare_traces(path_a, path_b):
 
 
 def main(argv):
+    # Консоль Windows по умолчанию не в UTF-8 и падает на кириллице и символе «×».
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except (AttributeError, ValueError):
+        pass
     if len(argv) not in (3, 5):
         print(__doc__)
         return 2
