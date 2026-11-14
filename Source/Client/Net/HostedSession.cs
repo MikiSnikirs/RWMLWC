@@ -99,6 +99,7 @@ public static class HostedSession
             SessionSeed = seed ?? (uint)System.Security.Cryptography.RandomNumberGenerator.GetInt32(int.MaxValue),
             Store = new SaveStore(DataDir),
             MaxPlayers = maxPlayers,
+            MaxLeadTicks = settings.GetInt("max_lead_ticks", 180, 0, 100000),
         };
         _host = new SessionHost(new Session(options, Write));
         _cts = new CancellationTokenSource();

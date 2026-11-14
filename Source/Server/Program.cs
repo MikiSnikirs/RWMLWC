@@ -36,6 +36,7 @@ internal static class Program
         string? publicHost = settings.GetString("public_host");
         double autosaveMinutes = settings.GetDouble("autosave_minutes", 5, 0, 24 * 60);
         int maxPlayers = settings.GetInt("max_players", 8, 1, 64);
+        int maxLead = settings.GetInt("max_lead_ticks", 180, 0, 100000);
         bool echo = false;
         int startTick = 0;
         uint? seed = null;
@@ -93,6 +94,7 @@ internal static class Program
             Store = store,
             Dedicated = true,
             MaxPlayers = maxPlayers,
+            MaxLeadTicks = maxLead,
             AutosaveInterval = autosaveMinutes > 0 ? TimeSpan.FromMinutes(autosaveMinutes) : null,
         };
         Console.WriteLine($"SESSION startTick={options.StartTick} seed={options.SessionSeed}");
