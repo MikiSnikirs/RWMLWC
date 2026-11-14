@@ -1,0 +1,16 @@
+2026-11-14 19:29:39 autoload: loading save 'tst014'
+2026-11-14 19:29:46 lockstep: connecting to 127.0.0.1:63344 as 'c1'
+2026-11-14 19:29:48 lockstep: connected to quic:127.0.0.1:63344, Hello sent
+2026-11-14 19:29:48 lockstep: Welcome, playerId=1, serverTick=14998, seed=7
+2026-11-14 19:29:48 run started: #0, tick=14998, scenario=none, ticks=40000, trace=False, quit=True, file=hash-c1-20261114-192948.txt
+2026-11-14 19:30:19 lockstep: snapshot for player 2 at tick 25654: raw=15736468 bytes, packed=2596137 bytes (16.5%), save=776 ms, pack=23 ms, 13 chunks sent; reloading it here too
+2026-11-14 19:30:22 lockstep: snapshot loaded, tick 25654, serverTick=25654, perMapSim=True
+2026-11-14 19:30:27 resumed after snapshot reload at tick 25654, perMapSim=True
+2026-11-14 19:31:49 summary: map0 drafted=0 forbidden=56 plants=[]
+2026-11-14 19:31:49 summary: map0 jobs=[231:LayDown@(143, 0, 127),234:LayDown@(140, 0, 128),239:LayDown@(145, 0, 131)]
+2026-11-14 19:31:49 summary: map0 settings=29B89D30A34E3B1A
+2026-11-14 19:31:49 summary: map0 designations=0 blueprints=0 zones=0; commands sent=0 executed=0 failed=0
+2026-11-14 19:31:49 run finished: file=hash-c1-20261114-192948.txt
+2026-11-14 19:31:49 queue: finished
+2026-11-14 19:31:49 lockstep: disconnect: прогон завершён
+2026-11-14 19:31:49 quitting game

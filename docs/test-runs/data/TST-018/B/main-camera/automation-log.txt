@@ -1,0 +1,21 @@
+2026-11-14 19:32:52 autoload: loading save 'tst'
+2026-11-14 19:33:00 run started: #0, tick=14998, scenario=raid, ticks=8000, trace=False, quit=True, file=hash-20261114-193300.txt
+2026-11-14 19:33:01 scenario raid: executed=True, faction=Ошойван
+2026-11-14 19:35:14 summary: map0 drafted=0 forbidden=56 plants=[]
+2026-11-14 19:35:14 summary: map0 jobs=[231:Wait_Wander@(153, 0, 141),234:Wait_Wander@(150, 0, 129),239:Wait_Wander@(144, 0, 145)]
+2026-11-14 19:35:14 camera: this client moved its camera 54 times during the run
+2026-11-14 19:35:14 summary: map0 settings=29B89D30A34E3B1A
+2026-11-14 19:35:14 summary: map0 designations=0 blueprints=0 zones=0; commands sent=0 executed=0 failed=0
+2026-11-14 19:35:14 run finished: file=hash-20261114-193300.txt
+2026-11-14 19:35:14 queue: restarting game for run #1 (raid)
+2026-11-14 19:35:30 autoload: loading save 'tst'
+2026-11-14 19:35:39 run started: #1, tick=14998, scenario=raid, ticks=8000, trace=False, quit=True, file=hash-20261114-193539.txt
+2026-11-14 19:35:39 scenario raid: executed=True, faction=Ошойван
+2026-11-14 19:37:54 summary: map0 drafted=0 forbidden=56 plants=[]
+2026-11-14 19:37:54 summary: map0 jobs=[231:Wait_Wander@(153, 0, 141),234:Wait_Wander@(150, 0, 129),239:Wait_Wander@(144, 0, 145)]
+2026-11-14 19:37:54 camera: this client moved its camera 54 times during the run
+2026-11-14 19:37:54 summary: map0 settings=29B89D30A34E3B1A
+2026-11-14 19:37:54 summary: map0 designations=0 blueprints=0 zones=0; commands sent=0 executed=0 failed=0
+2026-11-14 19:37:54 run finished: file=hash-20261114-193539.txt
+2026-11-14 19:37:54 queue: finished
+2026-11-14 19:37:54 quitting game
