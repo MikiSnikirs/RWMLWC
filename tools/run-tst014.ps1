@@ -69,6 +69,12 @@ $work = Join-Path $env:LOCALAPPDATA "RWMLWC-test\$Name"
 if (Test-Path $work) { Remove-Item $work -Recurse -Force }
 New-Item -ItemType Directory -Path $work | Out-Null
 
+. (Join-Path $PSScriptRoot 'StartQuiet.ps1')
+$blockers = Get-GameBlockers
+if ($blockers.Count -gt 0) {
+    Fail "Not starting: $($blockers -join ', ') is running (a fullscreen game would minimize). Run again later; see RWMLWC_TEST_BLOCKERS."
+}
+
 Step 'Starting the session server'
 $srvOut = Join-Path $work 'server-out.txt'
 $srvErr = Join-Path $work 'server-err.txt'
