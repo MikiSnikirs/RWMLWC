@@ -24,6 +24,8 @@ public static class MapAccess
     {
         public int owner;
         public Dictionary<int, PermissionLevel> grants = new Dictionary<int, PermissionLevel>();
+        /// <summary>Права «управляющего» (v7): действуют, только пока владельца нет в сети.</summary>
+        public HashSet<int> untilReturn = new HashSet<int>();
     }
 
     private static readonly Dictionary<int, MapEntry> table = new Dictionary<int, MapEntry>();
@@ -60,6 +62,10 @@ public static class MapAccess
             foreach (PermissionGrant grant in map.Grants)
             {
                 entry.grants[grant.PlayerId] = grant.Level;
+                if (grant.UntilReturn)
+                {
+                    entry.untilReturn.Add(grant.PlayerId);
+                }
                 NotePlayer(grant.PlayerId);
             }
             table[map.MapId] = entry;
@@ -84,8 +90,21 @@ public static class MapAccess
         {
             return PermissionLevel.Full;
         }
-        return entry.grants.TryGetValue(playerId, out PermissionLevel level) ? level : PermissionLevel.None;
+        if (!entry.grants.TryGetValue(playerId, out PermissionLevel level))
+        {
+            return PermissionLevel.None;
+        }
+        // Управляющий (v7): права «пока меня нет» действуют, только пока владелец не в сети.
+        if (entry.untilReturn.Contains(playerId) && SessionView.SessionUi.Players.Any(p => p.PlayerId == entry.owner && p.Online))
+        {
+            return PermissionLevel.None;
+        }
+        return level;
     }
+
+    /// <summary>Выданный уровень, как в таблице, без учёта «пока меня нет» (для окна владельца).</summary>
+    public static PermissionLevel GrantedLevel(int mapId, int playerId) =>
+        table.TryGetValue(mapId, out MapEntry? entry) && entry.grants.TryGetValue(playerId, out PermissionLevel level) ? level : PermissionLevel.None;
 
     public static PermissionLevel MyLevel(int mapId) => LevelOf(mapId, LockstepClient.PlayerId);
 
@@ -94,10 +113,14 @@ public static class MapAccess
         LockstepClient.SendRaw(new MapClaimMessage { MapId = map.uniqueID });
     }
 
-    public static void Grant(int mapId, int playerId, PermissionLevel level)
+    public static void Grant(int mapId, int playerId, PermissionLevel level, bool untilReturn = false)
     {
-        LockstepClient.SendRaw(new GrantPermissionMessage { MapId = mapId, PlayerId = playerId, Level = level });
+        LockstepClient.SendRaw(new GrantPermissionMessage { MapId = mapId, PlayerId = playerId, Level = level, UntilReturn = untilReturn });
     }
+
+    /// <summary>Права игрока на карте выданы «только пока владельца нет» (управляющий, v7).</summary>
+    public static bool IsUntilReturn(int mapId, int playerId) =>
+        table.TryGetValue(mapId, out MapEntry? entry) && entry.untilReturn.Contains(playerId);
 
     public static string LevelLabel(PermissionLevel level)
     {
@@ -116,7 +139,7 @@ public sealed class Dialog_MapAccess : Window
 {
     private Vector2 scroll;
 
-    public override Vector2 InitialSize => new Vector2(640f, 480f);
+    public override Vector2 InitialSize => new Vector2(820f, 480f);
 
     public Dialog_MapAccess()
     {
@@ -179,7 +202,7 @@ public sealed class Dialog_MapAccess : Window
             {
                 foreach (int player in others)
                 {
-                    PermissionLevel level = MapAccess.LevelOf(map.uniqueID, player);
+                    PermissionLevel level = MapAccess.GrantedLevel(map.uniqueID, player);
                     Widgets.Label(new Rect(30f, cy + 4f, 220f, 26f), SessionView.SessionUi.NameOf(player) + ": " + MapAccess.LevelLabel(level));
                     PermissionLevel[] levels = { PermissionLevel.None, PermissionLevel.Observer, PermissionLevel.Build, PermissionLevel.Full };
                     for (int i = 0; i < levels.Length; i++)
@@ -191,7 +214,20 @@ public sealed class Dialog_MapAccess : Window
                         }
                         if (Widgets.ButtonText(button, MapAccess.LevelLabel(levels[i])) && levels[i] != level)
                         {
-                            MapAccess.Grant(map.uniqueID, player, levels[i]);
+                            MapAccess.Grant(map.uniqueID, player, levels[i], MapAccess.IsUntilReturn(map.uniqueID, player));
+                        }
+                    }
+                    // Управляющий: права действуют, только пока меня нет; сервер снимет их, когда я вернусь.
+                    bool until = MapAccess.IsUntilReturn(map.uniqueID, player);
+                    bool now = until;
+                    Rect untilRect = new Rect(255f + levels.Length * 88f + 6f, cy, 150f, 26f);
+                    if (level != PermissionLevel.None)
+                    {
+                        Widgets.CheckboxLabeled(untilRect, "пока меня нет", ref now);
+                        TooltipHandler.TipRegion(untilRect, "Права действуют, только пока вас нет в игре; когда вернётесь, сервер их снимет (режим «управляющий»)");
+                        if (now != until)
+                        {
+                            MapAccess.Grant(map.uniqueID, player, level, now);
                         }
                     }
                     cy += 30f;
