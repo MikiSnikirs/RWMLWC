@@ -390,6 +390,7 @@ public static class GizmoCommands
     public static void PatchAll(Harmony harmony)
     {
         HarmonyMethod prefix = new HarmonyMethod(typeof(GizmoCommands), nameof(Prefix));
+        HarmonyMethod finalizer = new HarmonyMethod(typeof(GizmoCommands), nameof(Finalizer));
         const BindingFlags flags = BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
         int patched = 0;
         int failed = 0;
@@ -412,7 +413,7 @@ public static class GizmoCommands
                 }
                 try
                 {
-                    harmony.Patch(method, prefix: prefix);
+                    harmony.Patch(method, prefix: prefix, finalizer: finalizer);
                     patched++;
                 }
                 catch (Exception ex)
@@ -425,10 +426,31 @@ public static class GizmoCommands
         Log.Message($"[RWMLWC] кнопки: перехвачено методов {patched}, не удалось {failed}");
     }
 
-    private static bool Prefix(Gizmo __instance)
+    private static bool Prefix(Gizmo __instance, out bool __state)
     {
-        return Intercept(__instance);
+        bool runOriginal = Intercept(__instance);
+        // Кнопка исполняется на месте (выбор инструмента разметки и т. п.): меню, которое она откроет, — её собственное.
+        __state = runOriginal;
+        if (__state)
+        {
+            LocalInputDepth++;
+        }
+        return runOriginal;
     }
+
+    private static void Finalizer(bool __state)
+    {
+        if (__state)
+        {
+            LocalInputDepth--;
+        }
+    }
+
+    /// <summary>Сейчас на месте исполняется ProcessInput кнопки, которую мы не перехватываем.</summary>
+    public static int LocalInputDepth { get; private set; }
+
+    /// <summary>Сейчас рисуется панель кнопок (GizmoGridDrawer.DrawGizmoGrid).</summary>
+    public static int GridDepth { get; set; }
 }
 
 [StaticConstructorOnStartup]
@@ -444,5 +466,20 @@ internal static class GizmoCommandsStartup
         {
             Log.Error("[RWMLWC] кнопки: установка перехвата упала: " + ex);
         }
+    }
+}
+
+// Панель кнопок рисуется здесь; нужно знать, что меню открыто именно из неё (см. VirtualUi.OnWindowAdd).
+[HarmonyPatch(typeof(GizmoGridDrawer), nameof(GizmoGridDrawer.DrawGizmoGrid))]
+internal static class Patch_GizmoGridDrawer_DrawGizmoGrid
+{
+    private static void Prefix()
+    {
+        GizmoCommands.GridDepth++;
+    }
+
+    private static void Finalizer()
+    {
+        GizmoCommands.GridDepth--;
     }
 }

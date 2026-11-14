@@ -62,6 +62,13 @@ public static class VirtualUi
             // Меню, открытое прямо из интерфейса методом, за объектом которого идёт наблюдение
             // (FieldWatch): действия строк исполняются под тем же наблюдением.
             object? watched = FieldWatch.AmbientTarget;
+            if (CommandBus.CaptureActive && window is FloatMenu && GizmoCommands.GridDepth > 0 && GizmoCommands.LocalInputDepth == 0)
+            {
+                // Меню по правому щелчку на кнопке объекта. Его строки — замыкания, которые исполнились бы
+                // только у этого игрока. Передавать его пока не умеем, поэтому не показываем.
+                Messages.Message("RWMLWC: меню по правому щелчку на кнопке пока не работает в сетевой игре", MessageTypeDefOf.RejectInput, false);
+                return false;
+            }
             if (watched != null && CommandBus.CaptureActive && window is FloatMenu direct)
             {
                 foreach (FloatMenuOption option in menuOptions(direct))
