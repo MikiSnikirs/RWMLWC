@@ -8,6 +8,7 @@ using RWMLWC.Net;
 using RWMLWC.Shared;
 using RWMLWC.Shared.Protocol;
 using Verse;
+using Message = RWMLWC.Shared.Protocol.Message;
 
 namespace RWMLWC.Client.Sim;
 
