@@ -85,6 +85,9 @@ public static class LockstepClient
 
     /// <summary>Сколько команд этот клиент отправил серверу.</summary>
     public static int CommandsSent => nextClientSeq - 1;
+
+    /// <summary>Команды игрока (без служебных просьб о снимке), отправленные за сессию.</summary>
+    public static int PlayerCommandsSent { get; private set; }
     private static readonly Stopwatch frameClock = new Stopwatch();
     private static readonly Stopwatch holdClock = new Stopwatch();
     private static int heldSpeed = -1;
@@ -443,6 +446,7 @@ public static class LockstepClient
             return -1;
         }
         int clientSeq = nextClientSeq++;
+        PlayerCommandsSent++;
         conn.Send(new CommandMessage
         {
             ClientSeq = clientSeq,
