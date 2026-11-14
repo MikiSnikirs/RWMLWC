@@ -26,6 +26,9 @@ public sealed class HashRecorder : GameComponent
     private int endTick;
     private string? filePath;
     private string scenarioName = "none";
+
+    /// <summary>Добавка к имени файла хешей (имя игрока в сессии), чтобы два экземпляра игры не писали в один файл.</summary>
+    public static string FileTag = "";
     private int denseFrom;
     private int denseTo = DenseTicks;
     private readonly StringBuilder buffer = new StringBuilder();
@@ -88,7 +91,12 @@ public sealed class HashRecorder : GameComponent
             pendingStart = null;
             return;
         }
-        pendingStart = Armed ? this : null;
+        TestAutomation.Config cfg = TestAutomation.Read();
+        pendingStart = cfg.armed ? this : null;
+        if (cfg.armed)
+        {
+            TestAutomation.OnGameLoaded(cfg);
+        }
     }
 
     /// <summary>Остановить запись перед загрузкой снимка; после загрузки она продолжится сама.</summary>
@@ -157,7 +165,8 @@ public sealed class HashRecorder : GameComponent
         if (ReferenceEquals(recorder, Instance))
         {
             TestAutomation.Config cfg = TestAutomation.Read();
-            recorder.StartDeterminismRun(cfg.ticks, cfg.scenario, cfg.trace, cfg.denseFrom, cfg.denseTo);
+            FileTag = cfg.serverHost != null ? cfg.playerName + "-" : "";
+            recorder.StartDeterminismRun(cfg.ticks, cfg.scenario, cfg.trace, cfg.denseFrom, cfg.denseTo, resetRand: cfg.serverHost == null);
             TestAutomation.OnRunStarted(cfg, recorder.startTick, recorder.filePath);
             Log.Message("[RWMLWC] determinism run auto-started at tick " + recorder.startTick + ": " + recorder.filePath);
         }
@@ -175,23 +184,29 @@ public sealed class HashRecorder : GameComponent
     /// Начать прогон: включить раздельную симуляцию, привести все состояния Rand к известным значениям
     /// и писать хеши <paramref name="durationTicks"/> тиков.
     /// </summary>
-    public void StartDeterminismRun(int durationTicks, string scenario = "none", bool trace = true, int denseFromTick = 0, int denseToTick = DenseTicks)
+    /// <param name="resetRand">
+    /// Привести Rand к тестовым константам. В сессии (LockstepClient) — false: там состояние
+    /// уже задано зерном сессии, и прогон только записывает хеши.
+    /// </param>
+    public void StartDeterminismRun(int durationTicks, string scenario = "none", bool trace = true, int denseFromTick = 0, int denseToTick = DenseTicks, bool resetRand = true)
     {
         denseFrom = denseFromTick;
         denseTo = denseToTick;
-        PerMapSim.SetEnabled(true);
-        MapRandContext.SetGlobalState(TestGlobalRandState);
-
         List<Map> maps = Find.Maps;
-        for (int i = 0; i < maps.Count; i++)
+        if (resetRand)
         {
-            MapSimState? state = MapSimState.For(maps[i]);
-            if (state != null)
+            PerMapSim.SetEnabled(true);
+            MapRandContext.SetGlobalState(TestGlobalRandState);
+            for (int i = 0; i < maps.Count; i++)
             {
-                state.frozen = false;
-                state.randState = state.InitialRandState();
-                state.randInitialized = true;
-                state.nextThingId = 0;
+                MapSimState? state = MapSimState.For(maps[i]);
+                if (state != null)
+                {
+                    state.frozen = false;
+                    state.randState = state.InitialRandState();
+                    state.randInitialized = true;
+                    state.nextThingId = 0;
+                }
             }
         }
 
@@ -200,7 +215,7 @@ public sealed class HashRecorder : GameComponent
         string dir = Path.Combine(GenFilePaths.SaveDataFolderPath, "RWMLWC");
         Directory.CreateDirectory(dir);
         string stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
-        filePath = Path.Combine(dir, "hash-" + stamp + ".txt");
+        filePath = Path.Combine(dir, "hash-" + FileTag + stamp + ".txt");
         scenarioName = scenario;
         DumpThingsAtStart(dir, stamp);
         rotLogPath = Path.Combine(dir, "rotlog-" + stamp + ".txt");
