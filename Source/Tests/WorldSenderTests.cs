@@ -287,4 +287,16 @@ public sealed class WorldSenderTests : IDisposable
         // Большинства нет (1:1) — лучший пинг среди всех с миром.
         Assert.Equal(silent.Id, WorldSnapshotOrder.Sender(a.Ordered(ProtocolIds.RequestWorldSnapshotKind).Single().Payload));
     }
+
+    [Fact]
+    public void SaveNowOrdersASaveFromTheBestPingPlayer()
+    {
+        Session s = NewSession(autosave: TimeSpan.FromHours(1));
+        Assert.Null(s.SaveNow()); // никого нет
+        C a = Join(s, "a", 50, withWorld: true);
+        C b = Join(s, "b", 10, withWorld: true);
+        Assert.Equal(b.Id, s.SaveNow());
+        a.Drain();
+        Assert.Single(a.Ordered(ProtocolIds.SaveWorldSnapshotKind));
+    }
 }

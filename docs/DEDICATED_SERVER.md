@@ -44,6 +44,9 @@
 
 ## Выделенный сервер
 
+**Готовая сборка:** GitHub → Actions → последний прогон CI на `main` → Artifacts → `rwmlwc-server-win-x64` (или `rwmlwc-server-linux-x64`). Это папка с программой, .NET ставить не нужно. Запуск: `RWMLWC.Server.exe --data D:\rwmlwc-server`. На Linux ещё нужна библиотека `libmsquic`.
+
+Из исходников:
 ```
 dotnet RWMLWC.Server.dll --data D:\rwmlwc-server
 ```

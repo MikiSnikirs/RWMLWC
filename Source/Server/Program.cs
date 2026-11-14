@@ -195,7 +195,7 @@ internal static class Program
 
     private const string Help =
         "Команды: status — состояние; players — игроки; say <текст> — сообщение в чат; " +
-        "kick <номер> — отключить игрока; saves — копии мира; stop — остановить сервер; help — эта справка.";
+        "kick <номер> — отключить игрока; save — сохранить мир сейчас; saves — копии мира; stop — остановить сервер; help — эта справка.";
 
     /// <summary>Команды администратора из консоли. Действия над сессией выполняются в её потоке.</summary>
     private static void ConsoleLoop(SessionHost host, SaveStore store, CancellationTokenSource stop)
@@ -225,7 +225,8 @@ internal static class Program
                     break;
                 case "status":
                     host.Post(s => Console.WriteLine(
-                        $"тик {s.TickUpTo}, скорость {s.Speed}, игроков в сети {s.Players.Count(p => p.Online)} из {s.Players.Count}, " +
+                        $"тик {s.TickUpTo}, скорость {s.Speed}{(s.AlarmActive ? " (ТРЕВОГА)" : "")}, игроков в сети {s.Players.Count(p => p.Online)} из {s.Players.Count}" +
+                        $" (отошли {s.Players.Count(p => p.Online && p.Idle)}), " +
                         (store.Latest is { } l ? $"копия мира: тик {l.Tick}, {l.SavedUtc.ToLocalTime():g}" : "копии мира нет")));
                     break;
                 case "players":
@@ -233,7 +234,8 @@ internal static class Program
                     {
                         if (s.Players.Count == 0) Console.WriteLine("игроков не было");
                         foreach (Session.Player p in s.Players)
-                            Console.WriteLine($"  {p.Id}. {p.Name} — {(p.Online ? $"в сети, пинг {p.Connection.RoundTripMs} мс" : "не в сети")}");
+                            Console.WriteLine($"  {p.Id}. {p.Name} — {(p.Online ? $"в сети, пинг {p.Connection.RoundTripMs} мс{(p.Idle ? ", отошёл" : "")}{(p.HasWorld ? "" : ", загружает мир")}" : "не в сети")}" +
+                                (p.Color != 0 ? $", цвет #{p.Color:X6}" : ""));
                     });
                     break;
                 case "say":
@@ -242,6 +244,13 @@ internal static class Program
                 case "kick":
                     if (!int.TryParse(arg, out int id)) { Console.WriteLine("kick <номер игрока>"); break; }
                     host.Post(s => { if (!s.Kick(id, "администратор")) Console.WriteLine($"игрока {id} нет в сети"); });
+                    break;
+                case "save":
+                    host.Post(s =>
+                    {
+                        int? sender = s.SaveNow();
+                        Console.WriteLine(sender == null ? "сохранить нельзя: в сети нет игрока с миром" : $"мир запрошен у игрока {sender}; копия появится через несколько секунд (saves)");
+                    });
                     break;
                 case "saves":
                     foreach (SaveCopy c in store.List())
