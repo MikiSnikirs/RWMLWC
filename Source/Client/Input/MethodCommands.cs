@@ -70,6 +70,13 @@ public static class MethodCommands
         Setter(typeof(Pawn_ReadingTracker), nameof(Pawn_ReadingTracker.CurrentPolicy));
         // Разрешённая область пешки.
         Setter(typeof(Pawn_PlayerSettings), nameof(Pawn_PlayerSettings.AreaRestrictionInPawnCurrentMap));
+        // Исследования.
+        Method(typeof(ResearchManager), nameof(ResearchManager.SetCurrentProject));
+        Method(typeof(ResearchManager), nameof(ResearchManager.StopProject));
+        // Счета верстака: добавить, удалить, переставить. Поля самого счёта — FieldWatch.
+        Method(typeof(BillStack), nameof(BillStack.AddBill));
+        Method(typeof(BillStack), nameof(BillStack.Delete));
+        Method(typeof(BillStack), nameof(BillStack.Reorder));
     }
 
     // ---------- перехват ----------
@@ -106,14 +113,14 @@ public static class MethodCommands
     }
 
     // Карта команды: где находится пешка-владелец; если она не на карте (караван) — любая карта игрока.
-    private static Map? MapFor(object instance)
+    internal static Map? MapFor(object instance)
     {
         Pawn? pawn = instance as Pawn;
         if (pawn == null)
         {
             ValueCodec.TryPawnPart(instance, out pawn, out _);
         }
-        Map? map = pawn?.MapHeld ?? Find.CurrentMap;
+        Map? map = pawn?.MapHeld ?? (instance as BillStack)?.billGiver?.Map ?? (instance as Bill)?.Map ?? Find.CurrentMap;
         if (map == null && Find.Maps.Count > 0)
         {
             map = Find.Maps[0];

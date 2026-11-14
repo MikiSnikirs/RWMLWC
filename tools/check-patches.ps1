@@ -38,7 +38,7 @@ $bad = 0
 'static initializers (private fields and properties reached by name):'
 foreach ($name in @('RWMLWC.Client.Sim.MapRandContext', 'RWMLWC.Client.Sim.LockstepClient', 'RWMLWC.Client.Input.GizmoCommands',
         'RWMLWC.Client.Input.DesignatorCommands', 'RWMLWC.Client.Input.VirtualUi', 'RWMLWC.Client.Input.MethodCommands',
-        'RWMLWC.Client.Input.ValueCodec', 'RWMLWC.Client.Input.CommandBus', 'RWMLWC.Client.Input.MapClickCommands')) {
+        'RWMLWC.Client.Input.ValueCodec', 'RWMLWC.Client.Input.CommandBus', 'RWMLWC.Client.Input.MapClickCommands', 'RWMLWC.Client.Input.FieldWatch')) {
     $t = $mod.GetType($name)
     if (-not $t) { "  (no type $name in this branch)"; continue }
     try { [System.Runtime.CompilerServices.RuntimeHelpers]::RunClassConstructor($t.TypeHandle) }
@@ -56,7 +56,8 @@ foreach ($c in $classes) {
 
 # Patches installed in bulk at game start ([StaticConstructorOnStartup] classes call these with the mod's Harmony instance).
 foreach ($pair in @('RWMLWC.Client.Input.DesignatorCommands|PatchAll', 'RWMLWC.Client.Input.GizmoCommands|PatchAll',
-        'RWMLWC.Client.Input.VirtualUi|PatchOrderForceTarget', 'RWMLWC.Client.Input.MethodCommands|PatchAll')) {
+        'RWMLWC.Client.Input.VirtualUi|PatchOrderForceTarget', 'RWMLWC.Client.Input.MethodCommands|PatchAll',
+        'RWMLWC.Client.Input.FieldWatch|PatchAll')) {
     $typeName, $methodName = $pair.Split('|')
     $t = $mod.GetType($typeName)
     if (-not $t) { continue }

@@ -59,6 +59,19 @@ public static class VirtualUi
     {
         if (!CommandBus.Executing)
         {
+            // Меню, открытое прямо из интерфейса методом, за объектом которого идёт наблюдение
+            // (FieldWatch): действия строк исполняются под тем же наблюдением.
+            object? watched = FieldWatch.AmbientTarget;
+            if (watched != null && CommandBus.CaptureActive && window is FloatMenu direct)
+            {
+                foreach (FloatMenuOption option in menuOptions(direct))
+                {
+                    if (option.action != null)
+                    {
+                        option.action = FieldWatch.WrapMenuAction(watched, option.action);
+                    }
+                }
+            }
             return true;
         }
         if (window is FloatMenu menu)

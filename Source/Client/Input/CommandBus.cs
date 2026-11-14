@@ -30,6 +30,9 @@ public static class CommandKinds
 
     /// <summary>Вызов метода игры, которым окно или вкладка меняет настройку (приоритеты работ, расписание, политики) (T-023).</summary>
     public const int MethodCall = 7;
+
+    /// <summary>Запись поля объекта, которое окно меняет напрямую, без метода (счета, медицина) (T-023).</summary>
+    public const int FieldSet = 8;
 }
 
 /// <summary>
@@ -163,6 +166,9 @@ public static class CommandBus
                     break;
                 case CommandKinds.MethodCall:
                     MethodCommands.Execute(map, ref reader);
+                    break;
+                case CommandKinds.FieldSet:
+                    FieldWatch.Execute(map, ref reader);
                     break;
                 default:
                     Failed++;
