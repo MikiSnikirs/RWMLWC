@@ -57,9 +57,18 @@ public static class TestAutomation
         public bool desync;
         public int connectDelaySec;
         public bool quit;
+        /// <summary>Потолок тиков за кадр в сессии (0 — без потолка): ключ tpf.</summary>
+        public int ticksPerFrame;
     }
 
     private static Config? activeConfig;
+
+    /// <summary>
+    /// Ровно столько тиков за кадр делает клиент в сессии, если сервер разрешил (0 — как обычно:
+    /// сколько успеет за бюджет кадра). Нужен, чтобы воспроизвести зависимость симуляции от числа
+    /// тиков на кадр: два клиента с разными tpf, при этом трассировка не меняет темп.
+    /// </summary>
+    public static int TicksPerFrameCap { get; private set; }
     private static string? pendingScenario;
     private static bool quitWhenDone;
     private static bool automationActive;
@@ -236,8 +245,15 @@ public static class TestAutomation
                 case "quit":
                     cfg.quit = value == "1";
                     break;
+                case "tpf":
+                    if (int.TryParse(value, out int tpf) && tpf >= 0)
+                    {
+                        cfg.ticksPerFrame = tpf;
+                    }
+                    break;
             }
         }
+        TicksPerFrameCap = cfg.armed ? cfg.ticksPerFrame : 0;
         if (cfg.queue != null)
         {
             cfg.queueIndex = ReadProgress();
@@ -292,6 +308,10 @@ public static class TestAutomation
                 // Поэтому шаг «с правами» ждёт не только своего тика, но и самих прав; выдача стоит
                 // с запасом в 1000 тиков после попытки «без прав» (в прогоне агента B отстающий c1
                 // получил права раньше, чем дошёл до своей первой попытки).
+                // Попытка «без прав» имеет смысл, только когда карту уже занял c2: иначе карта свободна
+                // и открыта всем (прогон A 14.11, 17:54 МСК — c1 дошёл до шага раньше, чем узнал о владельце).
+                stepGates["access: designate without rights"] = () =>
+                    RWMLWC.Client.Maps.MapAccess.OwnerOf((Find.CurrentMap ?? Find.Maps[0]).uniqueID) != 0;
                 stepGates["access: designate with Build"] = () =>
                     RWMLWC.Client.Maps.MapAccess.MyLevel((Find.CurrentMap ?? Find.Maps[0]).uniqueID) >= RWMLWC.Shared.Protocol.PermissionLevel.Build;
             }

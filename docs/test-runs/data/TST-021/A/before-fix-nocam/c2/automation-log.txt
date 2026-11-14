@@ -1,0 +1,14 @@
+2026-11-14 17:37:28 autoload: loading save 'tst014'
+2026-11-14 17:37:35 lockstep: connecting to 127.0.0.1:54271 as 'c2'
+2026-11-14 17:37:36 lockstep: connected to quic:127.0.0.1:54271, Hello sent
+2026-11-14 17:37:37 lockstep: Welcome, playerId=2, serverTick=14998, seed=7
+2026-11-14 17:38:37 lockstep: hold is over, requesting speed 3
+2026-11-14 17:38:37 run started: #0, tick=14998, scenario=gizmo, ticks=3000, trace=False, quit=True, file=hash-c2-20261114-173837.txt
+2026-11-14 17:38:45 summary: map0 drafted=1 forbidden=55 plants=[]
+2026-11-14 17:38:45 summary: map0 jobs=[231:AttackMelee@(150, 0, 103),234:GotoWander@(141, 0, 108),239:GotoWander@(145, 0, 103)]
+2026-11-14 17:38:45 summary: map0 settings=29B89D30A34E3B1A
+2026-11-14 17:38:45 summary: map0 designations=0 blueprints=0 zones=0; commands sent=0 executed=3 failed=0
+2026-11-14 17:38:45 run finished: file=hash-c2-20261114-173837.txt
+2026-11-14 17:38:45 queue: finished
+2026-11-14 17:38:45 lockstep: disconnect: прогон завершён
+2026-11-14 17:38:45 quitting game
