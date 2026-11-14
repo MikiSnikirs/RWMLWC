@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/Source/">
     <Project Path="Source/Shared/RWMLWC.Shared.csproj" />
+    <Project Path="Source/Net/RWMLWC.Net.csproj" />
     <Project Path="Source/Server/RWMLWC.Server.csproj" />
     <Project Path="Source/Client/RWMLWC.Client.csproj" />
     <Project Path="Source/Tests/RWMLWC.Tests.csproj" />

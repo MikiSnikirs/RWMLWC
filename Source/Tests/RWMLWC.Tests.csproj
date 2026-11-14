@@ -4,6 +4,7 @@
     <RootNamespace>RWMLWC.Tests</RootNamespace>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
@@ -13,5 +14,8 @@
   <ItemGroup>
     <!-- Тесты не зависят от клиента и файлов игры, поэтому идут в CI. -->
     <ProjectReference Include="../Shared/RWMLWC.Shared.csproj" />
+    <ProjectReference Include="../Net/RWMLWC.Net.csproj" />
+    <!-- Сервер запускается тестом TST-012 отдельным процессом; ссылка только задаёт порядок сборки. -->
+    <ProjectReference Include="../Server/RWMLWC.Server.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 </Project>

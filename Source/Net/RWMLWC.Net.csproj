@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>RWMLWC.Net</AssemblyName>
+    <RootNamespace>RWMLWC.Net</RootNamespace>
+    <!-- System.Net.Quic помечен как Windows/Linux/macOS; проверка поддержки — QuicConnection.IsSupported во время работы. -->
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Shared/RWMLWC.Shared.csproj" />
+  </ItemGroup>
+</Project>
