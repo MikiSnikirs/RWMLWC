@@ -1,0 +1,27 @@
+2026-11-14 21:30:16 autoload: loading save 'tst014'
+2026-11-14 21:30:23 lockstep: connecting to 127.0.0.1:61999 as 'c1'
+2026-11-14 21:30:24 lockstep: connected to quic:127.0.0.1:61999, Hello sent
+2026-11-14 21:30:25 lockstep: Welcome, playerId=2, serverTick=14998, seed=7
+2026-11-14 21:31:25 lockstep: hold is over, requesting speed 3
+2026-11-14 21:31:25 run started: #0, tick=14998, scenario=access, ticks=4500, trace=False, quit=True, file=hash-c1-20261114-213125.txt
+2026-11-14 21:31:29 access: try 'designate, no rights': my level on map 0 is None, owner 1
+2026-11-14 21:31:29 designate: tick=15502, cut=961 cells, wall=10+1, zone=49, hunt=газель; captured=5, sent=0
+2026-11-14 21:31:29 access: try 'designate, no rights': commands sent=0
+2026-11-14 21:31:33 access: try 'designate, Build': my level on map 0 is Build, owner 1
+2026-11-14 21:31:33 designate: tick=17000, cut=961 cells, wall=10+1, zone=49, hunt=газель; captured=10, sent=5
+2026-11-14 21:31:33 access: try 'designate, Build': commands sent=5
+2026-11-14 21:31:33 access: try 'draft, Build': my level on map 0 is Build, owner 1
+2026-11-14 21:31:33 gizmo: draft Ross (id 231): sent=True
+2026-11-14 21:31:33 access: try 'draft, Build': commands sent=0
+2026-11-14 21:31:36 access: try 'designate, revoked': my level on map 0 is None, owner 1
+2026-11-14 21:31:36 designate: tick=18299, cut=961 cells, wall=10+1, zone=49, hunt=газель; captured=15, sent=5
+2026-11-14 21:31:36 access: try 'designate, revoked': commands sent=0
+2026-11-14 21:31:40 summary: map0 drafted=0 forbidden=56 plants=[]
+2026-11-14 21:31:40 summary: map0 jobs=[231:Wait_Wander@(124, 0, 143),234:GotoWander@(133, 0, 136),239:CutPlantDesignated@(134, 0, 133)]
+2026-11-14 21:31:40 summary: map0 settings=0C418F9892DD0219
+2026-11-14 21:31:40 summary: squads= rejected=0 drafted=[]
+2026-11-14 21:31:40 summary: map0 designations=433 blueprints=11 zones=1; commands sent=5 executed=5 failed=0
+2026-11-14 21:31:40 run finished: file=hash-c1-20261114-213125.txt
+2026-11-14 21:31:40 queue: finished
+2026-11-14 21:31:40 lockstep: disconnect: прогон завершён
+2026-11-14 21:31:40 quitting game
