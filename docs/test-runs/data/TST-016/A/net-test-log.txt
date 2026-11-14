@@ -1,0 +1,15 @@
+05:03:03.656 === старт, роль host, протокол v1, Steam есть
+05:03:03.660 мой SteamID: <SteamID64 скрыт>
+05:03:03.747 эхо-сервер слушает 127.0.0.1:58735
+05:03:04.426 Steam-мост: слушаю, мой SteamID <SteamID64 скрыт>, сервер 127.0.0.1:58735
+05:03:04.426 HOST READY. Другу: role=join, host=<SteamID64 скрыт>. Игру не закрывать до команды.
+05:05:07.962 Steam-мост: подключился steam:<SteamID64 скрыт>
+05:05:08.011 эхо-сервер: CONNECTED quic:127.0.0.1:49778
+05:05:08.678 Steam-мост: steam:<SteamID64 скрыт> отключён: удалённая сторона закрыла: Timed out attempting to connect
+05:05:08.678 эхо-сервер: DISCONNECTED quic:127.0.0.1:49778: QUIC: ConnectionAborted (код 0): Connection aborted by peer (0).
+05:05:57.774 Steam-мост: подключился steam:<SteamID64 скрыт>
+05:05:57.780 эхо-сервер: CONNECTED quic:127.0.0.1:58218
+05:06:02.647 Steam-мост: steam:<SteamID64 скрыт> отключён: удалённая сторона закрыла: проверка переподключения
+05:06:02.647 эхо-сервер: DISCONNECTED quic:127.0.0.1:58218: QUIC: ConnectionAborted (код 0): Connection aborted by peer (0).
+05:06:03.872 Steam-мост: подключился steam:<SteamID64 скрыт>
+05:06:03.876 эхо-сервер: CONNECTED quic:127.0.0.1:55572
