@@ -1,0 +1,26 @@
+2026-11-14 21:27:16 autoload: loading save 'tst014'
+2026-11-14 21:27:24 lockstep: connecting to 127.0.0.1:61990 as 'c1'
+2026-11-14 21:27:25 lockstep: connected to quic:127.0.0.1:61990, Hello sent
+2026-11-14 21:27:26 lockstep: Welcome, playerId=1, serverTick=14998, seed=7
+2026-11-14 21:28:26 lockstep: hold is over, requesting speed 3
+2026-11-14 21:28:26 run started: #0, tick=14998, scenario=tabs, ticks=4000, trace=False, quit=True, file=hash-c1-20261114-212826.txt
+2026-11-14 21:28:28 tabs: setup: crafting spot at (113, 0, 113), stockpile 25 cells; sent=2
+2026-11-14 21:28:29 tabs: work Art of Ross: 3 -> 0, sent=1, value now=3
+2026-11-14 21:28:29 tabs: schedule hour 5 of Ross: Sleep -> Work, sent=1
+2026-11-14 21:28:30 tabs: outfit of Ross -> policy 2, sent=1
+2026-11-14 21:28:30 tabs: allowed area of Ross -> 5, sent=1
+2026-11-14 21:28:30 tabs: research - -> Autodoors, sent=1
+2026-11-14 21:28:30 tabs: add bill SmashCorpseMechanoid to рабочее место (id 100000000), bills before=0, sent=1
+2026-11-14 21:28:31 tabs: suspend bill SmashCorpseMechanoid on рабочее место, sent=1, value now=False
+2026-11-14 21:28:31 tabs: medical care of Ross: Best -> NoMeds, sent=1
+2026-11-14 21:28:31 tabs: storage filter of zone 0: wood True -> False, sent=1, value now=True
+2026-11-14 21:28:32 tabs: storage priority of zone 0: Normal -> Critical, sent=1
+2026-11-14 21:28:39 summary: map0 drafted=0 forbidden=56 plants=[]
+2026-11-14 21:28:39 summary: map0 jobs=[231:GotoWander@(134, 0, 123),234:Wait_Wander@(129, 0, 122),239:Wait_Wander@(137, 0, 124)]
+2026-11-14 21:28:39 summary: map0 settings=405E8ED9CBD895E7
+2026-11-14 21:28:39 summary: squads= rejected=0 drafted=[]
+2026-11-14 21:28:39 summary: map0 designations=0 blueprints=0 zones=1; commands sent=12 executed=12 failed=0
+2026-11-14 21:28:39 run finished: file=hash-c1-20261114-212826.txt
+2026-11-14 21:28:39 queue: finished
+2026-11-14 21:28:39 lockstep: disconnect: прогон завершён
+2026-11-14 21:28:39 quitting game
