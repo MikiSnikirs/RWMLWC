@@ -132,17 +132,21 @@ public sealed class Dialog_MapAccess : Window
         Text.Font = GameFont.Medium;
         Widgets.Label(new Rect(inRect.x, inRect.y, inRect.width, 34f), "Карты и права");
         Text.Font = GameFont.Small;
+        if (Widgets.ButtonText(new Rect(inRect.xMax - 130f, inRect.y, 100f, 30f), "Отряды"))
+        {
+            Find.WindowStack.Add(new Dialog_Squads());
+        }
         float y = inRect.y + 40f;
         if (!LockstepClient.InSession)
         {
             Widgets.Label(new Rect(inRect.x, y, inRect.width, 30f), "Сетевая игра не идёт.");
             return;
         }
-        Widgets.Label(new Rect(inRect.x, y, inRect.width, 24f), "Я — игрок " + LockstepClient.PlayerId + (MapAccess.HasTable ? "" : " (таблица прав от сервера ещё не получена)"));
+        Widgets.Label(new Rect(inRect.x, y, inRect.width, 24f), "Я — " + SessionView.SessionUi.NameOf(LockstepClient.PlayerId) + " (игрок " + LockstepClient.PlayerId + ")" + (MapAccess.HasTable ? "" : " (таблица прав от сервера ещё не получена)"));
         y += 28f;
 
         List<Map> maps = Find.Maps;
-        List<int> others = MapAccess.KnownPlayers.Where(p => p != LockstepClient.PlayerId).ToList();
+        List<int> others = MapAccess.KnownPlayers.Concat(SessionView.SessionUi.Players.Select(p => p.PlayerId)).Distinct().Where(p => p != LockstepClient.PlayerId).OrderBy(p => p).ToList();
         float viewHeight = 0f;
         foreach (Map map in maps)
         {
@@ -156,7 +160,7 @@ public sealed class Dialog_MapAccess : Window
         {
             int owner = MapAccess.OwnerOf(map.uniqueID);
             bool mine = owner == LockstepClient.PlayerId;
-            string ownerText = owner <= 0 ? "свободна" : (mine ? "моя" : "игрок " + owner);
+            string ownerText = owner <= 0 ? "свободна" : (mine ? "моя" : SessionView.SessionUi.NameOf(owner));
             string name = map.Parent != null ? map.Parent.LabelCap : ("Карта " + map.uniqueID);
             Widgets.Label(new Rect(0f, cy + 4f, 250f, 28f), name + (map == Find.CurrentMap ? "  ◄" : ""));
             Widgets.Label(new Rect(255f, cy + 4f, 190f, 28f), ownerText + ", я: " + MapAccess.LevelLabel(MapAccess.MyLevel(map.uniqueID)));
@@ -176,7 +180,7 @@ public sealed class Dialog_MapAccess : Window
                 foreach (int player in others)
                 {
                     PermissionLevel level = MapAccess.LevelOf(map.uniqueID, player);
-                    Widgets.Label(new Rect(30f, cy + 4f, 220f, 26f), "игрок " + player + ": " + MapAccess.LevelLabel(level));
+                    Widgets.Label(new Rect(30f, cy + 4f, 220f, 26f), SessionView.SessionUi.NameOf(player) + ": " + MapAccess.LevelLabel(level));
                     PermissionLevel[] levels = { PermissionLevel.None, PermissionLevel.Observer, PermissionLevel.Build, PermissionLevel.Full };
                     for (int i = 0; i < levels.Length; i++)
                     {
