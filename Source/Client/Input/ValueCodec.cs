@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using HarmonyLib;
 using RimWorld;
 using RWMLWC.Shared.Protocol;
 using Verse;
@@ -31,6 +32,15 @@ public static class ValueCodec
     private const byte KPawnPart = 15;
     private const byte KPolicy = 16;
     private const byte KPawnAnywhere = 17;
+    private const byte KIntRange = 18;
+    private const byte KFloatRange = 19;
+    private const byte KQualityRange = 20;
+    private const byte KBill = 21;
+    private const byte KBillStack = 22;
+    private const byte KNewBill = 23;
+    private const byte KResearchManager = 24;
+
+    private static readonly AccessTools.FieldRef<Bill, int> billLoadId = AccessTools.FieldRefAccess<Bill, int>("loadID");
 
     private static Dictionary<string, Type>? typesByName;
 
@@ -40,7 +50,7 @@ public static class ValueCodec
         type = Nullable.GetUnderlyingType(type) ?? type;
         return type == typeof(bool) || type == typeof(int) || type == typeof(float) || type == typeof(byte)
             || type == typeof(string) || type.IsEnum || type == typeof(IntVec3) || type == typeof(Rot4)
-            || type == typeof(ColorInt)
+            || type == typeof(ColorInt) || type == typeof(IntRange) || type == typeof(FloatRange) || type == typeof(QualityRange)
             || typeof(Def).IsAssignableFrom(type) || typeof(Thing).IsAssignableFrom(type)
             || typeof(Zone).IsAssignableFrom(type) || typeof(Area).IsAssignableFrom(type)
             || typeof(Precept).IsAssignableFrom(type);
@@ -80,6 +90,21 @@ public static class ValueCodec
             case Rot4 rot:
                 w.WriteByte(KRot);
                 w.WriteByte((byte)rot.AsInt);
+                break;
+            case IntRange intRange:
+                w.WriteByte(KIntRange);
+                w.WriteInt32(intRange.min);
+                w.WriteInt32(intRange.max);
+                break;
+            case FloatRange floatRange:
+                w.WriteByte(KFloatRange);
+                w.WriteInt32(BitConverter.SingleToInt32Bits(floatRange.min));
+                w.WriteInt32(BitConverter.SingleToInt32Bits(floatRange.max));
+                break;
+            case QualityRange qualityRange:
+                w.WriteByte(KQualityRange);
+                w.WriteByte((byte)qualityRange.min);
+                w.WriteByte((byte)qualityRange.max);
                 break;
             case ColorInt color:
                 w.WriteByte(KColorInt);
@@ -187,6 +212,49 @@ public static class ValueCodec
                 }
                 return null;
             }
+            case KIntRange:
+            {
+                int min = r.ReadInt32();
+                return new IntRange(min, r.ReadInt32());
+            }
+            case KFloatRange:
+            {
+                float min = BitConverter.Int32BitsToSingle(r.ReadInt32());
+                return new FloatRange(min, BitConverter.Int32BitsToSingle(r.ReadInt32()));
+            }
+            case KQualityRange:
+            {
+                QualityCategory min = (QualityCategory)r.ReadByte();
+                return new QualityRange(min, (QualityCategory)r.ReadByte());
+            }
+            case KBill:
+            {
+                BillStack? stack = FindBillStack(map, r.ReadInt32());
+                int loadId = r.ReadInt32();
+                if (stack != null)
+                {
+                    foreach (Bill bill in stack.Bills)
+                    {
+                        if (billLoadId(bill) == loadId)
+                        {
+                            return bill;
+                        }
+                    }
+                }
+                return null;
+            }
+            case KBillStack:
+                return FindBillStack(map, r.ReadInt32());
+            case KNewBill:
+            {
+                Type? type = FindType(r.ReadString());
+                string defName = r.ReadString();
+                Precept_ThingStyle? precept = FindPrecept(r.ReadInt32()) as Precept_ThingStyle;
+                RecipeDef? recipe = type == null ? null : GenDefDatabase.GetDef(type, defName, false) as RecipeDef;
+                return recipe == null ? null : BillUtility.MakeNewBill(recipe, precept);
+            }
+            case KResearchManager:
+                return Find.ResearchManager;
             case KPawnAnywhere:
                 return FindPawnAnywhere(r.ReadInt32());
             case KPolicy:
@@ -232,6 +300,40 @@ public static class ValueCodec
                 w.WriteByte(KPolicy);
                 w.WriteString(policy.GetType().FullName ?? "");
                 w.WriteInt32(policy.id);
+                return true;
+            case ResearchManager:
+                w.WriteByte(KResearchManager);
+                return true;
+            case BillStack stack:
+                if (!(stack.billGiver is Thing stackOwner))
+                {
+                    return false;
+                }
+                w.WriteByte(KBillStack);
+                w.WriteInt32(stackOwner.thingIDNumber);
+                return true;
+            case Bill bill:
+                if (bill.billStack == null)
+                {
+                    // Счёт только что создан интерфейсом и ещё не добавлен: передаём, из чего его создать.
+                    // Операции (Bill_Medical) несут часть тела и так не передаются — пока не поддержаны.
+                    if (bill is Bill_Medical || bill.recipe == null)
+                    {
+                        return false;
+                    }
+                    w.WriteByte(KNewBill);
+                    w.WriteString(bill.recipe.GetType().FullName ?? "");
+                    w.WriteString(bill.recipe.defName ?? "");
+                    w.WriteInt32(bill.precept != null ? bill.precept.Id : -1);
+                    return true;
+                }
+                if (!(bill.billStack.billGiver is Thing billOwner))
+                {
+                    return false;
+                }
+                w.WriteByte(KBill);
+                w.WriteInt32(billOwner.thingIDNumber);
+                w.WriteInt32(billLoadId(bill));
                 return true;
         }
         if (value != null && !Supports(value.GetType()) && TryPawnPart(value, out Pawn? owner, out string? fieldName))
@@ -295,6 +397,31 @@ public static class ValueCodec
             if (pawn.thingIDNumber == thingIdNumber)
             {
                 return pawn;
+            }
+        }
+        return null;
+    }
+
+    private static BillStack? FindBillStack(Map map, int ownerThingId)
+    {
+        Thing? owner = FindThing(map, ownerThingId) ?? FindPawnAnywhere(ownerThingId);
+        return (owner as IBillGiver)?.BillStack;
+    }
+
+    private static Precept? FindPrecept(int id)
+    {
+        if (id < 0)
+        {
+            return null;
+        }
+        foreach (Ideo ideo in Find.IdeoManager.IdeosListForReading)
+        {
+            foreach (Precept precept in ideo.PreceptsListForReading)
+            {
+                if (precept.Id == id)
+                {
+                    return precept;
+                }
             }
         }
         return null;
