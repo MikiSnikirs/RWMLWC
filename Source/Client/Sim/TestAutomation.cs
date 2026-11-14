@@ -21,6 +21,7 @@ namespace RWMLWC.Client.Sim;
 ///                        когда очередь пройдена, метка считается выключенной;
 ///   ticks=10000        — длительность прогона;
 ///   trace=0|1          — писать ли трассировку Rand (большой файл);
+///   traceframes=7      — глубина цепочки вызовов в трассировке (больше — видно, кто вызвал, но файл крупнее);
 ///   densefrom=0, denseto=300 — окно (в тиках от старта), где хеш пишется каждый тик и идёт трассировка;
 ///   perprocess=1       — между прогонами очереди перезапускать игру, а не перезагружать сейв;
 ///   snapat=2000        — тик от старта, на котором сценарии snap-save и snap-reload снимают снимок игры;
@@ -40,6 +41,7 @@ public static class TestAutomation
         public int queueIndex;
         public int ticks = HashRecorder.AutoRunTicks;
         public bool trace = true;
+        public int traceFrames = 7;
         public int denseFrom;
         public int denseTo = HashRecorder.DenseTicks;
         public bool perProcess;
@@ -215,6 +217,12 @@ public static class TestAutomation
                 case "perprocess":
                     cfg.perProcess = value == "1";
                     break;
+                case "traceframes":
+                    if (int.TryParse(value, out int frames) && frames >= 1 && frames <= 64)
+                    {
+                        cfg.traceFrames = frames;
+                    }
+                    break;
                 case "trace":
                     cfg.trace = value != "0";
                     break;
@@ -313,6 +321,7 @@ public static class TestAutomation
             sessionSteps.Enqueue((startTick + 600, "gizmo: plant menu", GizmoPlantMenu));
             sessionSteps.Enqueue((startTick + 700, "gizmo: menu option", GizmoMenuOption));
         }
+        RandTracer.MaxFrames = cfg.traceFrames;
         snapshotDone = false;
         snapshotToApply = null;
         Note($"run started: #{cfg.queueIndex}, tick={startTick}, scenario={cfg.scenario}, ticks={cfg.ticks}, trace={cfg.trace}, quit={cfg.quit}, file={Path.GetFileName(hashFile)}");
