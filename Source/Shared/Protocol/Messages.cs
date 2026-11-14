@@ -87,17 +87,21 @@ public sealed class WelcomeMessage : Message
     public int PlayerId;
     /// <summary>Тик общих часов на момент входа.</summary>
     public int ServerTick;
+    /// <summary>Зерно сессии: от него клиент считает начальные состояния <c>Rand</c> карт (<c>PerMapSim.SessionSeed</c>).</summary>
+    public uint SessionSeed;
 
     public override void Write(PacketWriter w)
     {
         w.WriteInt32(PlayerId);
         w.WriteInt32(ServerTick);
+        w.WriteUInt32(SessionSeed);
     }
 
     internal static WelcomeMessage Read(ref PacketReader r) => new()
     {
         PlayerId = r.ReadInt32(),
         ServerTick = r.ReadInt32(),
+        SessionSeed = r.ReadUInt32(),
     };
 }
 
