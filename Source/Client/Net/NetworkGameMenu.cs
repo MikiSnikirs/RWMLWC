@@ -143,7 +143,9 @@ public class Dialog_ServerJoin : Window
             list.Label(st switch
             {
                 LockstepClient.State.InSession => "В сессии, игрок " + LockstepClient.PlayerId + ". Окно можно закрыть.",
-                LockstepClient.State.Off => "Подключение не состоялось: сервер недоступен или отказал (пароль, имя, версия). Подробности — в логе игры (строки RWMLWC).",
+                LockstepClient.State.Off => LockstepClient.LastReject.Length > 0
+                    ? "Сервер отказал: " + LockstepClient.LastReject + "."
+                    : "Подключение не состоялось: сервер недоступен (адрес, порт, проброс порта). Подробности — в логе игры (строки RWMLWC).",
                 LockstepClient.State.Connecting => "Подключаюсь...",
                 _ => "Сервер ответил, загружаю мир...",
             });
