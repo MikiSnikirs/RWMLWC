@@ -19,6 +19,8 @@ namespace RWMLWC.Client.Net;
 /// <item><c>role=selftest</c> — одна машина: пара соединений через стек Steam ↔ мост ↔ локальный сервер-эхо.</item>
 /// <item><c>role=host</c> — хост: сервер-эхо в игре + Steam-мост; ждёт друга, пока игра открыта.</item>
 /// <item><c>role=join</c>, <c>host=&lt;SteamID64&gt;</c> — друг: подключается к хосту по Steam и гоняет проверки.</item>
+/// <item><c>role=hostsession</c>, <c>port</c>, <c>starttick</c>, [<c>seed</c>], [<c>steam=0</c>] — сессия сервера внутри этой игры (T-019)
+/// поднимается при запуске; подключать к ней клиентов — ключами <c>server/thumbprint</c> автоматики A.</item>
 /// </list>
 /// Результаты — в <c>RWMLWC/net-test-log.txt</c> и в лог игры с меткой <c>[RWMLWC][net-test]</c>.
 /// </summary>
@@ -49,6 +51,14 @@ internal static class NetTestHarness
             switch (role)
             {
                 case "selftest": _ = Guard(SelfTestAsync); break;
+                case "hostsession":
+                    HostedSession.Start(
+                        int.Parse(cfg.GetValueOrDefault("starttick", "0")),
+                        int.Parse(cfg.GetValueOrDefault("port", "0")),
+                        steam: cfg.GetValueOrDefault("steam", "1") == "1",
+                        seed: cfg.TryGetValue("seed", out string? sd) ? uint.Parse(sd) : null);
+                    Write($"HOSTSESSION READY port={HostedSession.Port} thumbprint={HostedSession.Thumbprint}");
+                    break;
                 case "host": _ = Guard(HostAsync); break;
                 case "join":
                     ulong host = ulong.Parse(cfg["host"]);
