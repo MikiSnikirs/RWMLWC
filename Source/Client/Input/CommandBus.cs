@@ -21,6 +21,12 @@ public static class CommandKinds
 
     /// <summary>Выбор цели после команды, которая начала прицеливание (T-021).</summary>
     public const int TargetPicked = 4;
+
+    /// <summary>Правый щелчок по карте при выделенных пешках: приказ сразу или контекстное меню (T-022).</summary>
+    public const int MapRightClick = 5;
+
+    /// <summary>Приказ призванной пешке идти в клетку (перемещение группы с расстановкой) (T-022).</summary>
+    public const int PawnGoto = 6;
 }
 
 /// <summary>
@@ -145,6 +151,12 @@ public static class CommandBus
                     break;
                 case CommandKinds.TargetPicked:
                     VirtualUi.ExecuteTargetPicked(map, ref reader);
+                    break;
+                case CommandKinds.MapRightClick:
+                    MapClickCommands.ExecuteRightClick(map, ref reader);
+                    break;
+                case CommandKinds.PawnGoto:
+                    MapClickCommands.ExecuteGoto(map, ref reader);
                     break;
                 default:
                     Failed++;
