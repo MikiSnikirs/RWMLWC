@@ -27,6 +27,7 @@ param(
     [int]$DenseFrom = -1,       # hash every tick in this window (ticks from run start)
     [int]$DenseTo = -1,
     [int]$Camera = -1,          # camera wander for c2: 1/0 (default 1)
+    [string]$LanguageC2 = '',   # game language folder for c2 only, e.g. English (players with different languages)
     [switch]$NoBuild
 )
 
@@ -130,6 +131,13 @@ for ($c = 1; $c -le $Clients; $c++) {
         $px.Save($pf)
     }
     Set-TestWindow $pf ($c - 1)   # RWMLWC_TEST_MONITOR: windows on another monitor (tools/TestWindow.ps1)
+    if ($LanguageC2 -and $c -eq 2) {
+        $lx = [xml](Get-Content -LiteralPath $pf -Raw -Encoding UTF8)
+        $ln = $lx.PrefsData.SelectSingleNode('langFolderName')
+        if (-not $ln) { $ln = $lx.CreateElement('langFolderName'); [void]$lx.PrefsData.AppendChild($ln) }
+        $ln.InnerText = $LanguageC2
+        $lx.Save($pf)
+    }
     Copy-Item -LiteralPath $saveFile (Join-Path $dir 'Saves\tst014.rws')
     $armTicks = $Ticks
     $armScenario = $Scenario

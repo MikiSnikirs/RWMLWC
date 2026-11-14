@@ -404,6 +404,18 @@ public static class TestAutomation
         {
             sessionSteps.Enqueue((startTick + 300, "designate", ScenarioDesignate));
         }
+        if (cfg.scenario == "color")
+        {
+            // Опыт по сообщению владельца: расхождение при выборе цвета игрока. Оба открывают окно выбора и выбирают цвет посреди игры.
+            int index = cfg.issuer ? 1 : 3;
+            sessionSteps.Enqueue((startTick + 300, "color: open window", () => Find.WindowStack.Add(new RWMLWC.Client.SessionView.Dialog_ChooseColor())));
+            sessionSteps.Enqueue((startTick + (cfg.issuer ? 400 : 450), "color: choose", () =>
+            {
+                RWMLWC.Client.SessionView.SessionUi.ChooseColor(RWMLWC.Client.Maps.Squads.Palette[index]);
+                Find.WindowStack.TryRemove(typeof(RWMLWC.Client.SessionView.Dialog_ChooseColor));
+                Note($"color: chose {RWMLWC.Client.Maps.Squads.Palette[index]:X6} at tick {Find.TickManager.TicksGame}");
+            }));
+        }
         if (cfg.scenario == "cursors")
         {
             // TST-050: c1 «водит» курсором (точки рядом с центром карты), c2 видит его в цвете c1 с именем.
@@ -577,6 +589,7 @@ public static class TestAutomation
                 case "rightclick":
                 case "squads":
                 case "cursors":
+                case "color":
                     break; // срабатывают позже, из кадра (SessionFrame): приказы идут как ввод игрока
                 case "snap-save":
                 case "snap-reload":
