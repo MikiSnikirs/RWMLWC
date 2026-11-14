@@ -1,0 +1,11 @@
+2026-11-14 18:37:16 autoload: loading save 'tst014'
+2026-11-14 18:37:24 lockstep: connecting to 127.0.0.1:56612 as 'c1'
+2026-11-14 18:37:26 lockstep: connected to quic:127.0.0.1:56612, Hello sent
+2026-11-14 18:37:26 lockstep: Welcome, playerId=1, serverTick=14998, seed=7
+2026-11-14 18:37:56 lockstep: hold is over, requesting speed 3
+2026-11-14 18:37:57 run started: #0, tick=14998, scenario=none, ticks=3000, trace=False, quit=True, file=hash-c1-20261114-183757.txt
+2026-11-14 18:38:06 summary: map0 designations=0 blueprints=0 zones=0; commands sent=0 executed=0 failed=0
+2026-11-14 18:38:06 run finished: file=hash-c1-20261114-183757.txt
+2026-11-14 18:38:06 queue: finished
+2026-11-14 18:38:06 lockstep: disconnect: прогон завершён
+2026-11-14 18:38:06 quitting game

@@ -85,6 +85,7 @@ public sealed class HashRecorder : GameComponent
 
     public override void LoadedGame()
     {
+        LockstepClient.OnGameLoaded();
         if (resumeInfo != null)
         {
             pendingResume = this;

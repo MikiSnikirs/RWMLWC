@@ -3,6 +3,7 @@
 #   powershell -ExecutionPolicy Bypass -File tools\run-tst014.ps1            (one client)
 #   powershell -ExecutionPolicy Bypass -File tools\run-tst014.ps1 -Clients 2
 #   ... -Clients 2 -Scenario designate -Name tst020      (TST-020: client c1 issues designations)
+#   ... -Clients 2 -Scenario join -Name tst045           (TST-045: c2 joins a running game from the main menu)
 #
 # Builds the mod, starts the server, starts the game with a separate data folder per client
 # (-savedatafolder), waits until the game closes itself, stops the server and copies the results
@@ -19,6 +20,8 @@ param(
     [int]$TimeoutMin = 15,
     [string]$Scenario = 'none',
     [string]$Name = 'tst014',
+    [int]$HostTicks = 40000,
+    [int]$ConnectDelaySec = 45,
     [switch]$NoBuild
 )
 
@@ -97,10 +100,26 @@ for ($c = 1; $c -le $Clients; $c++) {
     $add = $xml.CreateElement('li'); $add.InnerText = 'mikisnikirs.rwmlwc'; [void]$active.AppendChild($add)
     $xml.Save($mc)
     Copy-Item -LiteralPath $saveFile (Join-Path $dir 'Saves\tst014.rws')
+    $armTicks = $Ticks
+    $armScenario = $Scenario
+    $armHold = $hold
+    $extra = @()
+    $saveLine = 'save=tst014'
+    if ($Scenario -eq 'join') {
+        # TST-045: c1 plays alone and serves the world snapshot; c2 joins from the main menu without a save.
+        $armScenario = 'none'
+        $armHold = 0
+        if ($c -eq 1) { $armTicks = $HostTicks; $extra = @('snapsender=1') }
+        else { $saveLine = 'save='; $extra = @("connectdelay=$ConnectDelaySec") }
+    }
+    if ($Scenario -eq 'desync') {
+        # TST-034: c2 corrupts its own state; c1 holds the snapshot and starts the common reload.
+        if ($c -eq 1) { $extra = @('snapsender=1') } else { $extra = @('desync=1') }
+    }
     $arm = @(
-        'armed=1', 'save=tst014', "scenarios=$Scenario", "ticks=$Ticks", 'trace=0', 'quit=1',
-        "server=127.0.0.1:$port", "thumbprint=$thumb", "name=c$c", "holdsec=$hold", "issuer=$(if ($c -eq 1) { 1 } else { 0 })"
-    )
+        'armed=1', $saveLine, "scenarios=$armScenario", "ticks=$armTicks", 'trace=0', 'quit=1',
+        "server=127.0.0.1:$port", "thumbprint=$thumb", "name=c$c", "holdsec=$armHold", "issuer=$(if ($c -eq 1) { 1 } else { 0 })", "camera=$(if ($c -eq 2) { 1 } else { 0 })"
+    ) + $extra
     [IO.File]::WriteAllLines((Join-Path $dir 'RWMLWC\arm-determinism-run.txt'), $arm)
     [IO.File]::WriteAllText((Join-Path $dir 'RWMLWC\automation-progress.txt'), '0')
     $procs += Start-Process $exe -ArgumentList "-savedatafolder=$dir" -WorkingDirectory $game -PassThru

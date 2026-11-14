@@ -12,6 +12,27 @@ public static class CommandKinds
 {
     /// <summary>Разметка: вызов Designator.DesignateSingleCell / DesignateMultiCell / DesignateThing (T-020).</summary>
     public const int Designate = 1;
+
+    /// <summary>Нажатие кнопки выделенного объекта (гизмо): призыв, переключатели, действия (T-021).</summary>
+    public const int GizmoClick = 2;
+
+    /// <summary>Выбор строки в меню, которое открыла предыдущая команда этого игрока (T-021).</summary>
+    public const int MenuOption = 3;
+
+    /// <summary>Выбор цели после команды, которая начала прицеливание (T-021).</summary>
+    public const int TargetPicked = 4;
+
+    /// <summary>Правый щелчок по карте при выделенных пешках: приказ сразу или контекстное меню (T-022).</summary>
+    public const int MapRightClick = 5;
+
+    /// <summary>Приказ призванной пешке идти в клетку (перемещение группы с расстановкой) (T-022).</summary>
+    public const int PawnGoto = 6;
+
+    /// <summary>Вызов метода игры, которым окно или вкладка меняет настройку (приоритеты работ, расписание, политики) (T-023).</summary>
+    public const int MethodCall = 7;
+
+    /// <summary>Запись поля объекта, которое окно меняет напрямую, без метода (счета, медицина) (T-023).</summary>
+    public const int FieldSet = 8;
 }
 
 /// <summary>
@@ -30,6 +51,12 @@ public static class CommandBus
     /// <summary>Исполняется команда другого игрока: звуки, сообщения и выбор инструмента на этом клиенте не трогаем.</summary>
     public static bool ExecutingRemote { get; private set; }
 
+    /// <summary>Игрок — автор исполняемой команды.</summary>
+    public static int CurrentPlayerId { get; private set; }
+
+    /// <summary>Обстановка автора исполняемой команды; вне исполнения — null.</summary>
+    public static CommandContext? Context { get; private set; }
+
     public static int Executed { get; private set; }
 
     public static int Failed { get; private set; }
@@ -41,15 +68,22 @@ public static class CommandBus
     {
         Executing = false;
         ExecutingRemote = false;
+        Context = null;
         Executed = 0;
         Failed = 0;
+        VirtualUi.Reset();
     }
 
     /// <summary>Начать команду: записывает обстановку автора. Дальше вызывающий дописывает данные команды и зовёт Send.</summary>
-    public static PacketWriter Begin(Map map)
+    public static PacketWriter Begin(Map map, UnityEngine.Vector3? mouseMapPosition = null)
     {
         PacketWriter w = new PacketWriter(256);
-        CommandContext.Capture(map).Write(w);
+        CommandContext context = CommandContext.Capture(map);
+        if (mouseMapPosition.HasValue)
+        {
+            context.mouseMapPosition = mouseMapPosition.Value; // щелчок: мышь там, где щёлкнули
+        }
+        context.Write(w);
         return w;
     }
 
@@ -106,6 +140,8 @@ public static class CommandBus
 
             Executing = true;
             ExecutingRemote = !own;
+            CurrentPlayerId = command.PlayerId;
+            Context = context;
             // Как в тике карты: Rand и номера новых вещей — из состояния этой карты.
             if (beganTick)
             {
@@ -117,6 +153,27 @@ public static class CommandBus
             {
                 case CommandKinds.Designate:
                     DesignatorCommands.Execute(map, ref reader);
+                    break;
+                case CommandKinds.GizmoClick:
+                    GizmoCommands.Execute(map, ref reader);
+                    break;
+                case CommandKinds.MenuOption:
+                    VirtualUi.ExecuteMenuOption(ref reader);
+                    break;
+                case CommandKinds.TargetPicked:
+                    VirtualUi.ExecuteTargetPicked(map, ref reader);
+                    break;
+                case CommandKinds.MapRightClick:
+                    MapClickCommands.ExecuteRightClick(map, ref reader);
+                    break;
+                case CommandKinds.PawnGoto:
+                    MapClickCommands.ExecuteGoto(map, ref reader);
+                    break;
+                case CommandKinds.MethodCall:
+                    MethodCommands.Execute(map, ref reader);
+                    break;
+                case CommandKinds.FieldSet:
+                    FieldWatch.Execute(map, ref reader);
                     break;
                 default:
                     Failed++;
@@ -139,6 +196,7 @@ public static class CommandBus
             }
             Executing = false;
             ExecutingRemote = false;
+            Context = null;
             DebugSettings.godMode = previousGodMode;
             if (!own && savedSelection != null)
             {
@@ -159,11 +217,34 @@ public sealed class CommandContext
     private const int MaxSelection = 256;
 
     public bool godMode;
+
+    /// <summary>Автор держал клавишу «в очередь» (Shift): приказ добавляется к текущим, а не заменяет их.</summary>
+    public bool queueOrder;
+
+    /// <summary>Где на карте был указатель мыши автора. Код приказов местами спрашивает мышь сам.</summary>
+    public UnityEngine.Vector3 mouseMapPosition;
+
     private readonly List<(byte kind, int id)> selection = new List<(byte, int)>();
 
     public static CommandContext Capture(Map map)
     {
         CommandContext context = new CommandContext { godMode = DebugSettings.godMode };
+        try
+        {
+            context.queueOrder = KeyBindingDefOf.QueueOrder.IsDownEvent;
+        }
+        catch (Exception)
+        {
+            context.queueOrder = false;
+        }
+        try
+        {
+            context.mouseMapPosition = UI.MouseMapPosition();
+        }
+        catch (Exception)
+        {
+            context.mouseMapPosition = default;
+        }
         List<object> selected = Find.Selector.SelectedObjects;
         for (int i = 0; i < selected.Count && context.selection.Count < MaxSelection; i++)
         {
@@ -194,6 +275,9 @@ public sealed class CommandContext
     public void Write(PacketWriter w)
     {
         w.WriteBool(godMode);
+        w.WriteBool(queueOrder);
+        w.WriteInt32(BitConverter.SingleToInt32Bits(mouseMapPosition.x));
+        w.WriteInt32(BitConverter.SingleToInt32Bits(mouseMapPosition.z));
         w.WriteInt32(selection.Count);
         foreach ((byte kind, int id) in selection)
         {
@@ -205,6 +289,10 @@ public sealed class CommandContext
     public static CommandContext Read(ref PacketReader r)
     {
         CommandContext context = new CommandContext { godMode = r.ReadBool() };
+        context.queueOrder = r.ReadBool();
+        float mouseX = BitConverter.Int32BitsToSingle(r.ReadInt32());
+        float mouseZ = BitConverter.Int32BitsToSingle(r.ReadInt32());
+        context.mouseMapPosition = new UnityEngine.Vector3(mouseX, 0f, mouseZ);
         int count = r.ReadCount(MaxSelection, 5);
         for (int i = 0; i < count; i++)
         {
