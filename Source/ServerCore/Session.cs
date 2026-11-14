@@ -126,6 +126,9 @@ public sealed class Session
         /// <summary>Мир и тик локальной копии сейва, о которых игрок сообщил в <c>Hello</c>.</summary>
         public ulong SaveWorldId { get; internal set; }
         public int SaveTick { get; internal set; }
+
+        /// <summary>Когда (часы сессии, мс) игрок писал в чат в последнем окне — для ограничения частоты.</summary>
+        internal Queue<double> ChatTimes { get; } = new();
     }
 
     private sealed class Pending
@@ -161,6 +164,12 @@ public sealed class Session
         UpdateSpeed();
     }
 
+    // Часы сессии (сумма elapsed из Advance) — для пинга и ограничения чата.
+    private double _clockMs;
+    private double _lastPingMs;
+    private double _lastPlayersRefreshMs;
+    private string _lastPings = "";
+
     // Состав, разосланный последним: номер и «в сети» каждого игрока. Уход замечается здесь же, в Pump.
     private string _lastRoster = "";
 
@@ -177,7 +186,7 @@ public sealed class Session
     {
         var msg = new PlayersMessage();
         foreach (Player p in _players)
-            msg.Players.Add(new PlayerInfo(p.Id, p.Name, p.Online));
+            msg.Players.Add(new PlayerInfo(p.Id, p.Name, p.Online, p.Online ? p.Connection.RoundTripMs : -1));
         return msg;
     }
 
@@ -191,6 +200,24 @@ public sealed class Session
             {
                 _pending[i].Connection.Close("нет Hello за " + _options.HelloTimeout.TotalSeconds + " с");
                 _pending.RemoveAt(i);
+            }
+        }
+
+        _clockMs += elapsed.TotalMilliseconds;
+        if (_clockMs - _lastPingMs >= ProtocolLimits.PingIntervalMs)
+        {
+            _lastPingMs = _clockMs;
+            foreach (Player p in _players)
+                if (p.Online) p.Connection.SendPing();
+        }
+        if (_clockMs - _lastPlayersRefreshMs >= ProtocolLimits.PlayersRefreshMs)
+        {
+            _lastPlayersRefreshMs = _clockMs;
+            string pings = string.Join(",", _players.Select(p => p.Online ? p.Connection.RoundTripMs : -1));
+            if (pings != _lastPings)
+            {
+                _lastPings = pings;
+                Broadcast(BuildPlayers());
             }
         }
 
@@ -328,6 +355,10 @@ public sealed class Session
 
             case MapHashMessage h:
                 CompareHash(player, h);
+                break;
+
+            case ChatMessage chat:
+                Chat(player, chat.Text);
                 break;
 
             case SnapshotChunkMessage chunk:
@@ -517,6 +548,23 @@ public sealed class Session
             msg.Maps.Add(m);
         }
         return msg;
+    }
+
+    private void Chat(Player player, string text)
+    {
+        text = (text ?? "").Trim();
+        if (text.Length == 0) return;
+        if (text.Length > ProtocolLimits.MaxChatChars) text = text.Substring(0, ProtocolLimits.MaxChatChars);
+        Queue<double> recent = player.ChatTimes;
+        while (recent.Count > 0 && _clockMs - recent.Peek() >= ProtocolLimits.ChatWindowMs) recent.Dequeue();
+        if (recent.Count >= ProtocolLimits.MaxChatPerWindow)
+        {
+            _log($"чат: игрок {player.Id} пишет слишком часто, сообщение отброшено");
+            return;
+        }
+        recent.Enqueue(_clockMs);
+        _log($"чат {player.Id} «{player.Name}»: {text}");
+        Broadcast(new ChatMessage { PlayerId = player.Id, Text = text });
     }
 
     /// <summary>Правило меньшей скорости: игра идёт на минимальной из скоростей игроков в сети; пауза любого — пауза всех.</summary>

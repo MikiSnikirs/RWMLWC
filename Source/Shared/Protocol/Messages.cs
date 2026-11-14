@@ -25,6 +25,9 @@ public enum MessageType : ushort
     Notice = 14,
     SnapshotApplied = 15,
     Players = 16,
+    Ping = 17,
+    Pong = 18,
+    Chat = 19,
 }
 
 /// <summary>
@@ -560,12 +563,14 @@ public sealed class SnapshotAppliedMessage : Message
 }
 
 /// <summary>Игрок сессии в сообщении <see cref="PlayersMessage"/>.</summary>
-public readonly record struct PlayerInfo(int PlayerId, string Name, bool Online);
+/// <summary><paramref name="PingMs"/> — время туда-обратно до сервера в мс; -1 — ещё не измерено или игрок не в сети.</summary>
+public readonly record struct PlayerInfo(int PlayerId, string Name, bool Online, int PingMs);
 
 /// <summary>
 /// Сервер → клиентам: состав сессии (v3). Все игроки, которые когда-либо входили, по возрастанию номера:
 /// ушедший остаётся в списке с <c>Online = false</c> (его номер и права сохраняются до его возвращения).
-/// Рассылается всем в сети при входе, возврате и уходе любого игрока; новый игрок получает его сразу после <c>Welcome</c>.
+/// Рассылается всем в сети при входе, возврате и уходе любого игрока (новый игрок получает его сразу после <c>Welcome</c>),
+/// а также раз в <see cref="ProtocolLimits.PlayersRefreshMs"/> мс, если изменился пинг.
 /// </summary>
 public sealed class PlayersMessage : Message
 {
@@ -582,15 +587,64 @@ public sealed class PlayersMessage : Message
             w.WriteInt32(p.PlayerId);
             w.WriteString(p.Name);
             w.WriteBool(p.Online);
+            w.WriteInt32(p.PingMs);
         }
     }
 
     internal static PlayersMessage Read(ref PacketReader r)
     {
         var msg = new PlayersMessage();
-        int n = r.ReadCount(ProtocolLimits.MaxPlayersInList, 9);
+        int n = r.ReadCount(ProtocolLimits.MaxPlayersInList, 13);
         for (int i = 0; i < n; i++)
-            msg.Players.Add(new PlayerInfo(r.ReadInt32(), r.ReadString(), r.ReadBool()));
+            msg.Players.Add(new PlayerInfo(r.ReadInt32(), r.ReadString(), r.ReadBool(), r.ReadInt32()));
         return msg;
     }
+}
+
+/// <summary>
+/// Проверка связи (v3), в обе стороны. Отвечает сам транспорт (<c>ConnectionBase</c>): получатель сразу шлёт
+/// <see cref="PongMessage"/> с тем же <see cref="Timestamp"/>, приложению ни то ни другое не передаётся.
+/// <see cref="Timestamp"/> — отметка часов отправителя, получатель её не толкует.
+/// </summary>
+public sealed class PingMessage : Message
+{
+    public override MessageType Type => MessageType.Ping;
+
+    public ulong Timestamp;
+
+    public override void Write(PacketWriter w) => w.WriteUInt64(Timestamp);
+
+    internal static PingMessage Read(ref PacketReader r) => new() { Timestamp = r.ReadUInt64() };
+}
+
+/// <summary>Ответ на <see cref="PingMessage"/> (v3).</summary>
+public sealed class PongMessage : Message
+{
+    public override MessageType Type => MessageType.Pong;
+
+    public ulong Timestamp;
+
+    public override void Write(PacketWriter w) => w.WriteUInt64(Timestamp);
+
+    internal static PongMessage Read(ref PacketReader r) => new() { Timestamp = r.ReadUInt64() };
+}
+
+/// <summary>
+/// Чат (v3). Клиент → сервер: <see cref="PlayerId"/> не читается (сервер ставит номер автора сам).
+/// Сервер → все в сети, включая автора: номер автора и текст. Текст не длиннее <see cref="ProtocolLimits.MaxChatChars"/> символов.
+/// </summary>
+public sealed class ChatMessage : Message
+{
+    public override MessageType Type => MessageType.Chat;
+
+    public int PlayerId;
+    public string Text = "";
+
+    public override void Write(PacketWriter w)
+    {
+        w.WriteInt32(PlayerId);
+        w.WriteString(Text);
+    }
+
+    internal static ChatMessage Read(ref PacketReader r) => new() { PlayerId = r.ReadInt32(), Text = r.ReadString() };
 }
