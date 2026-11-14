@@ -36,7 +36,7 @@ internal static class SessionMenu
         if (HostedSession.Running)
             yield return new ListableOption("Остановить сессию", () => Confirm("Остановить сессию? Друзья будут отключены.", HostedSession.StopAndLeave));
         else if (st != LockstepClient.State.Off)
-            yield return new ListableOption("Отключиться от сессии", () => Confirm("Отключиться от сессии? Игра останется открытой, но дальше пойдёт без друга.", () => LockstepClient.Disconnect("игрок отключился")));
+            yield return new ListableOption("Отключиться от сессии", () => Confirm("Отключиться от сессии? Игра останется открытой, но дальше пойдёт без друга.", () => { Reconnect.UserLeaving(); LockstepClient.Disconnect("игрок отключился"); }));
         else
             yield return new ListableOption("Открыть сессию для друзей", HostedSession.HostAndJoin);
     }
