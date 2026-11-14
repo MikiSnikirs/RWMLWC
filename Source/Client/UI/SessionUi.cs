@@ -61,8 +61,51 @@ public static class SessionUi
             case PlayersMessage players:
                 _players = players.Players.ToList();
                 break;
+            case CursorMessage cursor:
+                if (cursor.MapId == CursorMessage.NoCursor) Cursors.Remove(cursor.PlayerId);
+                else Cursors[cursor.PlayerId] = new RemoteCursor(cursor.MapId, cursor.X, cursor.Z, Time.realtimeSinceStartup);
+                break;
         }
     }
+
+    /// <summary>Курсор другого игрока (v5, T-064): карта, точка в клетках, когда получен (реальное время).</summary>
+    public readonly record struct RemoteCursor(int MapId, float X, float Z, float ReceivedAt);
+
+    /// <summary>Последние курсоры других игроков по номеру игрока. Рисует их T-050 (агент A).</summary>
+    public static readonly Dictionary<int, RemoteCursor> Cursors = new();
+
+    /// <summary>Цвет игрока 0xRRGGBB или PlayerColors.None (0), если не выбран.</summary>
+    public static int ColorOf(int playerId)
+    {
+        foreach (PlayerInfo p in _players)
+            if (p.PlayerId == playerId) return p.Color;
+        return PlayerColors.None;
+    }
+
+    public static Color ToUnityColor(int rgb) =>
+        rgb == PlayerColors.None ? Color.gray : new Color(((rgb >> 16) & 0xFF) / 255f, ((rgb >> 8) & 0xFF) / 255f, (rgb & 0xFF) / 255f);
+
+    private static float _lastCursorSent = -100f;
+    private static (int map, float x, float z) _lastCursor = (int.MinValue, 0, 0);
+
+    /// <summary>
+    /// Отправить свой курсор (для T-050): не чаще 10 раз в секунду; при сдвиге больше 0,1 клетки или раз в 2 с.
+    /// mapId = <see cref="CursorMessage.NoCursor"/> — курсора нет (смотрю не на карту).
+    /// </summary>
+    public static void SendCursor(int mapId, float x, float z)
+    {
+        float now = Time.realtimeSinceStartup;
+        if (now - _lastCursorSent < 1f / ProtocolLimits.MaxCursorsPerSecond) return;
+        bool moved = _lastCursor.map != mapId || Mathf.Abs(_lastCursor.x - x) > 0.1f || Mathf.Abs(_lastCursor.z - z) > 0.1f;
+        if (!moved && now - _lastCursorSent < 2f) return;
+        if (LockstepClient.TrySend(new CursorMessage { MapId = mapId, X = x, Z = z }))
+        {
+            _lastCursorSent = now;
+            _lastCursor = (mapId, x, z);
+        }
+    }
+
+    public static void ChooseColor(int rgb) => LockstepClient.TrySend(new ChooseColorMessage { Color = rgb });
 
     public static string NameOf(int playerId)
     {
@@ -148,9 +191,12 @@ public class Dialog_Session : Window
         {
             string ping = !p.Online ? "не в сети" : p.PingMs >= 0 ? p.PingMs + " мс" : "—";
             string me = p.PlayerId == LockstepClient.PlayerId ? " (вы)" : "";
+            Widgets.DrawBoxSolid(new Rect(inRect.x + 8f, y + 5f, 12f, 12f), SessionUi.ToUnityColor(p.Color));
             GUI.color = p.Online ? Color.white : Color.gray;
-            Widgets.Label(new Rect(inRect.x + 8f, y, inRect.width - 8f, 22f), $"{p.PlayerId}. {p.Name}{me} — {ping}");
+            Widgets.Label(new Rect(inRect.x + 26f, y, inRect.width - 130f, 22f), $"{p.PlayerId}. {p.Name}{me} — {ping}");
             GUI.color = Color.white;
+            if (p.PlayerId == LockstepClient.PlayerId && Widgets.ButtonText(new Rect(inRect.xMax - 100f, y, 100f, 22f), "Цвет"))
+                Find.WindowStack.Add(new Dialog_ChooseColor());
             y += 22f;
         }
         y += 4f;
@@ -269,8 +315,17 @@ internal static class StatusLineView
 
     private static string PathOnDisk => System.IO.Path.Combine(GenFilePaths.SaveDataFolderPath, "RWMLWC", "ui.txt");
 
+    private static bool _colorAsked;
+
     internal static void OnGUI()
     {
+        // Первый вход в сессию: цвет ещё не выбран — предложить выбрать (T-064).
+        if (!LockstepClient.InSession) _colorAsked = false;
+        else if (!_colorAsked && !TestAutomation.AutomationActive && SessionUi.Players.Any(p => p.PlayerId == LockstepClient.PlayerId) && SessionUi.ColorOf(LockstepClient.PlayerId) == PlayerColors.None)
+        {
+            _colorAsked = true;
+            Find.WindowStack.Add(new Dialog_ChooseColor());
+        }
         string line = SessionUi.StatusLine();
         if (line.Length == 0) return;
         if (SessionUi.Unread > 0) line += $" · чат: {SessionUi.Unread}";
@@ -371,9 +426,24 @@ internal static class ChatSelfTest
         long ms = Clock.ElapsedMilliseconds;
         if (_sent == 0 && ms > 5000) { _sent++; Write("send: " + SessionUi.SendChat($"привет от игрока {LockstepClient.PlayerId}")); }
         if (_sent == 1 && ms > 5300) { _sent++; Write("send empty: " + SessionUi.SendChat("   ")); }
+        if (_sent == 2 && ms > 5600)
+        {
+            _sent++;
+            // Оба выбирают один и тот же цвет: второй получит отказ и возьмёт следующий.
+            SessionUi.ChooseColor(RWMLWC.Client.Maps.Squads.Palette[0]);
+            Write("color: asked " + RWMLWC.Client.Maps.Squads.Palette[0].ToString("X6"));
+        }
+        if (_sent == 3 && ms > 7000 && SessionUi.ColorOf(LockstepClient.PlayerId) == PlayerColors.None)
+        {
+            _sent++;
+            SessionUi.ChooseColor(RWMLWC.Client.Maps.Squads.Palette[1]);
+            Write("color: first was taken, asked " + RWMLWC.Client.Maps.Squads.Palette[1].ToString("X6"));
+        }
+        if (ms > 6000) SessionUi.SendCursor(0, 10f + (ms / 100 % 50), 20f + LockstepClient.PlayerId);
         if (ms < _nextLogMs) return;
         _nextLogMs = ms + 1000;
-        Write(SessionUi.StatusLine() + " | players: " + string.Join(", ", SessionUi.Players.Select(p => $"{p.PlayerId}:{p.Name}:{(p.Online ? "on" : "off")}:{p.PingMs}")));
+        Write(SessionUi.StatusLine() + " | players: " + string.Join(", ", SessionUi.Players.Select(p => $"{p.PlayerId}:{p.Name}:{(p.Online ? "on" : "off")}:{p.PingMs}:{p.Color:X6}"))
+            + " | cursors: " + string.Join(", ", SessionUi.Cursors.Select(c => $"{c.Key}@{c.Value.MapId}:{c.Value.X:0.#},{c.Value.Z:0.#}")));
         var lines = SessionUi.ChatLines;
         for (; _loggedLines < lines.Count; _loggedLines++)
             Write($"chat: {lines[_loggedLines].PlayerId} {SessionUi.NameOf(lines[_loggedLines].PlayerId)}: {lines[_loggedLines].Text}");
@@ -400,6 +470,53 @@ internal static class ChatSelfTest
         }
         catch (Exception)
         {
+        }
+    }
+}
+
+/// <summary>Окно выбора цвета игрока (T-064): палитра, занятые цвета недоступны.</summary>
+public class Dialog_ChooseColor : Window
+{
+    public override Vector2 InitialSize => new Vector2(420f, 230f);
+
+    public Dialog_ChooseColor()
+    {
+        doCloseX = true;
+        closeOnClickedOutside = true;
+        absorbInputAroundWindow = false;
+        forcePause = false;
+    }
+
+    public override void DoWindowContents(Rect inRect)
+    {
+        Text.Font = GameFont.Medium;
+        Widgets.Label(new Rect(inRect.x, inRect.y, inRect.width, 32f), "Ваш цвет");
+        Text.Font = GameFont.Small;
+        Widgets.Label(new Rect(inRect.x, inRect.y + 34f, inRect.width, 24f), "Им будут видны ваш курсор и имя у других игроков.");
+        int mine = SessionUi.ColorOf(LockstepClient.PlayerId);
+        const float size = 44f, gap = 8f;
+        float x = inRect.x, y = inRect.y + 66f;
+        int perRow = Mathf.Max(1, (int)((inRect.width + gap) / (size + gap)));
+        int[] palette = RWMLWC.Client.Maps.Squads.Palette; // та же палитра, что у отрядов
+        for (int i = 0; i < palette.Length; i++)
+        {
+            int rgb = palette[i];
+            var r = new Rect(x + (i % perRow) * (size + gap), y + (i / perRow) * (size + gap), size, size);
+            PlayerInfo? owner = SessionUi.Players.Where(p => p.Color == rgb && p.PlayerId != LockstepClient.PlayerId).Select(p => (PlayerInfo?)p).FirstOrDefault();
+            Widgets.DrawBoxSolid(r, SessionUi.ToUnityColor(rgb));
+            if (rgb == mine) Widgets.DrawBox(r, 3);
+            if (owner != null)
+            {
+                Widgets.DrawBoxSolid(r, new Color(0f, 0f, 0f, 0.6f));
+                TooltipHandler.TipRegion(r, "Занят: " + owner.Value.Name);
+                continue;
+            }
+            if (Mouse.IsOver(r)) Widgets.DrawHighlight(r);
+            if (Widgets.ButtonInvisible(r))
+            {
+                SessionUi.ChooseColor(rgb);
+                Close();
+            }
         }
     }
 }
