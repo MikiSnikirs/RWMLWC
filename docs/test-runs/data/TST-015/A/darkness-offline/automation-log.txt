@@ -1,0 +1,23 @@
+2026-11-14 19:48:48 autoload: loading save 'offline'
+2026-11-14 19:48:55 run started: #0, tick=14998, scenario=darkness, ticks=10000, trace=False, quit=True, file=hash-20261114-194855.txt
+2026-11-14 19:48:55 scenario darkness: registered UnnaturalDarkness for 30000 ticks
+2026-11-14 19:51:42 summary: map0 drafted=0 forbidden=56 plants=[]
+2026-11-14 19:51:42 summary: map0 jobs=[231:GotoWander@(150, 0, 157),234:Wait_Wander@(143, 0, 158),239:Wait_Wander@(140, 0, 156)]
+2026-11-14 19:51:42 camera: this client moved its camera 67 times during the run
+2026-11-14 19:51:42 summary: map0 settings=29B89D30A34E3B1A
+2026-11-14 19:51:42 summary: squads= rejected=0 drafted=[]
+2026-11-14 19:51:42 summary: map0 designations=0 blueprints=0 zones=0; commands sent=0 executed=0 failed=0
+2026-11-14 19:51:42 run finished: file=hash-20261114-194855.txt
+2026-11-14 19:51:42 queue: restarting game for run #1 (darkness)
+2026-11-14 19:51:54 autoload: loading save 'offline'
+2026-11-14 19:52:01 run started: #1, tick=14998, scenario=darkness, ticks=10000, trace=False, quit=True, file=hash-20261114-195201.txt
+2026-11-14 19:52:02 scenario darkness: registered UnnaturalDarkness for 30000 ticks
+2026-11-14 19:54:50 summary: map0 drafted=0 forbidden=56 plants=[]
+2026-11-14 19:54:50 summary: map0 jobs=[231:GotoWander@(150, 0, 157),234:Wait_Wander@(143, 0, 158),239:Wait_Wander@(140, 0, 156)]
+2026-11-14 19:54:50 camera: this client moved its camera 67 times during the run
+2026-11-14 19:54:50 summary: map0 settings=29B89D30A34E3B1A
+2026-11-14 19:54:50 summary: squads= rejected=0 drafted=[]
+2026-11-14 19:54:50 summary: map0 designations=0 blueprints=0 zones=0; commands sent=0 executed=0 failed=0
+2026-11-14 19:54:50 run finished: file=hash-20261114-195201.txt
+2026-11-14 19:54:50 queue: finished
+2026-11-14 19:54:50 quitting game
