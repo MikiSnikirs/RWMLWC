@@ -523,6 +523,9 @@ public static class TestAutomation
                 case "darkness":
                     ScenarioDarkness();
                     break;
+                case "absence-raid":
+                    ScenarioAbsenceRaid();
+                    break;
                 case "ui":
                 case "access":
                 case "tabs":
@@ -1433,6 +1436,25 @@ public static class TestAutomation
         parms.forced = true;
         bool ok = IncidentDefOf.RaidEnemy.Worker.TryExecute(parms);
         Note("scenario raid: executed=" + ok + ", faction=" + (parms.faction != null ? parms.faction.Name : "null"));
+    }
+
+    // TST-072: рейд рассказчика не приходит на карту, чей владелец (выбравший режим отсутствия) не в сети.
+    private static void ScenarioAbsenceRaid()
+    {
+        Map map = Find.Maps[0];
+        RWMLWC.Client.Maps.AbsenceModes.Component?.SetDirect(map.uniqueID, RWMLWC.Client.Maps.AbsenceMode.Autopilot, 7);
+        RWMLWC.Client.Maps.PlayerPresence.Component?.Apply(7, false);
+        Note("absence-raid: offline owner, raid fired=" + FireRaidViaStoryteller(map));
+        RWMLWC.Client.Maps.PlayerPresence.Component?.Apply(7, true);
+        Note("absence-raid: owner back, raid fired=" + FireRaidViaStoryteller(map));
+    }
+
+    private static bool FireRaidViaStoryteller(Map map)
+    {
+        IncidentParms parms = StorytellerUtility.DefaultParmsNow(IncidentCategoryDefOf.ThreatBig, map);
+        parms.points = 500f;
+        parms.forced = true;
+        return Find.Storyteller.TryFire(new FiringIncident(IncidentDefOf.RaidEnemy, null, parms));
     }
 
     // TST-015, ч. 2: неестественная тьма (Anomaly) — яркость карты меняется в тике, шаг раньше брался из длительности кадра.
