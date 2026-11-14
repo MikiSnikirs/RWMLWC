@@ -77,6 +77,12 @@ if ($DenseFrom -ge 0 -and $DenseTo -gt $DenseFrom) { $arm += "densefrom=$DenseFr
 [IO.File]::WriteAllLines((Join-Path $dir 'RWMLWC\arm-determinism-run.txt'), $arm)
 [IO.File]::WriteAllText((Join-Path $dir 'RWMLWC\automation-progress.txt'), '0')
 
+. (Join-Path $PSScriptRoot 'StartQuiet.ps1')
+$blockers = Get-GameBlockers
+if ($blockers.Count -gt 0) {
+    Fail "Not starting: $($blockers -join ', ') is running (a fullscreen game would minimize). Run again later; see RWMLWC_TEST_BLOCKERS."
+}
+
 Step "Starting the game: queue $($Queue -join ','), $Ticks ticks each"
 # Without taking focus from the person's own game (tools/StartQuiet.ps1).
 . (Join-Path $PSScriptRoot 'StartQuiet.ps1')
