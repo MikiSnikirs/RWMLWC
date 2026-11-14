@@ -373,6 +373,10 @@ public static class LockstepClient
                 OnSnapshotChunk(chunk);
                 break;
 
+            case NoticeMessage notice:
+                OnNotice(notice);
+                break;
+
             case CommandRejectedMessage rejected:
                 TestAutomation.Note($"lockstep: command #{rejected.ClientSeq} REJECTED on map {rejected.MapId}: need {rejected.Required}, have {rejected.Had}");
                 Messages.Message("RWMLWC: нет прав на это действие на этой карте", MessageTypeDefOf.RejectInput, false);
@@ -421,6 +425,52 @@ public static class LockstepClient
             }
             CommandBus.Execute(command);
         }
+    }
+
+    // ---------- сообщения сервера игроку; расхождение ----------
+
+    /// <summary>
+    /// Код Notice «состояния игроков разошлись» (T-034). В NoticeCode его пока нет — предложение
+    /// агенту B (КОНТРАКТ); число выбрано следующим свободным. Пока сервер его не шлёт, код не срабатывает.
+    /// </summary>
+    public const ushort NoticeDesync = 3;
+
+    private static readonly Stopwatch resyncClock = new Stopwatch();
+
+    /// <summary>Сколько раз этот клиент запускал общую перезагрузку из-за расхождения.</summary>
+    public static int ResyncsStarted { get; private set; }
+
+    private static void OnNotice(NoticeMessage notice)
+    {
+        TestAutomation.Note($"lockstep: notice {(ushort)notice.Code}: {notice.Text}");
+        if ((ushort)notice.Code != NoticeDesync)
+        {
+            if (Current.ProgramState == ProgramState.Playing)
+            {
+                Messages.Message("RWMLWC: " + notice.Text, MessageTypeDefOf.CautionInput, false);
+            }
+            return;
+        }
+        // Лечение расхождения (T-034, первая версия): тот же общий снимок, что при входе игрока.
+        // Просит его клиент, который держит сессию; не чаще раза в 10 секунд.
+        if (!IsSnapshotSender || state != State.InSession || (resyncClock.IsRunning && resyncClock.ElapsedMilliseconds < 10_000))
+        {
+            return;
+        }
+        resyncClock.Restart();
+        ResyncsStarted++;
+        TestAutomation.Note("lockstep: desync reported, requesting a common snapshot");
+        if (Current.ProgramState == ProgramState.Playing)
+        {
+            Messages.Message("RWMLWC: игра разошлась между игроками — перезагружаем общий снимок", MessageTypeDefOf.CautionInput, false);
+        }
+        connection?.Send(new CommandMessage
+        {
+            ClientSeq = nextClientSeq++,
+            MapId = ProtocolIds.WorldMapId,
+            Kind = RequestSnapshotKind,
+            Required = PermissionLevel.Observer,
+        });
     }
 
     // ---------- снимок мира: вход в идущую игру ----------

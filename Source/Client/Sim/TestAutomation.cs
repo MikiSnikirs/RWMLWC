@@ -51,6 +51,7 @@ public static class TestAutomation
         public int holdSec;
         public bool issuer;
         public bool snapSender;
+        public bool desync;
         public int connectDelaySec;
         public bool quit;
     }
@@ -173,6 +174,9 @@ public static class TestAutomation
                 case "thumbprint":
                     cfg.thumbprint = value;
                     break;
+                case "desync":
+                    cfg.desync = value == "1";
+                    break;
                 case "snapsender":
                     cfg.snapSender = value == "1";
                     break;
@@ -260,6 +264,11 @@ public static class TestAutomation
         }
         activeConfig = cfg;
         sessionSteps.Clear();
+        if (cfg.desync && cfg.scenario == "desync")
+        {
+            // T-034: этот клиент нарочно портит своё состояние.
+            sessionSteps.Enqueue((startTick + 600, "desync: break map rand", DesyncBreak));
+        }
         if (cfg.scenario == "ui")
         {
             // T-024: интерфейс во время прогона не должен менять симуляцию. Без сессии, один процесс.
@@ -337,6 +346,7 @@ public static class TestAutomation
                     ScenarioSecondMap(true);
                     break;
                 case "ui":
+                case "desync":
                 case "designate":
                 case "gizmo":
                 case "rightclick":
@@ -430,6 +440,25 @@ public static class TestAutomation
         Find.MainTabsRoot.EscapeCurrentTab(false);
         Find.Selector.ClearSelection();
         Note("ui: closed");
+    }
+
+    // --- сценарий desync (T-034): искусственное расхождение ---
+
+    private static void DesyncBreak()
+    {
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        // Одно лишнее число из Rand карты: со следующего хеша поле rand у этого клиента другое.
+        MapRandContext.BeginTick();
+        try
+        {
+            MapRandContext.Enter(map);
+            float wasted = Rand.Value;
+            Note($"desync: took one extra Rand value on map {map.uniqueID} at tick {Find.TickManager.TicksGame} ({wasted})");
+        }
+        finally
+        {
+            MapRandContext.EndTick();
+        }
     }
 
     // --- сценарий gizmo (T-021): нажатия кнопок выделенных объектов, приказ атаки, меню ---
