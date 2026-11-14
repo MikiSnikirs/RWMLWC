@@ -67,6 +67,36 @@ public static class HostedSession
         }
     }
 
+    /// <summary>
+    /// Открыть сессию в загруженной игре и войти в неё самому (кнопка меню и отладочное действие).
+    /// Главный поток, игра загружена, сетевой игры ещё нет.
+    /// </summary>
+    public static void HostAndJoin()
+    {
+        if (Running || RWMLWC.Client.Sim.LockstepClient.CurrentState != RWMLWC.Client.Sim.LockstepClient.State.Off)
+        {
+            Messages.Message("RWMLWC: сетевая игра уже идёт", MessageTypeDefOf.RejectInput, false);
+            return;
+        }
+        Start(Find.TickManager.TicksGame);
+        RWMLWC.Client.Sim.LockstepClient.Connect("127.0.0.1", Port, Thumbprint, SteamNet.Available ? Steamworks.SteamFriends.GetPersonaName() : "host");
+        string id = SteamNet.Available ? SteamNet.MySteamId.ToString() : "(Steam недоступен)";
+        if (SteamNet.Available)
+        {
+            UnityEngine.GUIUtility.systemCopyBuffer = id;
+            SteamInvite.AdvertiseHost();
+        }
+        Messages.Message($"RWMLWC: сессия открыта. Друг может нажать «Присоединиться» в списке друзей Steam или ввести SteamID {id} (скопирован в буфер обмена)", MessageTypeDefOf.PositiveEvent, false);
+    }
+
+    /// <summary>Выйти из сессии и закрыть её (хост).</summary>
+    public static void StopAndLeave()
+    {
+        RWMLWC.Client.Sim.LockstepClient.Disconnect("хост остановил сессию");
+        Stop();
+        SteamInvite.Clear();
+    }
+
     private static void OnSteamAccepted(SteamConnection friend)
     {
         Write("Steam: подключился " + friend.Remote);
@@ -107,24 +137,8 @@ public static class HostedSession
 internal static class HostedSessionDebug
 {
     [DebugAction("RWMLWC", "Host session here (Steam)", allowedGameStates = AllowedGameStates.Playing)]
-    private static void HostHere()
-    {
-        if (HostedSession.Running)
-        {
-            Messages.Message("RWMLWC: сессия уже запущена", MessageTypeDefOf.RejectInput, false);
-            return;
-        }
-        HostedSession.Start(Find.TickManager.TicksGame);
-        RWMLWC.Client.Sim.LockstepClient.Connect("127.0.0.1", HostedSession.Port, HostedSession.Thumbprint, SteamNet.Available ? "host-" + SteamNet.MySteamId : "host");
-        string id = SteamNet.Available ? SteamNet.MySteamId.ToString() : "(Steam недоступен)";
-        if (SteamNet.Available) UnityEngine.GUIUtility.systemCopyBuffer = id;
-        Messages.Message($"RWMLWC: сессия запущена. Другу — SteamID {id} (скопирован в буфер обмена)", MessageTypeDefOf.PositiveEvent, false);
-    }
+    private static void HostHere() => HostedSession.HostAndJoin();
 
     [DebugAction("RWMLWC", "Stop hosted session", allowedGameStates = AllowedGameStates.Playing)]
-    private static void StopHost()
-    {
-        RWMLWC.Client.Sim.LockstepClient.Disconnect("хост остановил сессию");
-        HostedSession.Stop();
-    }
+    private static void StopHost() => HostedSession.StopAndLeave();
 }
