@@ -1068,6 +1068,12 @@ public static class TestAutomation
     public static void OnRunFinished(string? hashFile)
     {
         NoteMapSummary();
+        if (LockstepClient.InSession && LockstepClient.PlayerCommandsSent > CommandBus.ExecutedOwn)
+        {
+            // Команда встаёт в общий порядок там, где сервер на момент её прихода; отстающий клиент
+            // может закончить прогон раньше, чем дойдёт до неё. Тогда совпадение хешей ничего не доказывает.
+            Note($"FAILED: own commands executed {CommandBus.ExecutedOwn} of {LockstepClient.PlayerCommandsSent} by the end of the run; increase ticks");
+        }
         Note("run finished: file=" + Path.GetFileName(hashFile));
         Config? cfg = activeConfig;
         activeConfig = null;
