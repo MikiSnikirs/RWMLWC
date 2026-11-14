@@ -1,0 +1,19 @@
+2026-11-15 01:29:26 entry: will connect to :0 in 20 s without a loaded game
+2026-11-15 01:29:46 entry: joining a Steam friend who hosts an RWMLWC session
+2026-11-15 01:29:46 lockstep: connecting to steam friend as 'friendB'
+2026-11-15 01:29:48 lockstep: connected to steam:host, Hello sent
+2026-11-15 01:29:48 lockstep: Welcome, playerId=2, serverTick=14998, game=none: requesting world snapshot
+2026-11-15 01:29:51 lockstep: snapshot 3 received, 2604011 bytes; loading
+2026-11-15 01:30:00 lockstep: snapshot loaded, tick 14998, serverTick=14998, perMapSim=True
+2026-11-15 01:30:00 run started: #0, tick=14998, scenario=none, ticks=6000, trace=False, quit=True, file=hash-20261115-013000.txt
+2026-11-15 01:30:21 summary: map0 drafted=0 forbidden=56 plants=[]
+2026-11-15 01:30:21 summary: map0 jobs=[231:GotoWander@(125, 0, 110),234:GotoWander@(138, 0, 114),239:GotoWander@(139, 0, 117)]
+2026-11-15 01:30:21 camera: this client moved its camera 40 times during the run
+2026-11-15 01:30:21 summary: map0 settings=29B89D30A34E3B1A
+2026-11-15 01:30:21 summary: absence= offline=[]
+2026-11-15 01:30:21 summary: squads= rejected=0 drafted=[]
+2026-11-15 01:30:21 summary: map0 designations=0 blueprints=0 zones=0; commands sent=1 executed=0 failed=0
+2026-11-15 01:30:21 run finished: file=hash-20261115-013000.txt
+2026-11-15 01:30:21 queue: finished
+2026-11-15 01:30:21 lockstep: disconnect: прогон завершён
+2026-11-15 01:30:21 quitting game
