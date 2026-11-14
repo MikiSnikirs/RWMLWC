@@ -182,10 +182,16 @@ public static class LockstepClient
     /// <summary>Раз в кадр, пока игры нет или она загружается (главное меню, экран загрузки).</summary>
     public static void PumpWithoutGame()
     {
-        if (state != State.Off)
+        if (state == State.Off)
         {
-            Pump(null);
+            return;
         }
+        if (state == State.InSession && Current.Game == null)
+        {
+            Disconnect("игра закрыта"); // игрок вышел в главное меню
+            return;
+        }
+        Pump(null);
     }
 
     /// <summary>Игра загружена (любая). Если это наш снимок — продолжим сессию со следующего кадра.</summary>
