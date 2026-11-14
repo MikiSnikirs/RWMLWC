@@ -466,6 +466,9 @@ public static class TestAutomation
                 case "twomaps-freeze":
                     ScenarioSecondMap(true);
                     break;
+                case "darkness":
+                    ScenarioDarkness();
+                    break;
                 case "ui":
                 case "access":
                 case "tabs":
@@ -1307,6 +1310,20 @@ public static class TestAutomation
         parms.forced = true;
         bool ok = IncidentDefOf.RaidEnemy.Worker.TryExecute(parms);
         Note("scenario raid: executed=" + ok + ", faction=" + (parms.faction != null ? parms.faction.Name : "null"));
+    }
+
+    // TST-015, ч. 2: неестественная тьма (Anomaly) — яркость карты меняется в тике, шаг раньше брался из длительности кадра.
+    private static void ScenarioDarkness()
+    {
+        Map map = Find.Maps[0];
+        if (!ModsConfig.AnomalyActive || GameConditionDefOf.UnnaturalDarkness == null)
+        {
+            Note("scenario darkness: Anomaly is not active");
+            return;
+        }
+        GameCondition condition = GameConditionMaker.MakeCondition(GameConditionDefOf.UnnaturalDarkness, 30000);
+        map.gameConditionManager.RegisterCondition(condition);
+        Note($"scenario darkness: registered {condition.def.defName} for {condition.Duration} ticks");
     }
 
     // Второе поселение игрока на случайной клетке: вторая карта с дикой природой, без колонистов.
