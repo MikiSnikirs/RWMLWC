@@ -53,6 +53,9 @@ public sealed class SessionOptions
     /// </summary>
     public ISet<string>? AllowedNames;
 
+    /// <summary>Где хранить игроков и права между перезапусками (T-071); null — не хранить (сессия в игре хоста).</summary>
+    public SessionStateFile? State;
+
     /// <summary>Пароль сервера (T-068); null или пусто — без пароля.</summary>
     public string? Password;
 
@@ -111,6 +114,7 @@ public sealed class Session
         _options = options;
         _log = log ?? (_ => { });
         TickUpTo = options.StartTick;
+        RestoreState();
         SaveCopy? latest = options.Store?.Latest;
         if (latest != null)
         {
@@ -274,7 +278,63 @@ public sealed class Session
             rights.UntilReturn.Clear();
             changed = true;
         }
-        if (changed) Broadcast(BuildPermissions());
+        if (changed)
+        {
+            SaveState();
+            Broadcast(BuildPermissions());
+        }
+    }
+
+    /// <summary>Восстановить игроков (не в сети) и права карт с диска (T-071).</summary>
+    private void RestoreState()
+    {
+        SessionStateFile.Data? data;
+        try
+        {
+            data = _options.State?.Load();
+        }
+        catch (Exception e)
+        {
+            _log("ВНИМАНИЕ: состояние сессии не прочитано (" + e.Message + "), начинаю с пустого");
+            return;
+        }
+        if (data == null) return;
+        foreach (SessionStateFile.PlayerRecord r in data.Players)
+            _players.Add(new Player(r.Id, r.Name, OfflineConnection.Instance) { Color = r.Color });
+        _nextPlayerId = Math.Max(data.NextPlayerId, _players.Count == 0 ? 1 : _players.Max(p => p.Id) + 1);
+        foreach (SessionStateFile.MapRecord m in data.Maps)
+        {
+            var rights = new MapRights { Owner = m.Owner };
+            foreach (SessionStateFile.GrantRecord g in m.Grants)
+            {
+                rights.Grants[g.PlayerId] = g.Level;
+                if (g.UntilReturn) rights.UntilReturn.Add(g.PlayerId);
+            }
+            _maps[m.MapId] = rights;
+        }
+        _log($"состояние сессии восстановлено: игроков {_players.Count}, карт с владельцем {_maps.Count}");
+    }
+
+    private void SaveState()
+    {
+        if (_options.State == null) return;
+        var data = new SessionStateFile.Data { NextPlayerId = _nextPlayerId };
+        foreach (Player p in _players) data.Players.Add(new SessionStateFile.PlayerRecord { Id = p.Id, Name = p.Name, Color = p.Color });
+        foreach (var (mapId, rights) in _maps)
+        {
+            var m = new SessionStateFile.MapRecord { MapId = mapId, Owner = rights.Owner };
+            foreach (var (pid, level) in rights.Grants)
+                m.Grants.Add(new SessionStateFile.GrantRecord { PlayerId = pid, Level = level, UntilReturn = rights.UntilReturn.Contains(pid) });
+            data.Maps.Add(m);
+        }
+        try
+        {
+            _options.State.Save(data);
+        }
+        catch (Exception e)
+        {
+            _log("ВНИМАНИЕ: состояние сессии не сохранено: " + e.Message);
+        }
     }
 
     // Часы сессии (сумма elapsed из Advance) — для пинга и ограничения чата.
@@ -429,6 +489,7 @@ public sealed class Session
         {
             player = new Player(_nextPlayerId++, hello.PlayerName, connection);
             _players.Add(player);
+            SaveState();
             _log($"вошёл игрок {player.Id} «{player.Name}» ({connection.Remote})");
         }
 
@@ -737,6 +798,7 @@ public sealed class Session
             return;
         }
         _maps[mapId] = new MapRights { Owner = player.Id };
+        SaveState();
         _log($"карта {mapId} принадлежит игроку {player.Id} «{player.Name}»");
         Broadcast(BuildPermissions());
     }
@@ -759,6 +821,7 @@ public sealed class Session
         else return;
         if (g.Level != PermissionLevel.None && g.UntilReturn) rights.UntilReturn.Add(g.PlayerId);
         else rights.UntilReturn.Remove(g.PlayerId);
+        SaveState();
         _log($"карта {g.MapId}: игрок {g.PlayerId} — {g.Level}{(g.UntilReturn ? " (управляющий, до возвращения владельца)" : "")}");
         Broadcast(BuildPermissions());
     }
@@ -992,6 +1055,7 @@ public sealed class Session
             return;
         }
         player.Color = color;
+        SaveState();
         _log($"игрок {player.Id} «{player.Name}»: цвет {color:X6}");
         BroadcastPlayersIfChanged();
     }
