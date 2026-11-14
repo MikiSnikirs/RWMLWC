@@ -22,7 +22,7 @@ uint16 тип     — MessageType
 | № | Тип | Направление | Поля |
 |---|---|---|---|
 | 1 | `Hello` | клиент → сервер | `ProtocolVersion`, `ModId`, `GameVersion`, `PlayerName`, `ModListHash` (u64) |
-| 2 | `Welcome` | сервер → клиент | `PlayerId`, `ServerTick` |
+| 2 | `Welcome` | сервер → клиент | `PlayerId`, `ServerTick`, `SessionSeed` (u32) |
 | 3 | `Reject` | сервер → клиент | `Reason` (`RejectReason`), `Detail` |
 | 4 | `Command` | клиент → сервер | `ClientSeq`, `MapId`, `Kind`, `Payload` |
 | 5 | `CommandOrdered` | сервер → все | `Seq` (i64), `Tick`, `PlayerId`, `ClientSeq`, `MapId`, `Kind`, `Payload` |

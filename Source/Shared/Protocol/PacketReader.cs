@@ -50,6 +50,14 @@ public ref struct PacketReader
         return v;
     }
 
+    public uint ReadUInt32()
+    {
+        Need(4);
+        uint v = BinaryPrimitives.ReadUInt32LittleEndian(_data.Slice(_pos));
+        _pos += 4;
+        return v;
+    }
+
     public long ReadInt64()
     {
         Need(8);
