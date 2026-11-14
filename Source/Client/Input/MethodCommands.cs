@@ -100,6 +100,9 @@ public static class MethodCommands
         Setter(typeof(ThingFilter), nameof(ThingFilter.AllowedQualityLevels), PermissionLevel.Build, true);
         // Приоритет склада.
         Setter(typeof(StorageSettings), nameof(StorageSettings.Priority), PermissionLevel.Build, true);
+        // Вкладка «Животные»: чему учить, хозяин.
+        Method(typeof(Pawn_TrainingTracker), nameof(Pawn_TrainingTracker.SetWantedRecursive));
+        Setter(typeof(Pawn_PlayerSettings), nameof(Pawn_PlayerSettings.Master));
     }
 
     // ---------- перехват ----------

@@ -78,6 +78,8 @@ public static class FieldWatch
         Add(typeof(HostilityResponseModeUtility), nameof(HostilityResponseModeUtility.DrawResponseButton), (_, args) => (args[1] as Pawn)?.playerSettings);
         // Вкладка пленника/гостя: уровень медпомощи.
         Add(typeof(ITab_Pawn_Visitor), "FillTab", (_, _) => (Find.Selector.SingleSelectedThing as Pawn)?.playerSettings);
+        // Вкладка «Животные»: флажки «следовать за призванным хозяином», «…в поле», «искать еду», «копать».
+        Add(typeof(PawnColumnWorker_Checkbox), nameof(PawnColumnWorker_Checkbox.DoCell), (_, args) => (args[1] as Pawn)?.playerSettings);
         // Общие переключатели, от которых зависит симуляция. Остальные поля PlaySettings — что показывать
         // на экране; это личное дело каждого игрока, хотя и лежит в сейве.
         Add(typeof(PlaySettings), nameof(PlaySettings.DoPlaySettingsGlobalControls), (_, _) => Find.PlaySettings, "autoHomeArea", "autoRebuild");
