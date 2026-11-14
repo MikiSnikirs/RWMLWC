@@ -95,6 +95,20 @@ public static class LockstepClient
             TestAutomation.Note("lockstep: Connect ignored, state=" + state);
             return;
         }
+        Connect(QuicTransport.ConnectAsync(host, port, certThumbprintSha256), $"{host}:{port}", name);
+    }
+
+    /// <summary>
+    /// Начать сессию через готовое (или ещё устанавливаемое) соединение любого транспорта:
+    /// QUIC, Steam (SteamNet.ConnectAsync), сессия в игре хоста. description — только для журнала.
+    /// </summary>
+    public static void Connect(Task<IConnection> connectingTask, string description, string name)
+    {
+        if (state != State.Off)
+        {
+            TestAutomation.Note("lockstep: Connect ignored, state=" + state);
+            return;
+        }
         playerName = name;
         sentSpeed = -1;
         heldSpeed = -1;
@@ -102,9 +116,9 @@ public static class LockstepClient
         nextClientSeq = 1;
         pendingCommands.Clear();
         CommandBus.Reset();
-        connecting = QuicTransport.ConnectAsync(host, port, certThumbprintSha256);
+        connecting = connectingTask;
         state = State.Connecting;
-        TestAutomation.Note($"lockstep: connecting to {host}:{port} as '{name}'");
+        TestAutomation.Note($"lockstep: connecting to {description} as '{name}'");
     }
 
     public static void Disconnect(string reason)
