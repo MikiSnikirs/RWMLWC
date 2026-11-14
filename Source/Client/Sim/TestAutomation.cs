@@ -325,6 +325,11 @@ public static class TestAutomation
         }
         if (cfg.issuer && cfg.scenario == "tabs")
         {
+            // T-023, ч. 2: в тестовом сейве нет верстака и склада — ставим их обычной разметкой (у места для крафта
+            // время постройки 0, игра ставит его сразу). Шаги со счётом и складом ждут, пока они появятся у этого клиента.
+            sessionSteps.Enqueue((startTick + 150, "tabs: setup table and stockpile", TabsSetup));
+            stepGates["tabs: add bill"] = () => FirstWorkTable() != null;
+            stepGates["tabs: storage filter"] = () => FirstStockpile() != null;
             sessionSteps.Enqueue((startTick + 300, "tabs: work priority", TabsWorkPriority));
             sessionSteps.Enqueue((startTick + 400, "tabs: schedule", TabsSchedule));
             sessionSteps.Enqueue((startTick + 500, "tabs: outfit policy", TabsOutfit));
@@ -743,6 +748,41 @@ public static class TestAutomation
         Map map = Find.CurrentMap ?? Find.Maps[0];
         return map.listerBuildings.AllBuildingsColonistOfClass<Building_WorkTable>()
             .Where(t => t.def.AllRecipes.Any(r => r.AvailableNow)).OrderBy(t => t.thingIDNumber).FirstOrDefault();
+    }
+
+    private static void TabsSetup()
+    {
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        ThingDef? spotDef = DefDatabase<ThingDef>.GetNamedSilentFail("CraftingSpot");
+        IntVec3 center = map.Center + new IntVec3(-12, 0, -12);
+        string spotAt = "none";
+        if (spotDef != null)
+        {
+            Designator_Build spot = new Designator_Build(spotDef);
+            foreach (IntVec3 c in GenRadial.RadialCellsAround(center, 10f, true))
+            {
+                if (c.InBounds(map) && spot.CanDesignateCell(c).Accepted)
+                {
+                    spot.DesignateSingleCell(c);
+                    spotAt = c.ToString();
+                    break;
+                }
+            }
+        }
+        List<IntVec3> zoneCells = new List<IntVec3>();
+        Designator_ZoneAddStockpile_Resources stockpile = new Designator_ZoneAddStockpile_Resources();
+        foreach (IntVec3 c in CellRect.CenteredOn(center + new IntVec3(6, 0, 0), 2))
+        {
+            if (c.InBounds(map) && stockpile.CanDesignateCell(c).Accepted)
+            {
+                zoneCells.Add(c);
+            }
+        }
+        if (zoneCells.Count > 0)
+        {
+            stockpile.DesignateMultiCell(zoneCells);
+        }
+        Note($"tabs: setup: crafting spot at {spotAt}, stockpile {zoneCells.Count} cells; sent={LockstepClient.PlayerCommandsSent}");
     }
 
     private static void TabsAddBill()
