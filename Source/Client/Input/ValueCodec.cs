@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using RimWorld;
 using RWMLWC.Shared.Protocol;
 using Verse;
@@ -27,6 +28,9 @@ public static class ValueCodec
     private const byte KPrecept = 12;
     private const byte KColorInt = 13;
     private const byte KByte = 14;
+    private const byte KPawnPart = 15;
+    private const byte KPolicy = 16;
+    private const byte KPawnAnywhere = 17;
 
     private static Dictionary<string, Type>? typesByName;
 
@@ -183,6 +187,19 @@ public static class ValueCodec
                 }
                 return null;
             }
+            case KPawnAnywhere:
+                return FindPawnAnywhere(r.ReadInt32());
+            case KPolicy:
+            {
+                string typeName = r.ReadString();
+                return FindPolicy(typeName, r.ReadInt32());
+            }
+            case KPawnPart:
+            {
+                Pawn? owner = FindPawnAnywhere(r.ReadInt32());
+                string fieldName = r.ReadString();
+                return owner == null ? null : typeof(Pawn).GetField(fieldName, InstanceFields)?.GetValue(owner);
+            }
             case KEnum:
             {
                 Type? type = FindType(r.ReadString());
@@ -192,6 +209,129 @@ public static class ValueCodec
             default:
                 throw new ProtocolException("ValueCodec: неизвестный вид значения " + kind);
         }
+    }
+
+    // ---------- ссылки для команд-вызовов (T-023) ----------
+
+    private const BindingFlags InstanceFields = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+
+    /// <summary>
+    /// Как Write, но понимает ещё: часть пешки (объект с полем pawn, на который ссылается поле самой пешки:
+    /// настройки работ, расписание, политики…), политику (одежда, препараты, еда, чтение) и пешку,
+    /// которая может быть не на карте команды.
+    /// </summary>
+    public static bool TryWriteAny(PacketWriter w, object? value)
+    {
+        switch (value)
+        {
+            case Pawn pawn:
+                w.WriteByte(KPawnAnywhere);
+                w.WriteInt32(pawn.thingIDNumber);
+                return true;
+            case Policy policy:
+                w.WriteByte(KPolicy);
+                w.WriteString(policy.GetType().FullName ?? "");
+                w.WriteInt32(policy.id);
+                return true;
+        }
+        if (value != null && !Supports(value.GetType()) && TryPawnPart(value, out Pawn? owner, out string? fieldName))
+        {
+            w.WriteByte(KPawnPart);
+            w.WriteInt32(owner!.thingIDNumber);
+            w.WriteString(fieldName!);
+            return true;
+        }
+        if (value != null && !Supports(value.GetType()))
+        {
+            return false;
+        }
+        Write(w, value);
+        return true;
+    }
+
+    /// <summary>Пешка, которой принадлежит объект-часть (поле pawn), и имя поля пешки, которое на него ссылается.</summary>
+    public static bool TryPawnPart(object part, out Pawn? owner, out string? fieldName)
+    {
+        owner = null;
+        fieldName = null;
+        for (Type? t = part.GetType(); t != null && t != typeof(object); t = t.BaseType)
+        {
+            FieldInfo? pawnField = t.GetField("pawn", InstanceFields | BindingFlags.DeclaredOnly);
+            if (pawnField != null && typeof(Pawn).IsAssignableFrom(pawnField.FieldType))
+            {
+                owner = pawnField.GetValue(part) as Pawn;
+                break;
+            }
+        }
+        if (owner == null)
+        {
+            return false;
+        }
+        foreach (FieldInfo field in typeof(Pawn).GetFields(InstanceFields))
+        {
+            if (!field.FieldType.IsValueType && ReferenceEquals(field.GetValue(owner), part))
+            {
+                fieldName = field.Name;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static Pawn? FindPawnAnywhere(int thingIdNumber)
+    {
+        foreach (Map map in Find.Maps)
+        {
+            foreach (Pawn pawn in map.mapPawns.AllPawns)
+            {
+                if (pawn.thingIDNumber == thingIdNumber)
+                {
+                    return pawn;
+                }
+            }
+        }
+        foreach (Pawn pawn in Find.WorldPawns.AllPawnsAlive)
+        {
+            if (pawn.thingIDNumber == thingIdNumber)
+            {
+                return pawn;
+            }
+        }
+        return null;
+    }
+
+    private static Policy? FindPolicy(string typeName, int id)
+    {
+        Game game = Current.Game;
+        foreach (Policy policy in game.outfitDatabase.AllOutfits)
+        {
+            if (policy.id == id && policy.GetType().FullName == typeName)
+            {
+                return policy;
+            }
+        }
+        foreach (Policy policy in game.drugPolicyDatabase.AllPolicies)
+        {
+            if (policy.id == id && policy.GetType().FullName == typeName)
+            {
+                return policy;
+            }
+        }
+        foreach (Policy policy in game.foodRestrictionDatabase.AllFoodRestrictions)
+        {
+            if (policy.id == id && policy.GetType().FullName == typeName)
+            {
+                return policy;
+            }
+        }
+        foreach (Policy policy in game.readingPolicyDatabase.AllReadingPolicies)
+        {
+            if (policy.id == id && policy.GetType().FullName == typeName)
+            {
+                return policy;
+            }
+        }
+        return null;
     }
 
     public static void WriteCell(PacketWriter w, IntVec3 cell)
