@@ -484,6 +484,8 @@ public static class LockstepClient
         TickManager tickManager = Find.TickManager;
         expectedSnapshotId = SnapshotIdFor(request);
         snapshotRequestSeen = true;
+        // На время перезагрузки просим паузу; после загрузки каждый вернёт скорость, что была в мире на момент снимка.
+        RequestSpeed(0);
         state = State.WaitingSnapshot;
         HashRecorder.Instance?.SuspendForSnapshotReload();
         if (!IsSnapshotSender)
