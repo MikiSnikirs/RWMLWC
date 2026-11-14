@@ -1,0 +1,22 @@
+2026-11-14 22:41:58 autoload: loading save 'tst014'
+2026-11-14 22:42:04 lockstep: connecting to 127.0.0.1:50144 as 'c1'
+2026-11-14 22:42:06 lockstep: connected to quic:127.0.0.1:50144, Hello sent
+2026-11-14 22:42:06 lockstep: Welcome, playerId=1, serverTick=14998, seed=7
+2026-11-14 22:42:06 presence: player 1 online
+2026-11-14 22:42:06 run started: #0, tick=14998, scenario=none, ticks=40000, trace=False, quit=True, file=hash-c1-20261114-224206.txt
+2026-11-14 22:42:38 presence: player 2 online
+2026-11-14 22:42:39 lockstep: snapshot for player 2 at tick 25393: raw=15736928 bytes, packed=2596541 bytes (16.5%), save=656 ms, pack=22 ms, 13 chunks sent; reloading it here too
+2026-11-14 22:42:43 lockstep: snapshot loaded, tick 25393, serverTick=25393, perMapSim=True
+2026-11-14 22:42:46 resumed after snapshot reload at tick 25393, perMapSim=True
+2026-11-14 22:42:57 presence: player 2 offline
+2026-11-14 22:42:57 lockstep: autosave #5 at tick 28404: raw=15716511 bytes, packed=2595220 bytes (16.5%), save=363 ms, pack=16 ms, 13 chunks sent to the server
+2026-11-14 22:44:11 summary: map0 drafted=0 forbidden=56 plants=[]
+2026-11-14 22:44:11 summary: map0 jobs=[231:LayDown@(176, 0, 116),234:LayDown@(173, 0, 123),239:LayDown@(174, 0, 113)]
+2026-11-14 22:44:11 summary: map0 settings=29B89D30A34E3B1A
+2026-11-14 22:44:11 summary: absence= offline=[2]
+2026-11-14 22:44:11 summary: squads= rejected=0 drafted=[]
+2026-11-14 22:44:11 summary: map0 designations=0 blueprints=0 zones=0; commands sent=0 executed=0 failed=0
+2026-11-14 22:44:11 run finished: file=hash-c1-20261114-224206.txt
+2026-11-14 22:44:11 queue: finished
+2026-11-14 22:44:11 lockstep: disconnect: прогон завершён
+2026-11-14 22:44:11 quitting game

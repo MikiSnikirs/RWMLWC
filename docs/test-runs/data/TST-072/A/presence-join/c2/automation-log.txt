@@ -1,0 +1,18 @@
+2026-11-14 22:41:53 entry: will connect to 127.0.0.1:50144 in 45 s without a loaded game
+2026-11-14 22:42:38 lockstep: connecting to 127.0.0.1:50144 as 'c2'
+2026-11-14 22:42:38 lockstep: connected to quic:127.0.0.1:50144, Hello sent
+2026-11-14 22:42:38 lockstep: Welcome, playerId=2, serverTick=25393, game=none: requesting world snapshot
+2026-11-14 22:42:39 lockstep: snapshot 3 received, 2596542 bytes; loading
+2026-11-14 22:42:46 lockstep: snapshot loaded, tick 25393, serverTick=25393, perMapSim=True
+2026-11-14 22:42:46 run started: #0, tick=25393, scenario=none, ticks=3000, trace=False, quit=True, file=hash-c2-20261114-224246.txt
+2026-11-14 22:42:57 summary: map0 drafted=0 forbidden=56 plants=[]
+2026-11-14 22:42:57 summary: map0 jobs=[231:Skygaze@(159, 0, 140),234:GotoWander@(152, 0, 134),239:Wait_Wander@(151, 0, 132)]
+2026-11-14 22:42:57 camera: this client moved its camera 20 times during the run
+2026-11-14 22:42:57 summary: map0 settings=29B89D30A34E3B1A
+2026-11-14 22:42:57 summary: absence= offline=[]
+2026-11-14 22:42:57 summary: squads= rejected=0 drafted=[]
+2026-11-14 22:42:57 summary: map0 designations=0 blueprints=0 zones=0; commands sent=1 executed=0 failed=0
+2026-11-14 22:42:57 run finished: file=hash-c2-20261114-224246.txt
+2026-11-14 22:42:57 queue: finished
+2026-11-14 22:42:57 lockstep: disconnect: прогон завершён
+2026-11-14 22:42:57 quitting game
