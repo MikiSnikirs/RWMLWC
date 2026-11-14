@@ -57,6 +57,7 @@ public static class CaravanSelfTest
         if (_startTick < 0)
         {
             _startTick = tick;
+            CaptureErrors();
             _nextSummary = tick + 500;
         }
         bool issuer = LockstepClient.PlayerId == 1;
@@ -87,6 +88,29 @@ public static class CaravanSelfTest
             _nextSummary = tick + 500;
             TestAutomation.Note("caravan summary: " + Summary());
         }
+    }
+
+    /// <summary>
+    /// Ошибки игры — ещё и в свой журнал: <c>Player.log</c> у двух копий игры общий, строки затирают друг друга.
+    /// </summary>
+    private static void CaptureErrors()
+    {
+        try
+        {
+            var harmony = new Harmony("rwmlwc.caravantest");
+            harmony.Patch(AccessTools.Method(typeof(Log), nameof(Log.Error), new[] { typeof(string) }),
+                postfix: new HarmonyMethod(typeof(CaravanSelfTest), nameof(AfterError)));
+            AppDomain.CurrentDomain.UnhandledException += (_, e) => TestAutomation.Note("caravan: UNHANDLED " + e.ExceptionObject);
+        }
+        catch (Exception e)
+        {
+            TestAutomation.Note("caravan: error capture not installed: " + e.Message);
+        }
+    }
+
+    private static void AfterError(string text)
+    {
+        TestAutomation.Note("caravan: ERROR " + text);
     }
 
     private static string TryForm()
