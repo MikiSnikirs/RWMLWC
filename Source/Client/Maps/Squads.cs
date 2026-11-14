@@ -15,6 +15,8 @@ public sealed class Squad : IExposable
 {
     public int id;
     public string name = "";
+    /// <summary>Цвет отряда, 0xRRGGBB (T-062).</summary>
+    public int color;
     public List<int> players = new List<int>();
     public List<int> pawnIds = new List<int>();
 
@@ -22,6 +24,7 @@ public sealed class Squad : IExposable
     {
         Scribe_Values.Look(ref id, "id");
         Scribe_Values.Look(ref name, "name", "");
+        Scribe_Values.Look(ref color, "color", 0);
         Scribe_Collections.Look(ref players, "players", LookMode.Value);
         Scribe_Collections.Look(ref pawnIds, "pawns", LookMode.Value);
         players ??= new List<int>();
@@ -57,7 +60,7 @@ public sealed class SquadsComponent : GameComponent
     public string Digest()
     {
         return string.Join("; ", squads.Select(s =>
-            $"{s.id}:{s.name}[{string.Join(",", s.players)}|{string.Join(",", s.pawnIds)}]"));
+            $"{s.id}:{s.name}#{s.color:X6}[{string.Join(",", s.players)}|{string.Join(",", s.pawnIds)}]"));
     }
 }
 
@@ -69,6 +72,21 @@ public static class Squads
     private const byte OpDelete = 3;
     private const byte OpSetMember = 4;
     private const byte OpAssignPawn = 5;
+    private const byte OpSetColor = 6;
+
+    /// <summary>Палитра отрядов: хорошо различимые цвета (0xRRGGBB).</summary>
+    public static readonly int[] Palette =
+    {
+        0xE53935, 0x1E88E5, 0x43A047, 0xFDD835, 0x8E24AA, 0xFB8C00, 0x00ACC1, 0xD81B60, 0x6D4C41, 0xEEEEEE,
+    };
+
+    public static Color ToColor(int rgb) => new Color(((rgb >> 16) & 0xFF) / 255f, ((rgb >> 8) & 0xFF) / 255f, (rgb & 0xFF) / 255f, 1f);
+
+    /// <summary>
+    /// Имя и цвет отряда меняет его участник; у отряда без участников — любой, кто может отдавать команды на карте.
+    /// Правило зависит только от сейва и номера автора — одинаково у всех клиентов.
+    /// </summary>
+    public static bool CanEditLook(Squad squad, int playerId) => squad.players.Count == 0 || squad.players.Contains(playerId);
     private const int MaxName = 40;
 
     public static SquadsComponent? Component => Current.Game?.GetComponent<SquadsComponent>();
@@ -93,7 +111,11 @@ public static class Squads
 
     public static void Create(Map map, string name) => Send(map, OpCreate, w => w.WriteString(Clip(name)));
 
-    public static void Rename(Map map, int squadId, string name) => Send(map, OpRename, w => { w.WriteInt32(squadId); w.WriteString(Clip(name)); });
+    public static void Rename(Map map, int squadId, string name) =>
+        Send(map, OpRename, w => { w.WriteInt32(squadId); w.WriteString(Clip(name)); }, PermissionLevel.Observer);
+
+    public static void SetColor(Map map, int squadId, int rgb) =>
+        Send(map, OpSetColor, w => { w.WriteInt32(squadId); w.WriteInt32(rgb & 0xFFFFFF); }, PermissionLevel.Observer);
 
     public static void Delete(Map map, int squadId) => Send(map, OpDelete, w => w.WriteInt32(squadId));
 
@@ -125,14 +147,14 @@ public static class Squads
         return name.Length > MaxName ? name.Substring(0, MaxName) : name;
     }
 
-    private static void Send(Map map, byte op, Action<PacketWriter> body)
+    private static void Send(Map map, byte op, Action<PacketWriter> body, PermissionLevel required = PermissionLevel.Full)
     {
         PacketWriter w = CommandBus.Begin(map);
         w.WriteByte(op);
         body(w);
         if (LockstepClient.InSession)
         {
-            CommandBus.Send(map, CommandKinds.SquadEdit, PermissionLevel.Full, w);
+            CommandBus.Send(map, CommandKinds.SquadEdit, required, w);
             return;
         }
         // Одиночная игра: сразу, тем же кодом.
@@ -157,6 +179,7 @@ public static class Squads
                 {
                     string name = Clip(r.ReadString());
                     Squad squad = new Squad { id = comp.nextId++ };
+                    squad.color = Palette[(squad.id - 1) % Palette.Length];
                     squad.name = name.Length > 0 ? name : "Отряд " + squad.id;
                     comp.squads.Add(squad);
                     TestAutomation.Note($"squads: created {squad.id} '{squad.name}' by player {CommandBus.CurrentPlayerId}");
@@ -167,7 +190,7 @@ public static class Squads
                     int id = r.ReadInt32();
                     string name = Clip(r.ReadString());
                     Squad? squad = comp.Get(id);
-                    if (squad != null && name.Length > 0)
+                    if (squad != null && name.Length > 0 && LookAllowed(squad))
                     {
                         squad.name = name;
                     }
@@ -230,10 +253,32 @@ public static class Squads
                     target?.pawnIds.Sort();
                     break;
                 }
+            case OpSetColor:
+                {
+                    int id = r.ReadInt32();
+                    int rgb = r.ReadInt32() & 0xFFFFFF;
+                    Squad? squad = comp.Get(id);
+                    if (squad != null && LookAllowed(squad))
+                    {
+                        squad.color = rgb;
+                    }
+                    break;
+                }
             default:
                 TestAutomation.Note($"squads: unknown op {op}");
                 break;
         }
+    }
+
+    private static bool LookAllowed(Squad squad)
+    {
+        // Одиночная игра: ограничений нет.
+        if (!LockstepClient.InSession || CanEditLook(squad, CommandBus.CurrentPlayerId))
+        {
+            return true;
+        }
+        SquadRules.RejectAtExecution($"имя и цвет отряда «{squad.name}» меняют его участники", CommandBus.CurrentSeq);
+        return false;
     }
 
     public static string PawnLabel(int pawnId)
@@ -317,23 +362,36 @@ public sealed class Dialog_Squads : Window
         {
             Widgets.DrawMenuSection(new Rect(0f, cy, view.width, 4 * rowHeight + Math.Max(1, s.pawnIds.Count) * 24f + 4f));
             cy += 4f;
+            Widgets.DrawBoxSolid(new Rect(8f, cy + 5f, 20f, 20f), Squads.ToColor(s.color));
             Text.Font = GameFont.Medium;
-            Widgets.Label(new Rect(8f, cy, 300f, rowHeight), s.name);
+            Widgets.Label(new Rect(34f, cy, 260f, rowHeight), s.name);
             Text.Font = GameFont.Small;
+            bool look = !LockstepClient.InSession || Squads.CanEditLook(s, LockstepClient.PlayerId);
+            if (look && Widgets.ButtonText(new Rect(view.width - 410f, cy, 75f, 26f), "Цвет"))
+            {
+                int squadId = s.id;
+                List<FloatMenuOption> colors = new List<FloatMenuOption>();
+                foreach (int rgb in Squads.Palette)
+                {
+                    int chosen = rgb;
+                    colors.Add(new FloatMenuOption("■■■", () => Squads.SetColor(map, squadId, chosen), BaseContent.WhiteTex, Squads.ToColor(rgb)));
+                }
+                Find.WindowStack.Add(new FloatMenu(colors));
+            }
             if (manage)
             {
                 if (Widgets.ButtonText(new Rect(view.width - 330f, cy, 160f, 26f), $"Добавить выделенных ({selected.Count})") && selected.Count > 0)
                 {
                     Squads.AssignPawns(map, s.id, selected);
                 }
-                if (Widgets.ButtonText(new Rect(view.width - 165f, cy, 75f, 26f), "Имя"))
-                {
-                    Find.WindowStack.Add(new Dialog_SquadName(map, s.id, s.name));
-                }
                 if (Widgets.ButtonText(new Rect(view.width - 85f, cy, 75f, 26f), "Удалить"))
                 {
                     Squads.Delete(map, s.id);
                 }
+            }
+            if (look && Widgets.ButtonText(new Rect(view.width - 165f, cy, 75f, 26f), "Имя"))
+            {
+                Find.WindowStack.Add(new Dialog_SquadName(map, s.id, s.name));
             }
             cy += rowHeight + 4f;
             Widgets.Label(new Rect(8f, cy, 100f, rowHeight), "Игроки:");
@@ -414,6 +472,40 @@ public sealed class Dialog_SquadName : Window
         {
             Squads.Rename(map, squadId, name);
             Close();
+        }
+    }
+}
+
+/// <summary>Кольцо цвета отряда под его пешками на открытой карте (T-062). Только отрисовка, раз в кадр.</summary>
+[HarmonyLib.HarmonyPatch(typeof(MapInterface), nameof(MapInterface.MapInterfaceUpdate))]
+internal static class Patch_MapInterface_SquadRings
+{
+    private static readonly Dictionary<int, Material> materials = new Dictionary<int, Material>();
+
+    private static void Postfix()
+    {
+        Map? map = Find.CurrentMap;
+        SquadsComponent? comp = Squads.Component;
+        if (map == null || comp == null || comp.squads.Count == 0 || RimWorld.Planet.WorldRendererUtility.WorldSelected)
+        {
+            return;
+        }
+        foreach (Squad squad in comp.squads)
+        {
+            if (!materials.TryGetValue(squad.color, out Material? material))
+            {
+                material = MaterialPool.MatFrom(BaseContent.WhiteTex, ShaderDatabase.Transparent, Squads.ToColor(squad.color));
+                materials[squad.color] = material;
+            }
+            foreach (int pawnId in squad.pawnIds)
+            {
+                if (ValueCodec.FindThing(map, pawnId) is Pawn pawn && pawn.Spawned)
+                {
+                    Vector3 center = pawn.DrawPos;
+                    center.y = AltitudeLayer.MetaOverlays.AltitudeFor();
+                    GenDraw.DrawCircleOutline(center, 0.55f, material);
+                }
+            }
         }
     }
 }

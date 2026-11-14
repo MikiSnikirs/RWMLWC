@@ -1,0 +1,39 @@
+2026-11-14 19:06:40 autoload: loading save 'tst014'
+2026-11-14 19:06:47 lockstep: connecting to 127.0.0.1:54608 as 'c1'
+2026-11-14 19:06:49 lockstep: connected to quic:127.0.0.1:54608, Hello sent
+2026-11-14 19:06:49 lockstep: Welcome, playerId=2, serverTick=14998, seed=7
+2026-11-14 19:07:49 lockstep: hold is over, requesting speed 3
+2026-11-14 19:07:49 run started: #0, tick=14998, scenario=squads, ticks=4000, trace=False, quit=True, file=hash-c1-20261114-190749.txt
+2026-11-14 19:07:53 squads: now 
+2026-11-14 19:07:53 squads: members sent, me=2 other=1
+2026-11-14 19:07:53 squads: now 
+2026-11-14 19:07:53 squads: now 
+2026-11-14 19:07:53 squads: now 
+2026-11-14 19:07:53 squads: now 
+2026-11-14 19:07:53 squads: requesting a common snapshot
+2026-11-14 19:07:53 squads: created 1 'Альфа' by player 2
+2026-11-14 19:07:53 squads: created 2 'Бета' by player 2
+2026-11-14 19:07:53 squads: blocked locally: Ross — пешка отряда «Бета»
+2026-11-14 19:07:53 squads: draft Ross (id 231, bypass=False): click=True, commands sent=0
+2026-11-14 19:07:54 lockstep: snapshot for player 2 at tick 16379: raw=15756154 bytes, packed=2597186 bytes (16.5%), save=827 ms, pack=19 ms, 13 chunks sent; reloading it here too
+2026-11-14 19:07:58 lockstep: snapshot loaded, tick 16379, serverTick=16462, perMapSim=True
+2026-11-14 19:07:58 resumed after snapshot reload at tick 16379, perMapSim=True
+2026-11-14 19:07:59 squads: draft Ross (id 231, bypass=True): click=True, commands sent=1
+2026-11-14 19:07:59 command #9: rejected: squad (Ross — пешка отряда «Бета»), author 2
+2026-11-14 19:08:58 lockstep: hold is over, requesting speed 3
+2026-11-14 19:08:59 squads: draft Rika (id 239, bypass=False): click=True, commands sent=1
+2026-11-14 19:08:59 squads: work Art of Oleg (id 234) 0 -> 3 bypassing UI, commands sent=1
+2026-11-14 19:08:59 command #11: rejected: squad (Oleg — пешка отряда «Бета»), author 2
+2026-11-14 19:09:00 squads: now 1:Альфа#E53935[2|]; 2:Бета#1E88E5[1|231,234]
+2026-11-14 19:09:00 squads: now 1:Орлы#43A047[2|]; 2:Бета#1E88E5[1|231,234]
+2026-11-14 19:09:00 command #14: rejected: squad (имя и цвет отряда «Бета» меняют его участники), author 2
+2026-11-14 19:09:00 command #15: rejected: squad (имя и цвет отряда «Бета» меняют его участники), author 2
+2026-11-14 19:09:06 summary: map0 drafted=1 forbidden=56 plants=[]
+2026-11-14 19:09:06 summary: map0 jobs=[231:GotoWander@(131, 0, 126),234:GotoWander@(130, 0, 125),239:Wait_Combat@(133, 0, 129)]
+2026-11-14 19:09:06 summary: map0 settings=29B89D30A34E3B1A
+2026-11-14 19:09:06 summary: squads=1:Орлы#43A047[2|]; 2:Бета#1E88E5[1|231,234] rejected=4 drafted=[239]
+2026-11-14 19:09:06 summary: map0 designations=0 blueprints=0 zones=0; commands sent=15 executed=14 failed=0
+2026-11-14 19:09:06 run finished: file=hash-c1-20261114-190749.txt
+2026-11-14 19:09:06 queue: finished
+2026-11-14 19:09:06 lockstep: disconnect: прогон завершён
+2026-11-14 19:09:06 quitting game

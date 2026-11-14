@@ -1,0 +1,23 @@
+2026-11-14 19:11:58 autoload: loading save 'tst014'
+2026-11-14 19:12:05 lockstep: connecting to 127.0.0.1:57845 as 'c2'
+2026-11-14 19:12:06 lockstep: connected to quic:127.0.0.1:57845, Hello sent
+2026-11-14 19:12:06 lockstep: Welcome, playerId=1, serverTick=14998, seed=7
+2026-11-14 19:13:06 lockstep: hold is over, requesting speed 3
+2026-11-14 19:13:07 run started: #0, tick=14998, scenario=desync, ticks=6000, trace=False, quit=True, file=hash-c2-20261114-191307.txt
+2026-11-14 19:13:11 desync: broke map 0 at tick 15660: rand 0008708F00000000 -> 0008709000000000, victim Wall3031, total ED6E0F0A1D4FF5D2 -> 2B174170D3C13B7A, changed=True
+2026-11-14 19:13:11 lockstep: notice 3: карта 0 тик 15720: игрок 1 ≠ игрок 2
+2026-11-14 19:13:11 lockstep: desync reported, the server orders a common snapshot
+2026-11-14 19:13:12 lockstep: snapshot for player 0 at tick 16359: raw=15756606 bytes, packed=2597484 bytes (16.5%), save=824 ms, pack=20 ms, 13 chunks sent; reloading it here too
+2026-11-14 19:13:16 lockstep: snapshot loaded, tick 16359, serverTick=16469, perMapSim=True
+2026-11-14 19:13:16 resumed after snapshot reload at tick 16359, perMapSim=True
+2026-11-14 19:14:16 lockstep: hold is over, requesting speed 3
+2026-11-14 19:14:29 summary: map0 drafted=0 forbidden=56 plants=[]
+2026-11-14 19:14:29 summary: map0 jobs=[231:Wait_Wander@(129, 0, 146),234:GotoWander@(110, 0, 139),239:GotoWander@(116, 0, 140)]
+2026-11-14 19:14:29 camera: this client moved its camera 38 times during the run
+2026-11-14 19:14:29 summary: map0 settings=29B89D30A34E3B1A
+2026-11-14 19:14:29 summary: squads= rejected=0 drafted=[]
+2026-11-14 19:14:29 summary: map0 designations=0 blueprints=0 zones=0; commands sent=0 executed=0 failed=0
+2026-11-14 19:14:29 run finished: file=hash-c2-20261114-191307.txt
+2026-11-14 19:14:29 queue: finished
+2026-11-14 19:14:29 lockstep: disconnect: прогон завершён
+2026-11-14 19:14:29 quitting game
