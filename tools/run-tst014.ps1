@@ -2,10 +2,11 @@
 #
 #   powershell -ExecutionPolicy Bypass -File tools\run-tst014.ps1            (one client)
 #   powershell -ExecutionPolicy Bypass -File tools\run-tst014.ps1 -Clients 2
+#   ... -Clients 2 -Scenario designate -Name tst020      (TST-020: client c1 issues designations)
 #
 # Builds the mod, starts the server, starts the game with a separate data folder per client
 # (-savedatafolder), waits until the game closes itself, stops the server and copies the results
-# to <game data>\RWMLWC\tst014\ . Your normal game data is only read (Config and one save).
+# to <game data>\RWMLWC\<Name>\ . Your normal game data is only read (Config and one save).
 #
 # Messages are ASCII on purpose: PowerShell 5.1 misreads UTF-8 scripts without BOM.
 
@@ -16,6 +17,8 @@ param(
     [string]$Save = '',
     [int]$HoldSec = 60,
     [int]$TimeoutMin = 15,
+    [string]$Scenario = 'none',
+    [string]$Name = 'tst014',
     [switch]$NoBuild
 )
 
@@ -48,7 +51,7 @@ $serverDll = Get-ChildItem (Join-Path $repo 'Source\Server\bin') -Recurse -Filte
              Where-Object { $_.FullName -match '\\Release\\' } | Select-Object -First 1
 if (-not $serverDll) { Fail 'RWMLWC.Server.dll not found (build first).' }
 
-$work = Join-Path $env:LOCALAPPDATA 'RWMLWC-test\tst014'
+$work = Join-Path $env:LOCALAPPDATA "RWMLWC-test\$Name"
 if (Test-Path $work) { Remove-Item $work -Recurse -Force }
 New-Item -ItemType Directory -Path $work | Out-Null
 
@@ -83,8 +86,8 @@ for ($c = 1; $c -le $Clients; $c++) {
     Copy-Item (Join-Path $data 'Config') (Join-Path $dir 'Config') -Recurse
     Copy-Item -LiteralPath $saveFile (Join-Path $dir 'Saves\tst014.rws')
     $arm = @(
-        'armed=1', 'save=tst014', 'scenarios=none', "ticks=$Ticks", 'trace=0', 'quit=1',
-        "server=127.0.0.1:$port", "thumbprint=$thumb", "name=c$c", "holdsec=$hold"
+        'armed=1', 'save=tst014', "scenarios=$Scenario", "ticks=$Ticks", 'trace=0', 'quit=1',
+        "server=127.0.0.1:$port", "thumbprint=$thumb", "name=c$c", "holdsec=$hold", "issuer=$(if ($c -eq 1) { 1 } else { 0 })"
     )
     [IO.File]::WriteAllLines((Join-Path $dir 'RWMLWC\arm-determinism-run.txt'), $arm)
     [IO.File]::WriteAllText((Join-Path $dir 'RWMLWC\automation-progress.txt'), '0')
@@ -103,7 +106,7 @@ Start-Sleep -Seconds 1
 if (-not $srv.HasExited) { Stop-Process -Id $srv.Id -Force }
 
 Step 'Collecting results'
-$dest = Join-Path $data 'RWMLWC\tst014'
+$dest = Join-Path $data "RWMLWC\$Name"
 if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
 New-Item -ItemType Directory -Path $dest | Out-Null
 Copy-Item $srvOut, $srvErr $dest -ErrorAction SilentlyContinue
