@@ -27,6 +27,12 @@ public static class MethodCommands
         public MethodBase method = null!;
         public PermissionLevel required;
         public string key = "";
+
+        /// <summary>Для свойств: чтение текущего значения (запись того же значения командой не шлём).</summary>
+        public MethodInfo? getter;
+
+        /// <summary>Объект, который не удалось опознать, — временный объект интерфейса: вызов исполняется на месте.</summary>
+        public bool localIfUnknown;
     }
 
     private static readonly List<Entry> entries = new List<Entry>();
@@ -40,12 +46,19 @@ public static class MethodCommands
         Add(method, type.FullName + "." + name, required);
     }
 
-    private static void Setter(Type type, string property, PermissionLevel required = PermissionLevel.Full)
+    private static void Setter(Type type, string property, PermissionLevel required = PermissionLevel.Full, bool localIfUnknown = false)
     {
-        Add(AccessTools.PropertySetter(type, property), type.FullName + ".set_" + property, required);
+        Add(AccessTools.PropertySetter(type, property), type.FullName + ".set_" + property, required, AccessTools.PropertyGetter(type, property), localIfUnknown);
     }
 
-    private static void Add(MethodBase? method, string key, PermissionLevel required)
+    // Метод временного объекта интерфейса (фильтр без владельца) исполняется на месте.
+    private static void FilterMethod(string name, params Type[] parameters)
+    {
+        string key = typeof(ThingFilter).FullName + "." + name + "(" + parameters.Length + ")";
+        Add(AccessTools.Method(typeof(ThingFilter), name, parameters), key, PermissionLevel.Build, null, true);
+    }
+
+    private static void Add(MethodBase? method, string key, PermissionLevel required, MethodInfo? getter = null, bool localIfUnknown = false)
     {
         if (method == null)
         {
@@ -53,7 +66,7 @@ public static class MethodCommands
             return;
         }
         indexByMethod[method] = entries.Count;
-        entries.Add(new Entry { method = method, required = required, key = key });
+        entries.Add(new Entry { method = method, required = required, key = key, getter = getter, localIfUnknown = localIfUnknown });
     }
 
     // Порядок записей — часть формата команды: новые добавлять только в конец.
@@ -77,6 +90,16 @@ public static class MethodCommands
         Method(typeof(BillStack), nameof(BillStack.AddBill));
         Method(typeof(BillStack), nameof(BillStack.Delete));
         Method(typeof(BillStack), nameof(BillStack.Reorder));
+        // Фильтры вещей: склады, счета, политики (вкладка «Хранение», окно счёта, окна политик).
+        FilterMethod(nameof(ThingFilter.SetAllow), typeof(ThingDef), typeof(bool));
+        FilterMethod(nameof(ThingFilter.SetAllow), typeof(SpecialThingFilterDef), typeof(bool));
+        FilterMethod(nameof(ThingFilter.SetAllow), typeof(ThingCategoryDef), typeof(bool), typeof(IEnumerable<ThingDef>), typeof(IEnumerable<SpecialThingFilterDef>));
+        FilterMethod(nameof(ThingFilter.SetDisallowAll), typeof(IEnumerable<ThingDef>), typeof(IEnumerable<SpecialThingFilterDef>));
+        FilterMethod(nameof(ThingFilter.SetAllowAll), typeof(ThingFilter), typeof(bool));
+        Setter(typeof(ThingFilter), nameof(ThingFilter.AllowedHitPointsPercents), PermissionLevel.Build, true);
+        Setter(typeof(ThingFilter), nameof(ThingFilter.AllowedQualityLevels), PermissionLevel.Build, true);
+        // Приоритет склада.
+        Setter(typeof(StorageSettings), nameof(StorageSettings.Priority), PermissionLevel.Build, true);
     }
 
     // ---------- перехват ----------
@@ -88,6 +111,14 @@ public static class MethodCommands
             return true;
         }
         Entry entry = entries[index];
+        if (entry.getter != null && __args.Length == 1 && Equals(entry.getter.Invoke(__instance, null), __args[0]))
+        {
+            return true; // интерфейс каждый кадр записывает то же значение: не команда
+        }
+        if (entry.localIfUnknown && !ValueCodec.TryWriteAny(new PacketWriter(64), __instance))
+        {
+            return true; // временный объект интерфейса (фильтр нового счёта, буфер копирования)
+        }
         Map? map = MapFor(__instance);
         if (map == null)
         {
@@ -159,6 +190,20 @@ public static class MethodCommands
         for (int i = 0; i < count; i++)
         {
             // Ссылка, которая здесь не нашлась, допустима только там, где метод принимает null («без области»).
+            if (args[i] is List<Def> defs && parameters[i].ParameterType.IsGenericType)
+            {
+                // Список определений пришёл общим списком; метод ждёт список своего типа.
+                Type item = parameters[i].ParameterType.GetGenericArguments()[0];
+                System.Collections.IList typed = (System.Collections.IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(item))!;
+                foreach (Def def in defs)
+                {
+                    if (item.IsInstanceOfType(def))
+                    {
+                        typed.Add(def);
+                    }
+                }
+                args[i] = typed;
+            }
             if (args[i] != null && !parameters[i].ParameterType.IsInstanceOfType(args[i]))
             {
                 throw new InvalidOperationException("окна: " + key + ": аргумент " + i + " не того типа");
