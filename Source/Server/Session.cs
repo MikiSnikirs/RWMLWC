@@ -1,0 +1,288 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using RWMLWC.Net;
+using RWMLWC.Shared;
+using RWMLWC.Shared.Protocol;
+
+namespace RWMLWC.Server;
+
+/// <summary>Настройки сессии.</summary>
+public sealed class SessionOptions
+{
+    /// <summary>Тик мира на старте сессии (пока задаётся вручную; из сейва — T-044).</summary>
+    public int StartTick;
+
+    /// <summary>Зерно сессии для <c>Welcome.SessionSeed</c>.</summary>
+    public uint SessionSeed;
+
+    /// <summary>Сколько ждать <c>Hello</c> после подключения.</summary>
+    public TimeSpan HelloTimeout = TimeSpan.FromSeconds(10);
+
+    public int MaxPlayers = 8;
+}
+
+/// <summary>
+/// Сессия сервера (T-013): рукопожатие, общие часы, правило меньшей скорости, общий порядок команд.
+/// Однопоточная и без таймеров: хост вызывает <see cref="Pump"/> и <see cref="Advance"/> из одного цикла,
+/// тесты — вручную. Поэтому поведение воспроизводимо.
+/// </summary>
+public sealed class Session
+{
+    /// <summary>
+    /// Тиков в секунду на скорости 1; скорости 2..4 — базовые множители игры (<c>TickManager.TickRateMultiplier</c>): 3, 6, 15.
+    /// Игра сама меняет множитель по обстановке: бой — принудительно 1x (<c>ForcedNormalSpeed</c>),
+    /// «ничего не происходит» — 12x вместо 6x. Сервер этого не видит; учитывать это — дело клиента (T-014).
+    /// </summary>
+    public const int TicksPerSecondAtSpeed1 = 60;
+
+    private static readonly int[] SpeedMultiplier = { 0, 1, 3, 6, 15 };
+
+    private readonly SessionOptions _options;
+    private readonly List<Pending> _pending = new();
+    private readonly List<Player> _players = new();
+    private readonly Dictionary<(int map, int tick), (int playerId, MapHashMessage hash)> _hashes = new();
+    private readonly Action<string> _log;
+    private int _nextPlayerId = 1;
+    private long _nextSeq = 1;
+    private double _tickAccumulator;
+    private byte _lastSentSpeed = byte.MaxValue;
+
+    public Session(SessionOptions options, Action<string>? log = null)
+    {
+        _options = options;
+        _log = log ?? (_ => { });
+        TickUpTo = options.StartTick;
+    }
+
+    /// <summary>
+    /// Клиентам разрешено дотикать до этого тика включительно. Растёт только вперёд.
+    /// Команда, принятая сейчас, исполняется после тика <see cref="TickUpTo"/>.
+    /// </summary>
+    public int TickUpTo { get; private set; }
+
+    /// <summary>Общая скорость: 0 — пауза, 1..4.</summary>
+    public byte Speed { get; private set; }
+
+    public IReadOnlyList<Player> Players => _players;
+
+    /// <summary>Обнаружено расхождение хешей карты между игроками (T-034 будет на это реагировать).</summary>
+    public event Action<MapHashMessage, int, MapHashMessage, int>? Desync;
+
+    public sealed class Player
+    {
+        internal Player(int id, string name, IConnection connection)
+        {
+            Id = id;
+            Name = name;
+            Connection = connection;
+        }
+
+        public int Id { get; }
+        public string Name { get; }
+        public IConnection Connection { get; internal set; }
+        public bool Online => Connection.IsOpen;
+
+        /// <summary>Скорость, выбранная игроком. Новый игрок держит паузу, пока не пришлёт <c>SpeedRequest</c>.</summary>
+        public byte RequestedSpeed { get; internal set; }
+    }
+
+    private sealed class Pending
+    {
+        public required IConnection Connection;
+        public TimeSpan Waited;
+    }
+
+    /// <summary>Новое подключение: ждём от него <c>Hello</c>.</summary>
+    public void Accept(IConnection connection) => _pending.Add(new Pending { Connection = connection });
+
+    /// <summary>Обработать всё, что пришло. Вызывать часто (каждые ~10 мс).</summary>
+    public void Pump()
+    {
+        for (int i = _pending.Count - 1; i >= 0; i--)
+        {
+            Pending p = _pending[i];
+            if (!p.Connection.IsOpen) { _pending.RemoveAt(i); continue; }
+            if (!p.Connection.TryReceive(out Message m)) continue;
+            _pending.RemoveAt(i);
+            if (m is HelloMessage hello) Handshake(p.Connection, hello);
+            else p.Connection.Close("первым сообщением ожидался Hello, пришёл " + m.Type);
+        }
+
+        // Игроки обрабатываются по возрастанию номера, сообщения каждого — по порядку прихода.
+        foreach (Player player in _players)
+        {
+            while (player.Online && player.Connection.TryReceive(out Message m))
+                Handle(player, m);
+        }
+
+        UpdateSpeed();
+    }
+
+    /// <summary>Продвинуть общие часы на прошедшее реальное время и разослать разрешение тикать.</summary>
+    public void Advance(TimeSpan elapsed)
+    {
+        for (int i = _pending.Count - 1; i >= 0; i--)
+        {
+            _pending[i].Waited += elapsed;
+            if (_pending[i].Waited > _options.HelloTimeout)
+            {
+                _pending[i].Connection.Close("нет Hello за " + _options.HelloTimeout.TotalSeconds + " с");
+                _pending.RemoveAt(i);
+            }
+        }
+
+        UpdateSpeed();
+        int before = TickUpTo;
+        if (Speed > 0)
+        {
+            _tickAccumulator += elapsed.TotalSeconds * TicksPerSecondAtSpeed1 * SpeedMultiplier[Speed];
+            int whole = (int)Math.Floor(_tickAccumulator);
+            _tickAccumulator -= whole;
+            TickUpTo += whole;
+        }
+        if (TickUpTo != before || Speed != _lastSentSpeed)
+        {
+            _lastSentSpeed = Speed;
+            Broadcast(new TickMessage { TickUpTo = TickUpTo, Speed = Speed });
+        }
+    }
+
+    private void Handshake(IConnection connection, HelloMessage hello)
+    {
+        string? reject = null;
+        RejectReason reason = RejectReason.Other;
+        Player? first = _players.FirstOrDefault();
+        if (!ProtocolInfo.IsCompatible(hello.ProtocolVersion))
+            (reason, reject) = (RejectReason.ProtocolMismatch, $"версия протокола клиента {hello.ProtocolVersion}, сервера {ProtocolInfo.ProtocolVersion}");
+        else if (hello.ModId != ProtocolInfo.ModId)
+            (reason, reject) = (RejectReason.ModMismatch, "чужой мод: " + hello.ModId);
+        else if (string.IsNullOrWhiteSpace(hello.PlayerName))
+            (reason, reject) = (RejectReason.Other, "пустое имя игрока");
+        else if (_gameVersion != null && hello.GameVersion != _gameVersion)
+            (reason, reject) = (RejectReason.GameVersionMismatch, $"версия игры {hello.GameVersion}, в сессии {_gameVersion}");
+        else if (_modListHash != null && hello.ModListHash != _modListHash)
+            (reason, reject) = (RejectReason.ModListMismatch, "список модов отличается от сессии");
+
+        Player? existing = _players.FirstOrDefault(p => p.Name == hello.PlayerName);
+        if (reject == null && existing != null && existing.Online)
+            (reason, reject) = (RejectReason.NameTaken, "игрок с таким именем уже в сессии");
+        if (reject == null && existing == null && _players.Count(p => p.Online) >= _options.MaxPlayers)
+            (reason, reject) = (RejectReason.ServerFull, "сервер заполнен");
+
+        if (reject != null)
+        {
+            _log($"отказ {connection.Remote} ({hello.PlayerName}): {reject}");
+            connection.Send(new RejectMessage { Reason = reason, Detail = reject });
+            connection.Close("отказ: " + reject);
+            return;
+        }
+
+        _gameVersion ??= hello.GameVersion;
+        _modListHash ??= hello.ModListHash;
+
+        Player player;
+        if (existing != null)
+        {
+            // Возврат того же игрока: тот же номер. Догон пропущенного — T-045.
+            existing.Connection = connection;
+            existing.RequestedSpeed = 0;
+            player = existing;
+            _log($"вернулся игрок {player.Id} «{player.Name}» ({connection.Remote})");
+        }
+        else
+        {
+            player = new Player(_nextPlayerId++, hello.PlayerName, connection);
+            _players.Add(player);
+            _log($"вошёл игрок {player.Id} «{player.Name}» ({connection.Remote})");
+        }
+
+        connection.Send(new WelcomeMessage { PlayerId = player.Id, ServerTick = TickUpTo, SessionSeed = _options.SessionSeed });
+        // Новому игроку — текущее разрешение, остальным — новая скорость (новый игрок держит паузу).
+        connection.Send(new TickMessage { TickUpTo = TickUpTo, Speed = Speed });
+        UpdateSpeed();
+    }
+
+    private string? _gameVersion;
+    private ulong? _modListHash;
+
+    private void Handle(Player player, Message m)
+    {
+        switch (m)
+        {
+            case CommandMessage c:
+                // Исполняется всеми после тика TickUpTo: ни один клиент ещё не ушёл дальше него,
+                // а Tick с большим номером будет разослан только после этой команды.
+                Broadcast(new CommandOrderedMessage
+                {
+                    Seq = _nextSeq++,
+                    Tick = TickUpTo,
+                    PlayerId = player.Id,
+                    ClientSeq = c.ClientSeq,
+                    MapId = c.MapId,
+                    Kind = c.Kind,
+                    Payload = c.Payload,
+                });
+                break;
+
+            case SpeedRequestMessage s:
+                player.RequestedSpeed = Math.Min(s.Speed, (byte)4);
+                UpdateSpeed();
+                break;
+
+            case MapHashMessage h:
+                CompareHash(player, h);
+                break;
+
+            case SnapshotChunkMessage chunk:
+                // Пересылка снимка остальным; кому и когда — уточнят T-030/T-034.
+                foreach (Player other in _players)
+                    if (other != player && other.Online) other.Connection.Send(chunk);
+                break;
+
+            default:
+                player.Connection.Close("неожиданное сообщение от клиента: " + m.Type);
+                break;
+        }
+    }
+
+    private void CompareHash(Player player, MapHashMessage h)
+    {
+        var key = (h.MapId, h.Tick);
+        if (!_hashes.TryGetValue(key, out var first))
+        {
+            _hashes[key] = (player.Id, h);
+            // Держим ограниченную историю: старые тики больше не сравниваются.
+            if (_hashes.Count > 4096)
+                foreach (var k in _hashes.Keys.OrderBy(k => k.tick).Take(1024).ToList()) _hashes.Remove(k);
+            return;
+        }
+        if (first.playerId == player.Id) return;
+        if (first.hash.Total != h.Total)
+        {
+            _log($"РАСХОЖДЕНИЕ карта {h.MapId} тик {h.Tick}: игрок {first.playerId} {first.hash.Total:X16}, игрок {player.Id} {h.Total:X16}");
+            Desync?.Invoke(first.hash, first.playerId, h, player.Id);
+        }
+    }
+
+    /// <summary>Правило меньшей скорости: игра идёт на минимальной из скоростей игроков в сети; пауза любого — пауза всех.</summary>
+    private void UpdateSpeed()
+    {
+        byte speed = 0;
+        bool any = false;
+        foreach (Player p in _players)
+        {
+            if (!p.Online) continue;
+            speed = any ? Math.Min(speed, p.RequestedSpeed) : p.RequestedSpeed;
+            any = true;
+        }
+        Speed = any ? speed : (byte)0;
+        if (Speed == 0) _tickAccumulator = 0;
+    }
+
+    private void Broadcast(Message m)
+    {
+        foreach (Player p in _players)
+            if (p.Online) p.Connection.Send(m);
+    }
+}
