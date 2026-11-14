@@ -369,11 +369,31 @@ internal static class StatusLineView
 
     private static bool _colorAsked;
 
+    private static bool? _colorPopupArm;
+
+    /// <summary>Опыт TST-080: ключ colorpopup=1 в метке — показывать окно цвета и в автопрогоне, как человеку.</summary>
+    private static bool ColorPopupInAutomation()
+    {
+        if (_colorPopupArm == null)
+        {
+            try
+            {
+                string arm = System.IO.Path.Combine(GenFilePaths.SaveDataFolderPath, "RWMLWC", "arm-determinism-run.txt");
+                _colorPopupArm = System.IO.File.Exists(arm) && System.IO.File.ReadAllLines(arm).Any(l => l.Trim() == "colorpopup=1");
+            }
+            catch (Exception)
+            {
+                _colorPopupArm = false;
+            }
+        }
+        return _colorPopupArm.Value;
+    }
+
     internal static void OnGUI()
     {
         // Первый вход в сессию: цвет ещё не выбран — предложить выбрать (T-064).
         if (!LockstepClient.InSession) _colorAsked = false;
-        else if (!_colorAsked && !TestAutomation.AutomationActive && SessionUi.Players.Any(p => p.PlayerId == LockstepClient.PlayerId) && SessionUi.ColorOf(LockstepClient.PlayerId) == PlayerColors.None)
+        else if (!_colorAsked && (!TestAutomation.AutomationActive || ColorPopupInAutomation()) && SessionUi.Players.Any(p => p.PlayerId == LockstepClient.PlayerId) && SessionUi.ColorOf(LockstepClient.PlayerId) == PlayerColors.None)
         {
             _colorAsked = true;
             Find.WindowStack.Add(new Dialog_ChooseColor());
