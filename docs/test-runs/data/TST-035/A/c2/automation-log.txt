@@ -1,0 +1,45 @@
+2026-11-15 00:21:19 autoload: loading save 'tst014'
+2026-11-15 00:21:26 lockstep: connecting to 127.0.0.1:49832 as 'c2'
+2026-11-15 00:21:27 lockstep: connected to quic:127.0.0.1:49832, Hello sent
+2026-11-15 00:21:27 lockstep: Welcome, playerId=1, serverTick=14998, seed=7
+2026-11-15 00:21:27 presence: player 1 online
+2026-11-15 00:21:27 presence: player 2 online
+2026-11-15 00:22:27 lockstep: hold is over, requesting speed 3
+2026-11-15 00:22:27 run started: #0, tick=14998, scenario=none, ticks=10000, trace=False, quit=True, file=hash-c2-20261115-002227.txt
+2026-11-15 00:22:31 world: caravan form sent, pawns 1+0, item groups 1
+2026-11-15 00:22:31 caravan: form — отправка принята, колонист 231
+2026-11-15 00:22:31 world: caravan forming started by player 1, pawns 1+0, item groups 1
+2026-11-15 00:22:31 caravan summary: tick 15503, forming lords 1, caravans 0, player settlements 1, maps 1
+2026-11-15 00:22:33 caravan summary: tick 16004, forming lords 1, caravans 0, player settlements 1, maps 1
+2026-11-15 00:22:34 caravan summary: tick 16506, forming lords 1, caravans 0, player settlements 1, maps 1
+2026-11-15 00:22:35 caravan summary: tick 17009, forming lords 1, caravans 0, player settlements 1, maps 1
+2026-11-15 00:22:37 caravan summary: tick 17510, forming lords 1, caravans 0, player settlements 1, maps 1
+2026-11-15 00:22:38 world: settle sent, caravan 252
+2026-11-15 00:22:38 caravan: settle called on tile 240937,0
+2026-11-15 00:22:38 world: settled by player 1, caravan 252
+2026-11-15 00:22:38 long event FAILED in session: NullReferenceException: Object reference not set to an instance of an object.
+2026-11-15 00:22:38 caravan summary: tick 18011, forming lords 0, caravans 1, player settlements 2, maps 1
+2026-11-15 00:22:40 caravan summary: tick 18512, forming lords 0, caravans 1, player settlements 2, maps 1
+2026-11-15 00:22:41 caravan summary: tick 19015, forming lords 0, caravans 1, player settlements 2, maps 1
+2026-11-15 00:22:42 caravan summary: tick 19517, forming lords 0, caravans 1, player settlements 2, maps 1
+2026-11-15 00:22:44 caravan summary: tick 20019, forming lords 0, caravans 1, player settlements 2, maps 1
+2026-11-15 00:22:45 caravan summary: tick 20521, forming lords 0, caravans 1, player settlements 2, maps 1
+2026-11-15 00:22:47 caravan summary: tick 21023, forming lords 0, caravans 1, player settlements 2, maps 1
+2026-11-15 00:22:48 caravan summary: tick 21524, forming lords 0, caravans 1, player settlements 2, maps 1
+2026-11-15 00:22:49 caravan summary: tick 22026, forming lords 0, caravans 1, player settlements 2, maps 1
+2026-11-15 00:22:51 caravan summary: tick 22529, forming lords 0, caravans 1, player settlements 2, maps 1
+2026-11-15 00:22:52 caravan summary: tick 23030, forming lords 0, caravans 1, player settlements 2, maps 1
+2026-11-15 00:22:54 caravan summary: tick 23532, forming lords 0, caravans 1, player settlements 2, maps 1
+2026-11-15 00:22:55 caravan summary: tick 24035, forming lords 0, caravans 1, player settlements 2, maps 1
+2026-11-15 00:22:56 caravan summary: tick 24537, forming lords 0, caravans 1, player settlements 2, maps 1
+2026-11-15 00:22:58 summary: map0 drafted=0 forbidden=56 plants=[]
+2026-11-15 00:22:58 summary: map0 jobs=[234:Wait_Wander@(226, 0, 135),239:GotoWander@(227, 0, 136)]
+2026-11-15 00:22:58 camera: this client moved its camera 65 times during the run
+2026-11-15 00:22:58 summary: map0 settings=7C47AC7B3149885C
+2026-11-15 00:22:58 summary: absence= offline=[]
+2026-11-15 00:22:58 summary: squads= rejected=0 drafted=[]
+2026-11-15 00:22:58 summary: map0 designations=0 blueprints=0 zones=0; commands sent=2 executed=2 failed=0
+2026-11-15 00:22:58 run finished: file=hash-c2-20261115-002227.txt
+2026-11-15 00:22:58 queue: finished
+2026-11-15 00:22:58 lockstep: disconnect: прогон завершён
+2026-11-15 00:22:58 quitting game

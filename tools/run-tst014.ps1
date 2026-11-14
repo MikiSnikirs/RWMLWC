@@ -27,7 +27,8 @@ param(
     [int]$DenseFrom = -1,       # hash every tick in this window (ticks from run start)
     [int]$DenseTo = -1,
     [int]$Camera = -1,          # camera wander for c2: 1/0 (default 1)
-    [string]$LanguageC2 = '',   # game language folder for c2 only, e.g. English (players with different languages)
+    [string]$LanguageC2 = '',
+    [string[]]$ExtraArm = @(),  # extra key=value lines for every client's arm file, e.g. caravantest=1   # game language folder for c2 only, e.g. English (players with different languages)
     [switch]$NoBuild
 )
 
@@ -165,6 +166,7 @@ for ($c = 1; $c -le $Clients; $c++) {
         "camera=$(if ($c -eq 2 -and $Camera -ne 0) { 1 } else { 0 })"
     ) + $extra
     if ($Tpf.Count -ge $c) { $arm += "tpf=$($Tpf[$c - 1])" }
+    $arm += $ExtraArm
     if ($DenseFrom -ge 0 -and $DenseTo -gt $DenseFrom) { $arm += "densefrom=$DenseFrom"; $arm += "denseto=$DenseTo" }
     [IO.File]::WriteAllLines((Join-Path $dir 'RWMLWC\arm-determinism-run.txt'), $arm)
     [IO.File]::WriteAllText((Join-Path $dir 'RWMLWC\automation-progress.txt'), '0')

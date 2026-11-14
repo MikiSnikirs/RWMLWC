@@ -743,7 +743,7 @@ public static class LockstepClient
         frameClock.Restart();
         int done = 0;
         int cap = TestAutomation.TicksPerFrameCap;
-        while (tickManager.TicksGame < tickUpTo && state == State.InSession && (cap == 0 || done < cap))
+        while (tickManager.TicksGame < tickUpTo && state == State.InSession && (cap == 0 || done < cap) && !SessionLongEvents.PendingFromSimulation)
         {
             tickManager.DoSingleTick();
             done++;
@@ -753,6 +753,12 @@ public static class LockstepClient
             }
             // Порядок у всех клиентов один: тик T, хеш тика T, команды тика T.
             ExecuteDueCommands(tickManager);
+            // Команда или тик поставили долгое событие (генерация карты): оно выполнится в следующем кадре до любого
+            // следующего тика — у всех клиентов в одной точке общего порядка (SessionLongEvents).
+            if (SessionLongEvents.PendingFromSimulation)
+            {
+                break;
+            }
             if (state != State.InSession || (cap == 0 && frameClock.ElapsedMilliseconds > FrameBudgetMs))
             {
                 break;
