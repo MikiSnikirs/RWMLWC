@@ -296,6 +296,8 @@ public static class TestAutomation
         activeConfig = cfg;
         sessionSteps.Clear();
         stepGates.Clear();
+        cameraHeld = false;
+        RWMLWC.Client.Maps.RemoteCursors.FakeCursor = null;
         if (cfg.scenario == "access")
         {
             // T-033: c2 (issuer=0) занимает карту и выдаёт права; c1 (issuer=1) пробует действовать.
@@ -323,6 +325,11 @@ public static class TestAutomation
         }
         if (cfg.issuer && cfg.scenario == "tabs")
         {
+            // T-023, ч. 2: в тестовом сейве нет верстака и склада — ставим их обычной разметкой (у места для крафта
+            // время постройки 0, игра ставит его сразу). Шаги со счётом и складом ждут, пока они появятся у этого клиента.
+            sessionSteps.Enqueue((startTick + 150, "tabs: setup table and stockpile", TabsSetup));
+            stepGates["tabs: add bill"] = () => FirstWorkTable() != null;
+            stepGates["tabs: storage filter"] = () => FirstStockpile() != null;
             sessionSteps.Enqueue((startTick + 300, "tabs: work priority", TabsWorkPriority));
             sessionSteps.Enqueue((startTick + 400, "tabs: schedule", TabsSchedule));
             sessionSteps.Enqueue((startTick + 500, "tabs: outfit policy", TabsOutfit));
@@ -363,6 +370,24 @@ public static class TestAutomation
         if (cfg.issuer && cfg.scenario == "designate")
         {
             sessionSteps.Enqueue((startTick + 300, "designate", ScenarioDesignate));
+        }
+        if (cfg.scenario == "cursors")
+        {
+            // TST-050: c1 «водит» курсором (точки рядом с центром карты), c2 видит его в цвете c1 с именем.
+            if (cfg.issuer)
+            {
+                sessionSteps.Enqueue((startTick + 200, "cursors: point A", () => CursorAt(3f, 3f)));
+                sessionSteps.Enqueue((startTick + 500, "cursors: point B", () => CursorAt(-4f, 2f)));
+            }
+            else
+            {
+                sessionSteps.Enqueue((startTick + 700, "cursors: look at remote cursor", CursorLook));
+                sessionSteps.Enqueue((startTick + 800, "cursors: report and screenshot", () =>
+                {
+                    Note($"cursors: seen {string.Join(", ", RWMLWC.Client.SessionView.SessionUi.Cursors.Select(c => $"player {c.Key} map {c.Value.MapId} at {c.Value.X:0.#},{c.Value.Z:0.#} color {RWMLWC.Client.SessionView.SessionUi.ColorOf(c.Key):X6}"))}; drawn last frame {RWMLWC.Client.Maps.RemoteCursors.DrawnLastFrame}, labels {RWMLWC.Client.Maps.RemoteCursors.LabelsLastFrame}");
+                    ScreenshotTaker.TakeNonSteamShot("cursors-look");
+                }));
+            }
         }
         if (cfg.issuer && cfg.scenario == "squads")
         {
@@ -500,6 +525,7 @@ public static class TestAutomation
                 case "gizmo":
                 case "rightclick":
                 case "squads":
+                case "cursors":
                     break; // срабатывают позже, из кадра (SessionFrame): приказы идут как ввод игрока
                 case "snap-save":
                 case "snap-reload":
@@ -526,7 +552,7 @@ public static class TestAutomation
     private static void WanderCamera()
     {
         Config? cfg = activeConfig;
-        if (cfg == null || !cfg.cameraWander || Current.Game == null || Find.CurrentMap == null)
+        if (cfg == null || !cfg.cameraWander || cameraHeld || Current.Game == null || Find.CurrentMap == null)
         {
             return;
         }
@@ -722,6 +748,41 @@ public static class TestAutomation
         Map map = Find.CurrentMap ?? Find.Maps[0];
         return map.listerBuildings.AllBuildingsColonistOfClass<Building_WorkTable>()
             .Where(t => t.def.AllRecipes.Any(r => r.AvailableNow)).OrderBy(t => t.thingIDNumber).FirstOrDefault();
+    }
+
+    private static void TabsSetup()
+    {
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        ThingDef? spotDef = DefDatabase<ThingDef>.GetNamedSilentFail("CraftingSpot");
+        IntVec3 center = map.Center + new IntVec3(-12, 0, -12);
+        string spotAt = "none";
+        if (spotDef != null)
+        {
+            Designator_Build spot = new Designator_Build(spotDef);
+            foreach (IntVec3 c in GenRadial.RadialCellsAround(center, 10f, true))
+            {
+                if (c.InBounds(map) && spot.CanDesignateCell(c).Accepted)
+                {
+                    spot.DesignateSingleCell(c);
+                    spotAt = c.ToString();
+                    break;
+                }
+            }
+        }
+        List<IntVec3> zoneCells = new List<IntVec3>();
+        Designator_ZoneAddStockpile_Resources stockpile = new Designator_ZoneAddStockpile_Resources();
+        foreach (IntVec3 c in CellRect.CenteredOn(center + new IntVec3(6, 0, 0), 2))
+        {
+            if (c.InBounds(map) && stockpile.CanDesignateCell(c).Accepted)
+            {
+                zoneCells.Add(c);
+            }
+        }
+        if (zoneCells.Count > 0)
+        {
+            stockpile.DesignateMultiCell(zoneCells);
+        }
+        Note($"tabs: setup: crafting spot at {spotAt}, stockpile {zoneCells.Count} cells; sent={LockstepClient.PlayerCommandsSent}");
     }
 
     private static void TabsAddBill()
@@ -970,6 +1031,30 @@ public static class TestAutomation
             RWMLWC.Client.Maps.SquadRules.BypassLocalCheck = false;
         }
         Note($"squads: work {work.defName} of {pawn.LabelShort} (id {pawn.thingIDNumber}) {before} -> {(before == 0 ? 3 : 0)} bypassing UI, commands sent={LockstepClient.PlayerCommandsSent - sentBefore}");
+    }
+
+    private static bool cameraHeld;
+
+    private static void CursorAt(float dx, float dz)
+    {
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        RWMLWC.Client.Maps.RemoteCursors.FakeCursor = map.Center.ToVector3Shifted() + new UnityEngine.Vector3(dx, 0f, dz);
+        Note($"cursors: my cursor at {RWMLWC.Client.Maps.RemoteCursors.FakeCursor.Value.x:0.#},{RWMLWC.Client.Maps.RemoteCursors.FakeCursor.Value.z:0.#}");
+    }
+
+    private static void CursorLook()
+    {
+        cameraHeld = true; // камера c2 больше не гуляет
+        foreach (KeyValuePair<int, RWMLWC.Client.SessionView.SessionUi.RemoteCursor> c in RWMLWC.Client.SessionView.SessionUi.Cursors)
+        {
+            if (c.Key != LockstepClient.PlayerId)
+            {
+                Find.CameraDriver.SetRootPosAndSize(new UnityEngine.Vector3(c.Value.X, 0f, c.Value.Z), 10f);
+                Note($"cursors: camera on player {c.Key} cursor");
+                return;
+            }
+        }
+        Note("cursors: no remote cursor to look at");
     }
 
     private static void SquadsStep(Action<Map> act)
