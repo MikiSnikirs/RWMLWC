@@ -475,6 +475,12 @@ public static class LockstepClient
                 SaveWorldForServer(command); // v4: автосохранение — отдающий шлёт мир серверу, остальные пропускают
                 continue;
             }
+            if (command.Kind == ProtocolIds.PlayerPresenceKind)
+            {
+                // v7 (T-032): «игрок в сети / не в сети». Состояние игры (флаг в сейве) — клиентская часть A;
+                // пока её нет, команда пропускается, чтобы не считаться неизвестной (Failed) в автопрогонах.
+                continue;
+            }
             if (command.Tick < tickManager.TicksGame)
             {
                 // Сервер обещает прислать команду раньше разрешения на следующий тик; сюда попадать не должны.

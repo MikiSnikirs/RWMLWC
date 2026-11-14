@@ -15,8 +15,9 @@ public static class ProtocolInfo
     /// 4 — отдающий мир в <c>Payload</c> команды 100, сохранение мира на сервер (101), лечение расхождения сервером (T-065).
     /// 5 — цвет игрока (<c>PlayerInfo.Color</c>, <c>ChooseColor</c>, <c>Notice ColorTaken</c>), курсор (<c>Cursor</c>) (T-064).
     /// 6 — пароль в <c>Hello</c> (T-068), простой игрока (<c>PlayerState</c>, <c>PlayerInfo.Idle</c>) и тревога (<c>Alarm</c>) (T-040).
+    /// 7 — служебная команда 102 «игрок в сети / не в сети» (T-032), «управляющий» — права до возвращения владельца (T-042).
     /// </summary>
-    public const int ProtocolVersion = 6;
+    public const int ProtocolVersion = 7;
 
     /// <summary>Идентификатор мода: packageId в About.xml и id экземпляра Harmony.</summary>
     public const string ModId = "MikiSnikirs.RWMLWC";

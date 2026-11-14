@@ -32,7 +32,7 @@ public class SessionTests
             while (Conn.TryReceive(out Message m)) Received.Add(m);
         }
 
-        public IEnumerable<CommandOrderedMessage> Commands => Received.OfType<CommandOrderedMessage>();
+        public IEnumerable<CommandOrderedMessage> Commands => Received.OfType<CommandOrderedMessage>().Where(c => c.Kind != ProtocolIds.PlayerPresenceKind);
         public TickMessage LastTick => Received.OfType<TickMessage>().Last();
     }
 
@@ -107,7 +107,7 @@ public class SessionTests
         Assert.Equal(ca.Count, cb.Count);
         for (int i = 0; i < ca.Count; i++)
         {
-            Assert.Equal(i + 1, ca[i].Seq); // общий номер без пропусков
+            Assert.Equal(ca[0].Seq + i, ca[i].Seq); // общий номер без пропусков (до них — служебные 102 о входе игроков)
             Assert.Equal((ca[i].Seq, ca[i].Tick, ca[i].PlayerId, ca[i].ClientSeq, ca[i].Kind),
                          (cb[i].Seq, cb[i].Tick, cb[i].PlayerId, cb[i].ClientSeq, cb[i].Kind));
         }
