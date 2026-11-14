@@ -52,6 +52,12 @@ public static class ProtocolCodec
             MessageType.SpeedRequest => SpeedRequestMessage.Read(ref r),
             MessageType.SnapshotChunk => SnapshotChunkMessage.Read(ref r),
             MessageType.MapHash => MapHashMessage.Read(ref r),
+            MessageType.MapClaim => MapClaimMessage.Read(ref r),
+            MessageType.GrantPermission => GrantPermissionMessage.Read(ref r),
+            MessageType.Permissions => PermissionsMessage.Read(ref r),
+            MessageType.CommandRejected => CommandRejectedMessage.Read(ref r),
+            MessageType.Notice => NoticeMessage.Read(ref r),
+            MessageType.SnapshotApplied => SnapshotAppliedMessage.Read(ref r),
             _ => throw new ProtocolException($"Неизвестный тип сообщения: {(ushort)type}"),
         };
         r.EnsureEnd();
