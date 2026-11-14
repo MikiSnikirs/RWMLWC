@@ -306,6 +306,10 @@ public static class TestAutomation
                 sessionSteps.Enqueue((startTick + 500, "access: designate without rights", () => AccessTry("designate, no rights", ScenarioDesignate)));
                 sessionSteps.Enqueue((startTick + 2000, "access: designate with Build", () => AccessTry("designate, Build", ScenarioDesignate)));
                 sessionSteps.Enqueue((startTick + 2100, "access: draft with Build", () => AccessTry("draft, Build", GizmoDraft)));
+                // Отзыв действует сразу: c2 отзывает права на 3000-м тике, шаг ждёт, пока отзыв дойдёт до c1.
+                sessionSteps.Enqueue((startTick + 3300, "access: designate after revoke", () => AccessTry("designate, revoked", ScenarioDesignate)));
+                stepGates["access: designate after revoke"] = () =>
+                    RWMLWC.Client.Maps.MapAccess.MyLevel((Find.CurrentMap ?? Find.Maps[0]).uniqueID) == RWMLWC.Shared.Protocol.PermissionLevel.None;
                 // Права приходят вне общего порядка команд, а клиенты идут по тикам не вровень.
                 // Поэтому шаг «с правами» ждёт не только своего тика, но и самих прав; выдача стоит
                 // с запасом в 1000 тиков после попытки «без прав» (в прогоне агента B отстающий c1
@@ -321,6 +325,7 @@ public static class TestAutomation
             {
                 sessionSteps.Enqueue((startTick + 300, "access: claim", AccessClaim));
                 sessionSteps.Enqueue((startTick + 1500, "access: grant Build", AccessGrantBuild));
+                sessionSteps.Enqueue((startTick + 3000, "access: revoke", AccessRevoke));
             }
         }
         if (cfg.issuer && cfg.scenario == "tabs")
@@ -924,6 +929,14 @@ public static class TestAutomation
         int other = LockstepClient.PlayerId == 1 ? 2 : 1;
         RWMLWC.Client.Maps.MapAccess.Grant(map.uniqueID, other, RWMLWC.Shared.Protocol.PermissionLevel.Build);
         Note($"access: owner of map {map.uniqueID} is {RWMLWC.Client.Maps.MapAccess.OwnerOf(map.uniqueID)}; granting Build to player {other}");
+    }
+
+    private static void AccessRevoke()
+    {
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        int other = LockstepClient.PlayerId == 1 ? 2 : 1;
+        RWMLWC.Client.Maps.MapAccess.Grant(map.uniqueID, other, RWMLWC.Shared.Protocol.PermissionLevel.None);
+        Note($"access: revoking rights of player {other} on map {map.uniqueID}");
     }
 
     private static void AccessTry(string what, Action act)

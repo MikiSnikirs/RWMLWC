@@ -282,7 +282,7 @@
 Запуск: `powershell -ExecutionPolicy Bypass -File tools\run-tst014.ps1 -Clients 2 -Scenario access -Name tst033`.
 
 Ожидание:
-1. c1: `try 'designate, no rights': my level … None`, `commands sent=0` — клиент сам не отправил; затем `try 'designate, Build': … Build`, `commands sent=5`; затем `try 'draft, Build'`, `commands sent=0`.
+1. c1: `try 'designate, no rights': my level … None`, `commands sent=0` — клиент сам не отправил; затем `try 'designate, Build': … Build`, `commands sent=5`; затем `try 'draft, Build'`, `commands sent=0`. На 3000-м тике c2 отзывает права; c1 после отзыва: `try 'designate, revoked': … None`, `commands sent=0` (прогон 4500 тиков: `-Ticks 4500`).
 2. Строки `summary:` у обоих одинаковы: разметка второй попытки есть (`blueprints` больше нуля), `drafted=0`.
 3. Файлы хешей совпадают; сервер не сообщает о расхождении и об отклонённых командах (до сервера они не дошли).
 
