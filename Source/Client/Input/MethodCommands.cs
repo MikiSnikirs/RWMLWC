@@ -151,7 +151,8 @@ public static class MethodCommands
         {
             ValueCodec.TryPawnPart(instance, out pawn, out _);
         }
-        Map? map = pawn?.MapHeld ?? (instance as BillStack)?.billGiver?.Map ?? (instance as Bill)?.Map ?? Find.CurrentMap;
+        Map? map = pawn?.MapHeld ?? (instance as BillStack)?.billGiver?.Map ?? (instance as Bill)?.Map
+            ?? ((instance as StorageSettings)?.owner as Zone)?.Map ?? ((instance as StorageSettings)?.owner as Thing)?.MapHeld ?? Find.CurrentMap;
         if (map == null && Find.Maps.Count > 0)
         {
             map = Find.Maps[0];

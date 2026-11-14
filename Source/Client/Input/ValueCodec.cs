@@ -43,6 +43,7 @@ public static class ValueCodec
     private const byte KStoreSettings = 26;
     private const byte KDefList = 27;
     private const byte KSlotGroup = 28;
+    private const byte KPlaySettings = 29;
 
     // Чей это фильтр: зоны-склада, вещи с настройками хранения, счёта, политики.
     private const byte OwnerZone = 1;
@@ -271,6 +272,8 @@ public static class ValueCodec
             }
             case KResearchManager:
                 return Find.ResearchManager;
+            case KPlaySettings:
+                return Find.PlaySettings;
             case KSlotGroup:
             {
                 bool isZone = r.ReadBool();
@@ -346,6 +349,9 @@ public static class ValueCodec
                 return true;
             case ResearchManager:
                 w.WriteByte(KResearchManager);
+                return true;
+            case PlaySettings:
+                w.WriteByte(KPlaySettings);
                 return true;
             case ThingFilter filter:
                 return TryWriteFilter(w, filter);
