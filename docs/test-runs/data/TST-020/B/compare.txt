@@ -1,0 +1,4 @@
+A: # RWMLWC determinism run; startTick=14998; duration=3000; interval=250; sessionSeed=7; scenario=designate
+B: # RWMLWC determinism run; startTick=14998; duration=3000; interval=250; sessionSeed=7; scenario=designate
+замеров: A=624, B=624, общих=624
+ХЕШИ: совпадают на всех общих замерах
