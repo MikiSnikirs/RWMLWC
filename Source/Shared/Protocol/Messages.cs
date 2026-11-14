@@ -22,6 +22,8 @@ public enum MessageType : ushort
     GrantPermission = 11,
     Permissions = 12,
     CommandRejected = 13,
+    Notice = 14,
+    SnapshotApplied = 15,
 }
 
 /// <summary>
@@ -78,6 +80,10 @@ public sealed class HelloMessage : Message
     public string PlayerName = "";
     /// <summary>Хеш списка модов и их версий. Как он считается — решает клиент; сервер только сравнивает.</summary>
     public ulong ModListHash;
+    /// <summary>Мир локальной копии сейва у игрока (<c>WorldInfo.persistentRandomValue</c>); 0 — копии нет (T-044, v2).</summary>
+    public ulong SaveWorldId;
+    /// <summary>Номер ревизии локальной копии, выданный сервером при сохранении (T-044, v2); 0 — нет.</summary>
+    public ulong SaveRevision;
 
     public override void Write(PacketWriter w)
     {
@@ -86,6 +92,8 @@ public sealed class HelloMessage : Message
         w.WriteString(GameVersion);
         w.WriteString(PlayerName);
         w.WriteUInt64(ModListHash);
+        w.WriteUInt64(SaveWorldId);
+        w.WriteUInt64(SaveRevision);
     }
 
     internal static HelloMessage Read(ref PacketReader r) => new()
@@ -95,6 +103,8 @@ public sealed class HelloMessage : Message
         GameVersion = r.ReadString(),
         PlayerName = r.ReadString(),
         ModListHash = r.ReadUInt64(),
+        SaveWorldId = r.ReadUInt64(),
+        SaveRevision = r.ReadUInt64(),
     };
 }
 
@@ -109,12 +119,18 @@ public sealed class WelcomeMessage : Message
     public int ServerTick;
     /// <summary>Зерно сессии: от него клиент считает начальные состояния <c>Rand</c> карт (<c>PerMapSim.SessionSeed</c>).</summary>
     public uint SessionSeed;
+    /// <summary>Мир, который хранит сервер; 0 — сервер ещё не получал сейв (T-044, v2).</summary>
+    public ulong SaveWorldId;
+    /// <summary>Последняя ревизия сейва на сервере; 0 — нет (T-044, v2).</summary>
+    public ulong SaveRevision;
 
     public override void Write(PacketWriter w)
     {
         w.WriteInt32(PlayerId);
         w.WriteInt32(ServerTick);
         w.WriteUInt32(SessionSeed);
+        w.WriteUInt64(SaveWorldId);
+        w.WriteUInt64(SaveRevision);
     }
 
     internal static WelcomeMessage Read(ref PacketReader r) => new()
@@ -122,6 +138,8 @@ public sealed class WelcomeMessage : Message
         PlayerId = r.ReadInt32(),
         ServerTick = r.ReadInt32(),
         SessionSeed = r.ReadUInt32(),
+        SaveWorldId = r.ReadUInt64(),
+        SaveRevision = r.ReadUInt64(),
     };
 }
 
@@ -477,5 +495,60 @@ public sealed class CommandRejectedMessage : Message
         MapId = r.ReadInt32(),
         Required = CommandMessage.ReadLevel(ref r),
         Had = CommandMessage.ReadLevel(ref r),
+    };
+}
+
+/// <summary>Вид сообщения <see cref="NoticeMessage"/>.</summary>
+public enum NoticeCode : ushort
+{
+    Info = 0,
+    /// <summary>У игрока копия сейва новее, чем на сервере: сервер, вероятно, запущен со старой копии (T-044).</summary>
+    NewerSaveOnClient = 1,
+    /// <summary>У игрока копия другого мира.</summary>
+    DifferentWorld = 2,
+}
+
+/// <summary>Сервер → клиенту: предупреждение или сведение для показа игроку; соединение не рвёт.</summary>
+public sealed class NoticeMessage : Message
+{
+    public override MessageType Type => MessageType.Notice;
+
+    public NoticeCode Code;
+    public string Text = "";
+
+    public override void Write(PacketWriter w)
+    {
+        w.WriteUInt16((ushort)Code);
+        w.WriteString(Text);
+    }
+
+    internal static NoticeMessage Read(ref PacketReader r) => new()
+    {
+        Code = (NoticeCode)r.ReadUInt16(),
+        Text = r.ReadString(),
+    };
+}
+
+/// <summary>
+/// Клиент → сервер: снимок загружен, клиент готов тикать с <see cref="Tick"/>. Сервер возобновляет тики,
+/// когда подтвердили все, кто загружает снимок (правило «загружают все», запись A 15:10; поток — T-032/T-034/T-045).
+/// </summary>
+public sealed class SnapshotAppliedMessage : Message
+{
+    public override MessageType Type => MessageType.SnapshotApplied;
+
+    public int SnapshotId;
+    public int Tick;
+
+    public override void Write(PacketWriter w)
+    {
+        w.WriteInt32(SnapshotId);
+        w.WriteInt32(Tick);
+    }
+
+    internal static SnapshotAppliedMessage Read(ref PacketReader r) => new()
+    {
+        SnapshotId = r.ReadInt32(),
+        Tick = r.ReadInt32(),
     };
 }

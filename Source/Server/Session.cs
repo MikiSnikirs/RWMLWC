@@ -249,6 +249,11 @@ public sealed class Session
                 Grant(player, grant);
                 break;
 
+            case SnapshotAppliedMessage applied:
+                // Поток «снимок → все загружают → все подтвердили → тики дальше» — T-032/T-034/T-045.
+                _log($"игрок {player.Id}: снимок {applied.SnapshotId} применён, тик {applied.Tick}");
+                break;
+
             case SpeedRequestMessage s:
                 player.RequestedSpeed = Math.Min(s.Speed, (byte)4);
                 UpdateSpeed();

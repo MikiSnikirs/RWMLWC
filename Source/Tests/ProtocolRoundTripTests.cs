@@ -30,6 +30,10 @@ public class ProtocolRoundTripTests
         yield return new object[] { new PermissionsMessage { Maps = {
             new MapPermissions { MapId = 0, OwnerPlayerId = 1, Grants = { new(2, PermissionLevel.Build), new(3, PermissionLevel.Full) } },
             new MapPermissions { MapId = 7, OwnerPlayerId = 2 } } } };
+        yield return new object[] { new HelloMessage { PlayerName = "B", SaveWorldId = 0x1234_5678_9ABC, SaveRevision = 42 } };
+        yield return new object[] { new WelcomeMessage { PlayerId = 1, SaveWorldId = 77, SaveRevision = ulong.MaxValue } };
+        yield return new object[] { new NoticeMessage { Code = NoticeCode.NewerSaveOnClient, Text = "У игрока сейв новее" } };
+        yield return new object[] { new SnapshotAppliedMessage { SnapshotId = 3, Tick = 20000 } };
         yield return new object[] { new CommandRejectedMessage { ClientSeq = 9, MapId = 0, Required = PermissionLevel.Full, Had = PermissionLevel.Build } };
     }
 
