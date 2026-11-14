@@ -108,6 +108,8 @@ internal static class Patch_TickManager_DoSingleTick
         {
             MapRandContext.BeginTick();
             RandTracer.BeginTick();
+            // Сценарий тестового прогона исполняется уже в контексте симуляции.
+            TestAutomation.ApplyScenarioIfPending();
         }
     }
 
