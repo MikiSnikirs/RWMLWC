@@ -196,3 +196,67 @@ public sealed class ConnectionCodeTests
         Assert.False(RWMLWC.Net.ConnectionCode.TryParse(text, out _, out _, out _));
     }
 }
+
+public sealed class ServerOpsTests : IDisposable
+{
+    private readonly string _dir = Path.Combine(Path.GetTempPath(), "rwmlwc-ops-" + Guid.NewGuid().ToString("N"));
+
+    public void Dispose()
+    {
+        try { Directory.Delete(_dir, true); } catch { }
+    }
+
+    [Fact]
+    public void KeepCopiesIsConfigurable()
+    {
+        var store = new SaveStore(_dir, keepCopies: 2);
+        for (int t = 1; t <= 4; t++) store.Store(7, 1000 * t, new byte[] { (byte)t });
+        Assert.Equal(new[] { 3000, 4000 }, store.List().Select(c => c.Tick));
+    }
+
+    [Fact]
+    public void BackupsAreMadeOncePerIntervalAndOldOnesRemoved()
+    {
+        var store = new SaveStore(_dir) { BackupInterval = TimeSpan.FromHours(24), KeepBackups = 2 };
+        SaveCopy c = store.Store(7, 1000, new byte[] { 1 }); // первая копия — сразу резервная
+        Assert.Single(store.Backups());
+        Assert.Null(store.MaybeBackup(c, c.SavedUtc.AddHours(1)));      // рано
+        Assert.NotNull(store.MaybeBackup(c, c.SavedUtc.AddHours(25)));  // сутки прошли
+        Assert.NotNull(store.MaybeBackup(c, c.SavedUtc.AddHours(50)));
+        Assert.Equal(2, store.Backups().Count);                         // хранится 2
+        Assert.All(store.Backups(), b => Assert.True(File.Exists(Path.ChangeExtension(b, ".meta"))));
+    }
+
+    [Fact]
+    public void NoBackupsWhenDisabled()
+    {
+        var store = new SaveStore(_dir);
+        store.Store(7, 1000, new byte[] { 1 });
+        Assert.Empty(store.Backups());
+    }
+
+    [Fact]
+    public void WhitelistRejectsOtherNamesIgnoringCase()
+    {
+        var s = new Session(new SessionOptions { AllowedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Miki", "Друг" } });
+        foreach (var (name, ok) in new[] { ("miki", true), ("друг", true), ("Чужой", false) })
+        {
+            var (client, server) = InMemoryConnection.CreatePair(name, "server");
+            s.Accept(server);
+            client.Send(new HelloMessage { PlayerName = name, GameVersion = "1.7.5005", ModListHash = 7 });
+            s.Pump();
+            client.TryReceive(out Message first);
+            if (ok) Assert.IsType<WelcomeMessage>(first);
+            else Assert.Contains("нет в списке", Assert.IsType<RejectMessage>(first).Detail);
+        }
+    }
+
+    [Fact]
+    public void EmptyServerDoesNotTick()
+    {
+        var s = new Session(new SessionOptions { StartTick = 100 });
+        s.Advance(TimeSpan.FromMinutes(5));
+        Assert.Equal(100, s.TickUpTo);
+        Assert.Equal(0, s.Speed);
+    }
+}
