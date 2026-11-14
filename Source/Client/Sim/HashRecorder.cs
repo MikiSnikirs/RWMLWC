@@ -25,6 +25,9 @@ public sealed class HashRecorder : GameComponent
     private int startTick;
     private int endTick;
     private string? filePath;
+    private string scenarioName = "none";
+    private int denseFrom;
+    private int denseTo = DenseTicks;
     private readonly StringBuilder buffer = new StringBuilder();
 
     // Диагностика поворотов в первых тиках прогона (по одной карте — первой).
@@ -45,7 +48,7 @@ public sealed class HashRecorder : GameComponent
     /// <summary>Файл-метка: пока он существует, каждый загруженный сейв начинает прогон сам.</summary>
     public static string ArmFilePath => Path.Combine(GenFilePaths.SaveDataFolderPath, "RWMLWC", "arm-determinism-run.txt");
 
-    public static bool Armed => File.Exists(ArmFilePath);
+    public static bool Armed => TestAutomation.Read().armed;
 
     public static void SetArmed(bool armed)
     {
@@ -53,11 +56,12 @@ public sealed class HashRecorder : GameComponent
         if (armed)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            File.WriteAllText(path, "Delete this file to stop automatic determinism runs on game load.");
+            File.WriteAllText(path, "# RWMLWC: automatic determinism run on game load. Keys: see TestAutomation.cs\narmed=1\n");
         }
         else if (File.Exists(path))
         {
-            File.Delete(path);
+            // Перезапись вместо удаления: агенту на машине игрока удаление файлов может быть запрещено.
+            File.WriteAllText(path, "armed=0\n");
         }
     }
 
@@ -77,7 +81,9 @@ public sealed class HashRecorder : GameComponent
         pendingStart = null;
         if (ReferenceEquals(recorder, Instance))
         {
-            recorder.StartDeterminismRun(AutoRunTicks);
+            TestAutomation.Config cfg = TestAutomation.Read();
+            recorder.StartDeterminismRun(cfg.ticks, cfg.scenario, cfg.trace, cfg.denseFrom, cfg.denseTo);
+            TestAutomation.OnRunStarted(cfg, recorder.startTick, recorder.filePath);
             Log.Message("[RWMLWC] determinism run auto-started at tick " + recorder.startTick + ": " + recorder.filePath);
         }
     }
@@ -94,8 +100,10 @@ public sealed class HashRecorder : GameComponent
     /// Начать прогон: включить раздельную симуляцию, привести все состояния Rand к известным значениям
     /// и писать хеши <paramref name="durationTicks"/> тиков.
     /// </summary>
-    public void StartDeterminismRun(int durationTicks)
+    public void StartDeterminismRun(int durationTicks, string scenario = "none", bool trace = true, int denseFromTick = 0, int denseToTick = DenseTicks)
     {
+        denseFrom = denseFromTick;
+        denseTo = denseToTick;
         PerMapSim.SetEnabled(true);
         MapRandContext.SetGlobalState(TestGlobalRandState);
 
@@ -108,6 +116,7 @@ public sealed class HashRecorder : GameComponent
                 state.frozen = false;
                 state.randState = state.InitialRandState();
                 state.randInitialized = true;
+                state.nextThingId = 0;
             }
         }
 
@@ -117,13 +126,17 @@ public sealed class HashRecorder : GameComponent
         Directory.CreateDirectory(dir);
         string stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
         filePath = Path.Combine(dir, "hash-" + stamp + ".txt");
+        scenarioName = scenario;
         DumpThingsAtStart(dir, stamp);
         rotLogPath = Path.Combine(dir, "rotlog-" + stamp + ".txt");
         rotBuffer.Clear();
         lastRot.Clear();
-        RandTracer.Start(Path.Combine(dir, "randtrace-" + stamp + ".txt"), startTick, DenseTicks);
+        if (trace)
+        {
+            RandTracer.Start(Path.Combine(dir, "randtrace-" + stamp + ".txt"), startTick + denseFrom, startTick + denseTo);
+        }
         buffer.Clear();
-        buffer.AppendLine($"# RWMLWC determinism run; startTick={startTick}; duration={durationTicks}; interval={Interval}; sessionSeed={PerMapSim.SessionSeed}");
+        buffer.AppendLine($"# RWMLWC determinism run; startTick={startTick}; duration={durationTicks}; interval={Interval}; sessionSeed={PerMapSim.SessionSeed}; scenario={scenario}");
         recording = true;
         WriteSample();
     }
@@ -139,6 +152,11 @@ public sealed class HashRecorder : GameComponent
         Flush();
     }
 
+    public override void GameComponentUpdate()
+    {
+        TestAutomation.KeepRunning();
+    }
+
     public override void GameComponentTick()
     {
         if (!recording)
@@ -147,7 +165,7 @@ public sealed class HashRecorder : GameComponent
         }
         int tick = Find.TickManager.TicksGame;
         int elapsed = tick - startTick;
-        if (elapsed <= DenseTicks || elapsed % Interval == 0)
+        if ((elapsed >= denseFrom && elapsed <= denseTo) || elapsed % Interval == 0)
         {
             WriteSample();
         }
@@ -156,6 +174,7 @@ public sealed class HashRecorder : GameComponent
             Stop();
             Log.Message("[RWMLWC] determinism run finished: " + filePath);
             Messages.Message("[RWMLWC] determinism run finished", RimWorld.MessageTypeDefOf.NeutralEvent, false);
+            TestAutomation.OnRunFinished(filePath);
         }
     }
 
@@ -189,7 +208,7 @@ public sealed class HashRecorder : GameComponent
             MapStateHash hash = MapStateHasher.Compute(map);
             buffer.AppendLine($"{tick};map{map.uniqueID};{hash}");
         }
-        if (tick - startTick <= DenseTicks && maps.Count > 0)
+        if (tick - startTick >= denseFrom && tick - startTick <= denseTo && maps.Count > 0)
         {
             MapStateHasher.LogRotationChanges(maps[0], tick, lastRot, rotBuffer);
         }

@@ -126,6 +126,11 @@ public static class MapStateHasher
         {
             result.rand = ReferenceEquals(MapRandContext.Current, map) ? MapRandContext.CurrentRawState : sim.randState;
         }
+        else if (PerMapSim.Enabled && sim != null)
+        {
+            // Карта ещё ни разу не тикала (например, заморожена с рождения): её Rand — начальный.
+            result.rand = sim.InitialRandState();
+        }
         else
         {
             result.rand = MapRandContext.GlobalState;
