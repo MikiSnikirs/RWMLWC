@@ -752,6 +752,14 @@ public static class LockstepClient
             }
             hash.Add(-1);
         }
+        // Язык игры тоже должен совпадать: тексты (имена, описания предметов искусства, названия заданий)
+        // собираются из правил активного языка через Rand, и у разных языков число вызовов разное.
+        string language = LanguageDatabase.activeLanguage?.folderName ?? "";
+        for (int i = 0; i < language.Length; i++)
+        {
+            hash.Add((int)language[i]);
+        }
+        hash.Add(-2);
         return hash.Value;
     }
 }
