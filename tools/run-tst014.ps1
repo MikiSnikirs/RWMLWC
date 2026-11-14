@@ -152,9 +152,12 @@ for ($c = 1; $c -le $Clients; $c++) {
     if ($DenseFrom -ge 0 -and $DenseTo -gt $DenseFrom) { $arm += "densefrom=$DenseFrom"; $arm += "denseto=$DenseTo" }
     [IO.File]::WriteAllLines((Join-Path $dir 'RWMLWC\arm-determinism-run.txt'), $arm)
     [IO.File]::WriteAllText((Join-Path $dir 'RWMLWC\automation-progress.txt'), '0')
-    $procs += Start-Process $exe -ArgumentList "-savedatafolder=$dir" -WorkingDirectory $game -PassThru
+    # Without taking focus from the person's own game (tools/StartQuiet.ps1).
+    . (Join-Path $PSScriptRoot 'StartQuiet.ps1')
+    $procs += Start-GameQuiet $exe "-savedatafolder=$dir" $game
     Write-Host "client c$c pid $($procs[-1].Id), data $dir"
 }
+foreach ($p in $procs) { [void](Show-GameQuiet $p) }
 
 Step "Waiting for the game to close itself (up to $TimeoutMin min)"
 $deadline = (Get-Date).AddMinutes($TimeoutMin)
