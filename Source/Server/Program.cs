@@ -1,6 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using RWMLWC.Net;
@@ -10,8 +14,9 @@ using RWMLWC.Shared.Protocol;
 namespace RWMLWC.Server;
 
 /// <summary>
-/// Лёгкий сервер: хранит сейв, ведёт общие часы, упорядочивает команды. Игру не симулирует.
+/// Выделенный сервер (T-058): хранит копии мира, ведёт общие часы, упорядочивает команды. Игру не симулирует.
 /// Сессия — <see cref="Session"/> (T-013). Режим <c>--echo</c> — для проверки транспорта (TST-012).
+/// Команды консоли — <c>help</c>.
 /// </summary>
 internal static class Program
 {
@@ -21,8 +26,9 @@ internal static class Program
         Console.OutputEncoding = System.Text.Encoding.UTF8;
         Console.WriteLine($"RWMLWC server, protocol v{ProtocolInfo.ProtocolVersion}");
 
-        int port = 0;
+        int port = DefaultPort;
         string dataDir = "server-data";
+        string? publicHost = null;
         bool echo = false;
         int startTick = 0;
         uint? seed = null;
@@ -35,9 +41,10 @@ internal static class Program
                 case "--echo": echo = true; break;
                 case "--start-tick": startTick = int.Parse(args[++i]); break;
                 case "--seed": seed = uint.Parse(args[++i]); break;
+                case "--public-host": publicHost = args[++i]; break;
                 default:
                     Console.Error.WriteLine($"Неизвестный аргумент: {args[i]}");
-                    Console.Error.WriteLine("Использование: RWMLWC.Server [--port N] [--data папка] [--start-tick T] [--seed S] [--echo]");
+                    Console.Error.WriteLine($"Использование: RWMLWC.Server [--port N (по умолчанию {DefaultPort}; 0 — любой)] [--data папка] [--public-host адрес] [--start-tick T] [--seed S] [--echo]");
                     return 2;
             }
         }
@@ -77,10 +84,115 @@ internal static class Program
             StartTick = startTick,
             SessionSeed = seed ?? (uint)System.Security.Cryptography.RandomNumberGenerator.GetInt32(int.MaxValue),
             Store = store,
+            Dedicated = true,
         };
         Console.WriteLine($"SESSION startTick={options.StartTick} seed={options.SessionSeed}");
+        PrintConnectionCodes(server.LocalEndPoint.Port, ServerCertificate.Thumbprint(cert), publicHost);
         var host = new SessionHost(new Session(options, Console.WriteLine));
+        _ = Task.Run(() => ConsoleLoop(host, store, stop));
         await host.RunAsync(server, stop.Token, Console.WriteLine);
+        Console.WriteLine("сервер остановлен");
         return 0;
+    }
+
+    /// <summary>Порт выделенного сервера по умолчанию (UDP: QUIC).</summary>
+    public const int DefaultPort = 47800;
+
+    private static void PrintConnectionCodes(int port, string thumbprint, string? publicHost)
+    {
+        Console.WriteLine("Код подключения (в игре: «Сетевая игра» → «Подключиться к серверу»):");
+        if (publicHost != null)
+        {
+            Console.WriteLine("  через интернет: " + ConnectionCode.Format(publicHost, port, thumbprint));
+        }
+        foreach (IPAddress ip in LocalAddresses())
+            Console.WriteLine("  в локальной сети: " + ConnectionCode.Format(ip.ToString(), port, thumbprint));
+        if (publicHost == null)
+            Console.WriteLine($"  через интернет: укажите внешний адрес (--public-host) и пробросьте UDP-порт {port} на роутере.");
+    }
+
+    private static IEnumerable<IPAddress> LocalAddresses()
+    {
+        var result = new List<IPAddress>();
+        try
+        {
+            foreach (NetworkInterface ni in NetworkInterface.GetAllNetworkInterfaces())
+            {
+                if (ni.OperationalStatus != OperationalStatus.Up || ni.NetworkInterfaceType == NetworkInterfaceType.Loopback) continue;
+                foreach (UnicastIPAddressInformation a in ni.GetIPProperties().UnicastAddresses)
+                    if (a.Address.AddressFamily == AddressFamily.InterNetwork) result.Add(a.Address);
+            }
+        }
+        catch (NetworkInformationException)
+        {
+        }
+        if (result.Count == 0) result.Add(IPAddress.Loopback);
+        return result;
+    }
+
+    private const string Help =
+        "Команды: status — состояние; players — игроки; say <текст> — сообщение в чат; " +
+        "kick <номер> — отключить игрока; saves — копии мира; stop — остановить сервер; help — эта справка.";
+
+    /// <summary>Команды администратора из консоли. Действия над сессией выполняются в её потоке.</summary>
+    private static void ConsoleLoop(SessionHost host, SaveStore store, CancellationTokenSource stop)
+    {
+        Console.WriteLine(Help);
+        while (!stop.IsCancellationRequested)
+        {
+            string? line;
+            try
+            {
+                line = Console.ReadLine();
+            }
+            catch (IOException)
+            {
+                return;
+            }
+            if (line == null) return; // ввода нет (запуск без консоли) — сервер работает дальше
+            line = line.Trim();
+            if (line.Length == 0) continue;
+            int space = line.IndexOf(' ');
+            string cmd = (space < 0 ? line : line.Substring(0, space)).ToLowerInvariant();
+            string arg = space < 0 ? "" : line.Substring(space + 1).Trim();
+            switch (cmd)
+            {
+                case "help":
+                    Console.WriteLine(Help);
+                    break;
+                case "status":
+                    host.Post(s => Console.WriteLine(
+                        $"тик {s.TickUpTo}, скорость {s.Speed}, игроков в сети {s.Players.Count(p => p.Online)} из {s.Players.Count}, " +
+                        (store.Latest is { } l ? $"копия мира: тик {l.Tick}, {l.SavedUtc.ToLocalTime():g}" : "копии мира нет")));
+                    break;
+                case "players":
+                    host.Post(s =>
+                    {
+                        if (s.Players.Count == 0) Console.WriteLine("игроков не было");
+                        foreach (Session.Player p in s.Players)
+                            Console.WriteLine($"  {p.Id}. {p.Name} — {(p.Online ? $"в сети, пинг {p.Connection.RoundTripMs} мс" : "не в сети")}");
+                    });
+                    break;
+                case "say":
+                    host.Post(s => s.ServerChat(arg));
+                    break;
+                case "kick":
+                    if (!int.TryParse(arg, out int id)) { Console.WriteLine("kick <номер игрока>"); break; }
+                    host.Post(s => { if (!s.Kick(id, "администратор")) Console.WriteLine($"игрока {id} нет в сети"); });
+                    break;
+                case "saves":
+                    foreach (SaveCopy c in store.List())
+                        Console.WriteLine($"  мир {c.WorldId:X16}, тик {c.Tick}, {c.SavedUtc.ToLocalTime():g}, {c.Size} байт");
+                    break;
+                case "stop":
+                case "exit":
+                case "quit":
+                    stop.Cancel();
+                    return;
+                default:
+                    Console.WriteLine("неизвестная команда. " + Help);
+                    break;
+            }
+        }
     }
 }
