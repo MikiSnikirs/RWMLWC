@@ -1,0 +1,23 @@
+2026-11-14 18:02:37 autoload: loading save 'tst014'
+2026-11-14 18:02:47 lockstep: connecting to 127.0.0.1:62990 as 'c1'
+2026-11-14 18:02:48 lockstep: connected to quic:127.0.0.1:62990, Hello sent
+2026-11-14 18:02:49 lockstep: Welcome, playerId=2, serverTick=14998, seed=7
+2026-11-14 18:03:49 lockstep: hold is over, requesting speed 3
+2026-11-14 18:03:49 run started: #0, tick=14998, scenario=access, ticks=3000, trace=False, quit=True, file=hash-c1-20261114-180349.txt
+2026-11-14 18:03:54 access: try 'designate, no rights': my level on map 0 is Build, owner 1
+2026-11-14 18:03:54 designate: tick=15540, cut=961 cells, wall=10+1, zone=49, hunt=газель; captured=5, sent=5
+2026-11-14 18:03:54 access: try 'designate, no rights': commands sent=5
+2026-11-14 18:03:54 access: try 'designate, Build': my level on map 0 is Build, owner 1
+2026-11-14 18:03:54 designate: tick=15900, cut=961 cells, wall=10+1, zone=49, hunt=газель; captured=10, sent=10
+2026-11-14 18:03:54 access: try 'designate, Build': commands sent=5
+2026-11-14 18:03:54 access: try 'draft, Build': my level on map 0 is Build, owner 1
+2026-11-14 18:03:54 gizmo: draft Ross (id 231): sent=True
+2026-11-14 18:03:54 access: try 'draft, Build': commands sent=0
+2026-11-14 18:03:57 summary: map0 drafted=0 forbidden=56 plants=[]
+2026-11-14 18:03:57 summary: map0 jobs=[231:Wait_Wander@(135, 0, 134),234:GotoWander@(128, 0, 134),239:CutPlantDesignated@(131, 0, 139)]
+2026-11-14 18:03:57 summary: map0 settings=0C418F9892DD0219
+2026-11-14 18:03:57 summary: map0 designations=450 blueprints=11 zones=1; commands sent=10 executed=10 failed=0
+2026-11-14 18:03:57 run finished: file=hash-c1-20261114-180349.txt
+2026-11-14 18:03:57 queue: finished
+2026-11-14 18:03:57 lockstep: disconnect: прогон завершён
+2026-11-14 18:03:57 quitting game

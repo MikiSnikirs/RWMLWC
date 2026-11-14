@@ -1,0 +1,16 @@
+2026-11-14 18:07:32 autoload: loading save 'tst014'
+2026-11-14 18:07:42 lockstep: connecting to 127.0.0.1:59282 as 'c2'
+2026-11-14 18:07:43 lockstep: connected to quic:127.0.0.1:59282, Hello sent
+2026-11-14 18:07:43 lockstep: Welcome, playerId=1, serverTick=14998, seed=7
+2026-11-14 18:08:43 lockstep: hold is over, requesting speed 3
+2026-11-14 18:08:44 run started: #0, tick=14998, scenario=access, ticks=3000, trace=False, quit=True, file=hash-c2-20261114-180844.txt
+2026-11-14 18:08:48 access: player 1 claims map 0
+2026-11-14 18:08:49 access: owner of map 0 is 1; granting Build to player 2
+2026-11-14 18:08:52 summary: map0 drafted=0 forbidden=56 plants=[]
+2026-11-14 18:08:52 summary: map0 jobs=[231:GotoWander@(134, 0, 131),234:Wait_Wander@(125, 0, 137),239:CutPlantDesignated@(131, 0, 139)]
+2026-11-14 18:08:52 summary: map0 settings=0C418F9892DD0219
+2026-11-14 18:08:52 summary: map0 designations=450 blueprints=11 zones=1; commands sent=0 executed=5 failed=0
+2026-11-14 18:08:52 run finished: file=hash-c2-20261114-180844.txt
+2026-11-14 18:08:52 queue: finished
+2026-11-14 18:08:52 lockstep: disconnect: прогон завершён
+2026-11-14 18:08:52 quitting game
