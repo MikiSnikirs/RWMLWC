@@ -10,7 +10,7 @@ namespace RWMLWC.Client.Net;
 
 /// <summary>
 /// Пункты сетевой игры в меню игры (без режима разработчика):
-/// главное меню — «Подключиться к другу (Steam)»; меню паузы — «Открыть сессию для друзей»,
+/// главное меню — «Сетевая игра» (окно выбора, T-058); меню паузы — «Открыть сессию для друзей»,
 /// «Остановить сессию» у хоста, «Отключиться» у гостя.
 /// </summary>
 internal static class SessionMenu
@@ -28,7 +28,7 @@ internal static class SessionMenu
         if (Current.ProgramState == ProgramState.Entry)
         {
             if (st == LockstepClient.State.Off)
-                yield return new ListableOption("Подключиться к другу (Steam)", () => Find.WindowStack.Add(new Dialog_SteamJoin()));
+                yield return new ListableOption("Сетевая игра", () => Find.WindowStack.Add(new Dialog_NetworkGame()));
             yield break;
         }
         if (Current.ProgramState != ProgramState.Playing) yield break;

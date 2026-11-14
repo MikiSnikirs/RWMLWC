@@ -26,6 +26,13 @@ public sealed class SessionOptions
 
     /// <summary>Предел размера одного собираемого снимка мира.</summary>
     public long MaxSnapshotBytes = 512L * 1024 * 1024;
+
+    /// <summary>
+    /// Выделенный сервер (T-058): мира в процессе нет ни у кого постоянно. Когда в сессии никого нет,
+    /// часы встают на тик мира, с которым придёт первый игрок: копия на сервере или его сейв, если он новее.
+    /// Игроку без мира, который входит в пустую сессию, сервер сам отдаёт сохранённую копию.
+    /// </summary>
+    public bool Dedicated;
 }
 
 /// <summary>
@@ -43,6 +50,15 @@ public sealed class Session
     public const int TicksPerSecondAtSpeed1 = 60;
 
     private static readonly int[] SpeedMultiplier = { 0, 1, 3, 6, 15 };
+
+    /// <summary>
+    /// Вид команды «пришлите мне мир» (клиент A: <c>LockstepClient.RequestSnapshotKind</c>). Номер снимка,
+    /// который ждёт просивший, — <c>Seq &amp; 0x7FFFFFFF</c> этой команды в общем порядке.
+    /// </summary>
+    public const int RequestWorldSnapshotKind = 100;
+
+    /// <summary>Номер игрока-«автора» сообщений самого сервера (чат из консоли).</summary>
+    public const int ServerPlayerId = 0;
 
     private readonly SessionOptions _options;
     private readonly List<Pending> _pending = new();
@@ -93,7 +109,8 @@ public sealed class Session
     }
 
     /// <summary>
-    /// Клиентам разрешено дотикать до этого тика включительно. Растёт только вперёд.
+    /// Клиентам разрешено дотикать до этого тика включительно. Растёт только вперёд; исключение —
+    /// пустая выделенная сессия, где часы встают на тик мира следующего игрока (T-058).
     /// Команда, принятая сейчас, исполняется после тика <see cref="TickUpTo"/>.
     /// </summary>
     public int TickUpTo { get; private set; }
@@ -267,6 +284,19 @@ public sealed class Session
             return;
         }
 
+        // Выделенный сервер, сессия пуста: выбрать тик мира до Welcome (до создания игрока — он ещё не в сети).
+        if (_options.Dedicated && !_players.Any(p => p.Online))
+        {
+            string? why = AlignEmptySession(hello);
+            if (why != null)
+            {
+                _log($"отказ {connection.Remote} ({hello.PlayerName}): {why}");
+                connection.Send(new RejectMessage { Reason = RejectReason.Other, Detail = why });
+                connection.Close("отказ: " + why);
+                return;
+            }
+        }
+
         _gameVersion ??= hello.GameVersion;
         _modListHash ??= hello.ModListHash;
 
@@ -323,9 +353,10 @@ public sealed class Session
                 }
                 // Исполняется всеми после тика TickUpTo: ни один клиент ещё не ушёл дальше него,
                 // а Tick с большим номером будет разослан только после этой команды.
+                long seq = _nextSeq++;
                 Broadcast(new CommandOrderedMessage
                 {
-                    Seq = _nextSeq++,
+                    Seq = seq,
                     Tick = TickUpTo,
                     PlayerId = player.Id,
                     ClientSeq = c.ClientSeq,
@@ -333,6 +364,7 @@ public sealed class Session
                     Kind = c.Kind,
                     Payload = c.Payload,
                 });
+                if (c.Kind == RequestWorldSnapshotKind) ServeStoredWorld(player, seq);
                 break;
 
             case MapClaimMessage claim:
@@ -565,6 +597,106 @@ public sealed class Session
         recent.Enqueue(_clockMs);
         _log($"чат {player.Id} «{player.Name}»: {text}");
         Broadcast(new ChatMessage { PlayerId = player.Id, Text = text });
+    }
+
+    /// <summary>
+    /// Пустая выделенная сессия: на какой тик встают часы. Новее — сейв игрока того же мира (его мир становится
+    /// миром сессии), иначе копия на сервере. Мира нет ни там, ни там — отказ. Возвращает причину отказа или null.
+    /// </summary>
+    private string? AlignEmptySession(HelloMessage hello)
+    {
+        SaveCopy? latest = _options.Store?.Latest;
+        bool playerHasWorld = hello.SaveWorldId != 0;
+        int tick;
+        string source;
+        if (playerHasWorld && (latest == null || (hello.SaveWorldId == latest.WorldId && hello.SaveTick > latest.Tick)))
+        {
+            tick = hello.SaveTick;
+            source = latest == null ? "сейв игрока (на сервере мира ещё нет)" : $"сейв игрока новее копии сервера ({latest.Tick})";
+        }
+        else if (latest != null)
+        {
+            tick = latest.Tick;
+            source = $"копия сервера {latest.WorldId:X16}";
+        }
+        else
+        {
+            return "на сервере ещё нет мира: первым должен войти игрок с загруженным сейвом";
+        }
+        if (tick != TickUpTo)
+        {
+            _log($"сессия пуста: часы {TickUpTo} → {tick} ({source})");
+            TickUpTo = tick;
+            _tickAccumulator = 0;
+            _hashes.Clear();
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Выделенный сервер: игрок просит мир, а отдать его некому (он в сети один) — отдаём копию сервера.
+    /// Куски — с номером, который ждёт клиент (<c>Seq &amp; 0x7FFFFFFF</c> его просьбы), и тиком копии.
+    /// </summary>
+    private void ServeStoredWorld(Player player, long requestSeq)
+    {
+        if (!_options.Dedicated || _players.Any(p => p.Online && p != player)) return;
+        SaveCopy? latest = _options.Store?.Latest;
+        if (latest == null) return;
+        if (latest.Tick != TickUpTo)
+        {
+            _log($"мир для игрока {player.Id} не отдан: копия на тике {latest.Tick}, часы на {TickUpTo}");
+            return;
+        }
+        byte[] data;
+        try
+        {
+            data = _options.Store!.Read(latest);
+        }
+        catch (Exception e)
+        {
+            _log($"мир для игрока {player.Id} не прочитан: {e.Message}");
+            return;
+        }
+        int id = unchecked((int)(requestSeq & 0x7FFFFFFF));
+        int size = ProtocolLimits.SnapshotChunkBytes;
+        int count = Math.Max(1, (data.Length + size - 1) / size);
+        for (int i = 0; i < count; i++)
+        {
+            int offset = i * size;
+            int length = Math.Min(size, data.Length - offset);
+            byte[] part = new byte[length];
+            Buffer.BlockCopy(data, offset, part, 0, length);
+            player.Connection.Send(new SnapshotChunkMessage
+            {
+                SnapshotId = id,
+                MapId = ProtocolIds.WorldMapId,
+                Tick = latest.Tick,
+                ChunkIndex = i,
+                ChunkCount = count,
+                Data = part,
+            });
+        }
+        _log($"игроку {player.Id} отдан мир с сервера: тик {latest.Tick}, {data.Length} байт, {count} кусков");
+    }
+
+    /// <summary>Сообщение в чат от сервера (консоль администратора).</summary>
+    public void ServerChat(string text)
+    {
+        text = (text ?? "").Trim();
+        if (text.Length == 0) return;
+        if (text.Length > ProtocolLimits.MaxChatChars) text = text.Substring(0, ProtocolLimits.MaxChatChars);
+        _log("чат сервера: " + text);
+        Broadcast(new ChatMessage { PlayerId = ServerPlayerId, Text = text });
+    }
+
+    /// <summary>Отключить игрока (консоль администратора). Номер и права сохраняются — он может вернуться.</summary>
+    public bool Kick(int playerId, string reason)
+    {
+        Player? p = _players.FirstOrDefault(x => x.Id == playerId && x.Online);
+        if (p == null) return false;
+        _log($"игрок {p.Id} «{p.Name}» отключён: {reason}");
+        p.Connection.Close("отключён сервером: " + reason);
+        return true;
     }
 
     /// <summary>Правило меньшей скорости: игра идёт на минимальной из скоростей игроков в сети; пауза любого — пауза всех.</summary>
