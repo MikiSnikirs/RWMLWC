@@ -26,7 +26,7 @@ internal static class SessionLongEvents
 
     private static int pending;
 
-    internal static void Wrap(ref Action action, ref bool doAsynchronously, ref Action<Exception> exceptionHandler)
+    internal static void Wrap(ref Action action, string textKey, ref bool doAsynchronously, ref Action<Exception> exceptionHandler)
     {
         if (!PerMapSim.Enabled || !(CommandBus.Executing || MapRandContext.InTick))
         {
@@ -45,7 +45,9 @@ internal static class SessionLongEvents
             try
             {
                 MapRandContext.Enter(null);
+                TestAutomation.Note($"long event '{textKey}' start, maps {Find.Maps.Count}");
                 inner();
+                TestAutomation.Note($"long event '{textKey}' done, maps {Find.Maps.Count}");
             }
             finally
             {
@@ -69,8 +71,8 @@ internal static class SessionLongEvents
     new[] { typeof(Action), typeof(string), typeof(bool), typeof(Action<Exception>), typeof(bool), typeof(bool), typeof(Action) })]
 internal static class Patch_LongEventHandler_QueueLongEvent_Session
 {
-    private static void Prefix(ref Action action, ref bool doAsynchronously, ref Action<Exception> exceptionHandler)
+    private static void Prefix(ref Action action, string textKey, ref bool doAsynchronously, ref Action<Exception> exceptionHandler)
     {
-        SessionLongEvents.Wrap(ref action, ref doAsynchronously, ref exceptionHandler);
+        SessionLongEvents.Wrap(ref action, textKey, ref doAsynchronously, ref exceptionHandler);
     }
 }

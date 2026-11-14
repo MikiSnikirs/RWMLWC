@@ -580,6 +580,12 @@ public static class TestAutomation
                 case "absence-raid":
                     ScenarioAbsenceRaid();
                     break;
+                case "settle-adjacent":
+                    ScenarioSettle(adjacent: true);
+                    break;
+                case "settle-valid":
+                    ScenarioSettle(adjacent: false);
+                    break;
                 case "ui":
                 case "access":
                 case "tabs":
@@ -1564,6 +1570,37 @@ public static class TestAutomation
         Note("absence-raid: offline owner, raid fired=" + FireRaidViaStoryteller(map));
         RWMLWC.Client.Maps.PlayerPresence.Component?.Apply(7, true);
         Note("absence-raid: owner back, raid fired=" + FireRaidViaStoryteller(map));
+    }
+
+    // T-073: «основать поселение» караваном из одного колониста — на соседней с колонией клетке (как самопроверка B)
+    // или на клетке, которую игра считает подходящей для поселения. Без сервера — поведение самой игры.
+    private static void ScenarioSettle(bool adjacent)
+    {
+        Map home = Find.Maps[0];
+        Pawn? pawn = home.mapPawns.FreeColonistsSpawned.OrderBy(p => p.thingIDNumber).FirstOrDefault();
+        if (pawn == null)
+        {
+            Note("settle: no colonist");
+            return;
+        }
+        RimWorld.Planet.PlanetTile tile = RimWorld.Planet.PlanetTile.Invalid;
+        if (adjacent)
+        {
+            List<RimWorld.Planet.PlanetTile> neighbors = new List<RimWorld.Planet.PlanetTile>();
+            Find.WorldGrid.GetTileNeighbors(home.Tile, neighbors);
+            tile = neighbors.OrderBy(t => t.tileId).FirstOrDefault(t => !Find.WorldObjects.AnyWorldObjectAt(t));
+        }
+        else
+        {
+            tile = RimWorld.Planet.TileFinder.RandomSettlementTileFor(Faction.OfPlayer);
+        }
+        string valid = tile.Valid ? RimWorld.Planet.TileFinder.IsValidTileForNewSettlement(tile).ToString() : "-";
+        pawn.DeSpawn();
+        RimWorld.Planet.Caravan caravan = RimWorld.Planet.CaravanMaker.MakeCaravan(new[] { pawn }, Faction.OfPlayer, tile, true);
+        Note($"settle: caravan {caravan.ID} at tile {tile.tileId}, valid for settlement={valid}, adjacent={adjacent}");
+        RimWorld.Planet.SettleInEmptyTileUtility.Settle(caravan);
+        LongEventHandler.ExecuteWhenFinished(() =>
+            Note($"settle: after long events: maps {Find.Maps.Count}, player settlements {Find.WorldObjects.Settlements.Count(s => s.Faction == Faction.OfPlayer)}, caravan alive={Find.WorldObjects.Caravans.Contains(caravan)}"));
     }
 
     private static bool FireRaidViaStoryteller(Map map)
