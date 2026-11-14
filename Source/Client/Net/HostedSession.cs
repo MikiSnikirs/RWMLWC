@@ -126,7 +126,7 @@ public static class HostedSession
         {
             SteamNet.Accepted += OnSteamAccepted;
             SteamNet.Listen();
-            Write($"Steam: принимаю друзей, мой SteamID {SteamNet.MySteamId}");
+            Write("Steam: принимаю друзей");
         }
     }
 

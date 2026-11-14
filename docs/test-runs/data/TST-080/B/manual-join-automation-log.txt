@@ -1,0 +1,11 @@
+2026-11-15 01:11:03 lockstep: connecting to steam:<SteamID хоста> as '<ник Steam>'
+2026-11-15 01:11:04 lockstep: connected to steam:<SteamID хоста>, Hello sent
+2026-11-15 01:11:05 lockstep: Welcome, playerId=2, serverTick=14998, game=none: requesting world snapshot
+2026-11-15 01:11:08 lockstep: snapshot 3 received, 2604242 bytes; loading
+2026-11-15 01:11:15 lockstep: snapshot loaded, tick 14998, serverTick=14998, perMapSim=True
+2026-11-15 01:11:16 lockstep: notice 3: карта 0 тик 15000: игрок 1 ≠ игрок 2
+2026-11-15 01:11:16 lockstep: desync reported, the server orders a common snapshot
+2026-11-15 01:11:16 lockstep: player 0 asked for a snapshot at tick 15041; waiting for it
+2026-11-15 01:11:19 lockstep: snapshot 4 received, 2574378 bytes; loading
+2026-11-15 01:11:23 lockstep: snapshot loaded, tick 15041, serverTick=15045, perMapSim=True
+2026-11-15 01:13:43 lockstep: connection closed: удалённая сторона закрыла: SteamNetworkingSockets shutdown
