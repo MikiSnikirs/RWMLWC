@@ -21,8 +21,8 @@ uint16 тип     — MessageType
 
 | № | Тип | Направление | Поля |
 |---|---|---|---|
-| 1 | `Hello` | клиент → сервер | `ProtocolVersion`, `ModId`, `GameVersion`, `PlayerName`, `ModListHash` (u64) |
-| 2 | `Welcome` | сервер → клиент | `PlayerId`, `ServerTick`, `SessionSeed` (u32) |
+| 1 | `Hello` | клиент → сервер | `ProtocolVersion`, `ModId`, `GameVersion`, `PlayerName`, `ModListHash` (u64), `SaveWorldId`, `SaveRevision` (u64, v2) |
+| 2 | `Welcome` | сервер → клиент | `PlayerId`, `ServerTick`, `SessionSeed` (u32), `SaveWorldId`, `SaveRevision` (u64, v2) |
 | 3 | `Reject` | сервер → клиент | `Reason` (`RejectReason`), `Detail` |
 | 4 | `Command` | клиент → сервер | `ClientSeq`, `MapId`, `Kind`, `Required` (`PermissionLevel`, с v2), `Payload` |
 | 5 | `CommandOrdered` | сервер → все | `Seq` (i64), `Tick`, `PlayerId`, `ClientSeq`, `MapId`, `Kind`, `Payload` |
@@ -34,6 +34,8 @@ uint16 тип     — MessageType
 | 11 | `GrantPermission` | клиент → сервер | `MapId`, `PlayerId`, `Level`; `None` — отзыв (v2) |
 | 12 | `Permissions` | сервер → все | список карт: `MapId`, `OwnerPlayerId`, выданные права (`PlayerId`, `Level`) (v2) |
 | 13 | `CommandRejected` | сервер → автору | `ClientSeq`, `MapId`, `Required`, `Had` (v2) |
+| 14 | `Notice` | сервер → клиенту | `Code` (`NoticeCode`), `Text` — предупреждение без разрыва (v2) |
+| 15 | `SnapshotApplied` | клиент → сервер | `SnapshotId`, `Tick` — снимок загружен (v2) |
 
 `MapId` — `Map.uniqueID`; `-1` (`ProtocolIds.WorldMapId`) — уровень мира.
 
