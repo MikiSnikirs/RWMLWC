@@ -28,6 +28,8 @@ public enum MessageType : ushort
     Ping = 17,
     Pong = 18,
     Chat = 19,
+    ChooseColor = 20,
+    Cursor = 21,
 }
 
 /// <summary>
@@ -556,6 +558,8 @@ public enum NoticeCode : ushort
     /// Сервер шлёт всем игрокам в сети, не чаще раза в <see cref="ProtocolLimits.DesyncNoticeIntervalTicks"/> тиков на карту.
     /// </summary>
     Desync = 3,
+    /// <summary>Выбранный цвет уже занят другим игроком (v5); цвет игрока не изменился.</summary>
+    ColorTaken = 4,
 }
 
 /// <summary>Сервер → клиенту: предупреждение или сведение для показа игроку; соединение не рвёт.</summary>
@@ -604,8 +608,11 @@ public sealed class SnapshotAppliedMessage : Message
 }
 
 /// <summary>Игрок сессии в сообщении <see cref="PlayersMessage"/>.</summary>
-/// <summary><paramref name="PingMs"/> — время туда-обратно до сервера в мс; -1 — ещё не измерено или игрок не в сети.</summary>
-public readonly record struct PlayerInfo(int PlayerId, string Name, bool Online, int PingMs);
+/// <summary>
+/// <paramref name="PingMs"/> — время туда-обратно до сервера в мс; -1 — ещё не измерено или игрок не в сети.
+/// <paramref name="Color"/> — цвет игрока 0xRRGGBB (v5); 0 — ещё не выбран.
+/// </summary>
+public readonly record struct PlayerInfo(int PlayerId, string Name, bool Online, int PingMs, int Color = PlayerColors.None);
 
 /// <summary>
 /// Сервер → клиентам: состав сессии (v3). Все игроки, которые когда-либо входили, по возрастанию номера:
@@ -629,15 +636,16 @@ public sealed class PlayersMessage : Message
             w.WriteString(p.Name);
             w.WriteBool(p.Online);
             w.WriteInt32(p.PingMs);
+            w.WriteInt32(p.Color);
         }
     }
 
     internal static PlayersMessage Read(ref PacketReader r)
     {
         var msg = new PlayersMessage();
-        int n = r.ReadCount(ProtocolLimits.MaxPlayersInList, 13);
+        int n = r.ReadCount(ProtocolLimits.MaxPlayersInList, 17);
         for (int i = 0; i < n; i++)
-            msg.Players.Add(new PlayerInfo(r.ReadInt32(), r.ReadString(), r.ReadBool(), r.ReadInt32()));
+            msg.Players.Add(new PlayerInfo(r.ReadInt32(), r.ReadString(), r.ReadBool(), r.ReadInt32(), r.ReadInt32()));
         return msg;
     }
 }
@@ -688,4 +696,59 @@ public sealed class ChatMessage : Message
     }
 
     internal static ChatMessage Read(ref PacketReader r) => new() { PlayerId = r.ReadInt32(), Text = r.ReadString() };
+}
+
+/// <summary>Цвета игроков (v5).</summary>
+public static class PlayerColors
+{
+    /// <summary>Цвет не выбран: клиент рисует серым.</summary>
+    public const int None = 0;
+
+    /// <summary>Допустимый цвет: 0xRRGGBB, не <see cref="None"/>.</summary>
+    public static bool IsValid(int color) => color > 0 && color <= 0xFFFFFF;
+}
+
+/// <summary>Клиент → сервер (v5): выбрать свой цвет 0xRRGGBB (палитра — у клиента). Ответ — новый <c>Players</c> или <c>Notice ColorTaken</c>.</summary>
+public sealed class ChooseColorMessage : Message
+{
+    public override MessageType Type => MessageType.ChooseColor;
+
+    public int Color;
+
+    public override void Write(PacketWriter w) => w.WriteInt32(Color);
+
+    internal static ChooseColorMessage Read(ref PacketReader r) => new() { Color = r.ReadInt32() };
+}
+
+/// <summary>
+/// Курсор игрока (v5): клиент → сервер → остальные. В общий порядок команд не входит, на симуляцию не влияет.
+/// <see cref="PlayerId"/> от клиента не читается (ставит сервер). <see cref="MapId"/> = <see cref="NoCursor"/> — курсора нет
+/// (игрок не смотрит на карту). X, Z — точка на карте в клетках. От игрока не чаще <see cref="ProtocolLimits.MaxCursorsPerSecond"/> в секунду.
+/// </summary>
+public sealed class CursorMessage : Message
+{
+    public const int NoCursor = -2;
+
+    public override MessageType Type => MessageType.Cursor;
+
+    public int PlayerId;
+    public int MapId;
+    public float X;
+    public float Z;
+
+    public override void Write(PacketWriter w)
+    {
+        w.WriteInt32(PlayerId);
+        w.WriteInt32(MapId);
+        w.WriteInt32(BitConverter.SingleToInt32Bits(X));
+        w.WriteInt32(BitConverter.SingleToInt32Bits(Z));
+    }
+
+    internal static CursorMessage Read(ref PacketReader r) => new()
+    {
+        PlayerId = r.ReadInt32(),
+        MapId = r.ReadInt32(),
+        X = BitConverter.Int32BitsToSingle(r.ReadInt32()),
+        Z = BitConverter.Int32BitsToSingle(r.ReadInt32()),
+    };
 }

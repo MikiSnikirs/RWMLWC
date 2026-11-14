@@ -461,4 +461,49 @@ public class SessionTests
         Step(s, 10, a);
         Assert.Equal("снова можно", a.Received.OfType<ChatMessage>().Last().Text);
     }
+
+    [Fact]
+    public void ColorIsUniqueFromThePaletteAndSurvivesReconnect()
+    {
+        var (s, _) = NewSession();
+        TestClient a = Join(s, "A");
+        TestClient b = Join(s, "B");
+        int red = 0xE53935, green = 0x43A047;
+        a.Conn.Send(new ChooseColorMessage { Color = red });
+        b.Conn.Send(new ChooseColorMessage { Color = red });       // занят
+        b.Conn.Send(new ChooseColorMessage { Color = PlayerColors.None });  // «нет цвета» выбрать нельзя
+        b.Conn.Send(new ChooseColorMessage { Color = 0x1000000 });          // не RGB
+        b.Conn.Send(new ChooseColorMessage { Color = green });
+        Step(s, 10, a, b);
+        Assert.Contains(b.Received, m => m is NoticeMessage n && n.Code == NoticeCode.ColorTaken);
+        var players = b.Received.OfType<PlayersMessage>().Last().Players;
+        Assert.Equal(red, players.Single(p => p.PlayerId == a.PlayerId).Color);
+        Assert.Equal(green, players.Single(p => p.PlayerId == b.PlayerId).Color);
+
+        b.Conn.Close("обрыв");
+        Step(s, 10, a);
+        TestClient b2 = Join(s, "B");
+        Assert.Equal(green, b2.Received.OfType<PlayersMessage>().Last().Players.Single(p => p.PlayerId == b.PlayerId).Color);
+        // Цвет ушедшего игрока занят и пока его нет.
+    }
+
+    [Fact]
+    public void CursorsAreForwardedToOthersOnlyAndRateLimited()
+    {
+        var (s, _) = NewSession();
+        TestClient a = Join(s, "A");
+        TestClient b = Join(s, "B");
+        for (int i = 0; i < ProtocolLimits.MaxCursorsPerSecond + 5; i++)
+            a.Conn.Send(new CursorMessage { PlayerId = 99, MapId = 0, X = i, Z = 2 });
+        Step(s, 10, a, b);
+        var got = b.Received.OfType<CursorMessage>().ToList();
+        Assert.Equal(ProtocolLimits.MaxCursorsPerSecond, got.Count);
+        Assert.All(got, c => Assert.Equal(a.PlayerId, c.PlayerId)); // номер ставит сервер
+        Assert.Empty(a.Received.OfType<CursorMessage>());
+
+        Step(s, 1000, a, b); // секунда прошла
+        a.Conn.Send(new CursorMessage { MapId = CursorMessage.NoCursor });
+        Step(s, 10, a, b);
+        Assert.Equal(CursorMessage.NoCursor, b.Received.OfType<CursorMessage>().Last().MapId);
+    }
 }
