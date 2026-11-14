@@ -65,14 +65,89 @@ public sealed class HashRecorder : GameComponent
         }
     }
 
+    // Прогон, прерванный загрузкой снимка: после загрузки запись продолжается в тот же файл,
+    // без сброса Rand (сценарий snap-reload).
+    private sealed class ResumeInfo
+    {
+        public string? filePath;
+        public string scenario = "none";
+        public int startTick;
+        public int endTick;
+        public int denseFrom;
+        public int denseTo;
+    }
+
+    private static ResumeInfo? resumeInfo;
+    private static HashRecorder? pendingResume;
+
     public override void LoadedGame()
     {
+        if (resumeInfo != null)
+        {
+            pendingResume = this;
+            pendingStart = null;
+            return;
+        }
         pendingStart = Armed ? this : null;
+    }
+
+    /// <summary>Остановить запись перед загрузкой снимка; после загрузки она продолжится сама.</summary>
+    public void SuspendForSnapshotReload()
+    {
+        if (!recording)
+        {
+            return;
+        }
+        resumeInfo = new ResumeInfo
+        {
+            filePath = filePath,
+            scenario = scenarioName,
+            startTick = startTick,
+            endTick = endTick,
+            denseFrom = denseFrom,
+            denseTo = denseTo,
+        };
+        recording = false;
+        Flush();
+    }
+
+    private void ResumeAfterSnapshotReload(ResumeInfo info)
+    {
+        filePath = info.filePath;
+        scenarioName = info.scenario;
+        startTick = info.startTick;
+        endTick = info.endTick;
+        denseFrom = info.denseFrom;
+        denseTo = info.denseTo;
+        rotLogPath = null;
+        buffer.Clear();
+        recording = true;
     }
 
     /// <summary>Вызывается перед каждым тиком игры (патч TickManager.DoSingleTick).</summary>
     public static void BeforeTick()
     {
+        HashRecorder? resuming = pendingResume;
+        if (resuming != null)
+        {
+            pendingResume = null;
+            ResumeInfo? info = resumeInfo;
+            resumeInfo = null;
+            if (info != null && ReferenceEquals(resuming, Instance))
+            {
+                resuming.ResumeAfterSnapshotReload(info);
+                TestAutomation.Note("resumed after snapshot reload at tick " + Find.TickManager.TicksGame
+                    + ", perMapSim=" + PerMapSim.Enabled);
+            }
+            return;
+        }
+
+        HashRecorder? active = Instance;
+        if (active != null && active.recording)
+        {
+            TestAutomation.BeforeTickDuringRun(active, Find.TickManager.TicksGame - active.startTick);
+        }
+
         HashRecorder? recorder = pendingStart;
         if (recorder == null)
         {
