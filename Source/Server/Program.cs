@@ -124,7 +124,11 @@ internal static class Program
         "autosave_minutes = 5\r\n" +
         "\r\n" +
         "# Сколько игроков одновременно.\r\n" +
-        "max_players = 8\r\n";
+        "max_players = 8\r\n" +
+        "\r\n" +
+        "# На сколько тиков часы сервера могут опережать самого медленного игрока (0 — без ограничения).\r\n" +
+        "# Меньше — быстрее исполняются приказы и входят новички; больше — медленный компьютер реже тормозит остальных.\r\n" +
+        "max_lead_ticks = 180\r\n";
 
     private static void PrintConnectionCodes(int port, string thumbprint, string? publicHost)
     {
