@@ -1,0 +1,10 @@
+2026-11-14 08:21:41 autoload: loading save 'tst019'
+2026-11-14 08:21:49 lockstep: connecting to 127.0.0.1:47811 as 'c2'
+2026-11-14 08:21:50 lockstep: connected to quic:127.0.0.1:47811, Hello sent
+2026-11-14 08:21:51 lockstep: Welcome, playerId=2, serverTick=14998, seed=7
+2026-11-14 08:22:51 lockstep: hold is over, requesting speed 3
+2026-11-14 08:22:51 run started: #0, tick=14998, scenario=none, ticks=3000, trace=False, quit=True, file=hash-c2-20261114-082251.txt
+2026-11-14 08:22:59 run finished: file=hash-c2-20261114-082251.txt
+2026-11-14 08:22:59 queue: finished
+2026-11-14 08:22:59 lockstep: disconnect: прогон завершён
+2026-11-14 08:22:59 quitting game
