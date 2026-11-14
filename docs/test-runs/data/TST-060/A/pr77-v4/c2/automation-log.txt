@@ -1,0 +1,26 @@
+2026-11-14 19:14:50 autoload: loading save 'tst014'
+2026-11-14 19:14:57 lockstep: connecting to 127.0.0.1:59538 as 'c2'
+2026-11-14 19:14:58 lockstep: connected to quic:127.0.0.1:59538, Hello sent
+2026-11-14 19:14:59 lockstep: Welcome, playerId=2, serverTick=14998, seed=7
+2026-11-14 19:15:59 lockstep: hold is over, requesting speed 3
+2026-11-14 19:15:59 run started: #0, tick=14998, scenario=squads, ticks=4000, trace=False, quit=True, file=hash-c2-20261114-191559.txt
+2026-11-14 19:16:03 squads: created 1 'Альфа' by player 1
+2026-11-14 19:16:03 squads: created 2 'Бета' by player 1
+2026-11-14 19:16:03 lockstep: player 1 asked for a snapshot at tick 16368; waiting for it
+2026-11-14 19:16:04 lockstep: snapshot 8 received, 2597727 bytes; loading
+2026-11-14 19:16:07 lockstep: snapshot loaded, tick 16368, serverTick=16435, perMapSim=True
+2026-11-14 19:16:07 resumed after snapshot reload at tick 16368, perMapSim=True
+2026-11-14 19:16:07 command #9: rejected: squad (Ross — пешка отряда «Бета»), author 1
+2026-11-14 19:17:08 command #11: rejected: squad (Oleg — пешка отряда «Бета»), author 1
+2026-11-14 19:17:09 command #14: rejected: squad (имя и цвет отряда «Бета» меняют его участники), author 1
+2026-11-14 19:17:09 command #15: rejected: squad (имя и цвет отряда «Бета» меняют его участники), author 1
+2026-11-14 19:17:14 summary: map0 drafted=1 forbidden=56 plants=[]
+2026-11-14 19:17:14 summary: map0 jobs=[231:GotoWander@(136, 0, 125),234:GotoWander@(131, 0, 136),239:Wait_Combat@(133, 0, 129)]
+2026-11-14 19:17:14 camera: this client moved its camera 25 times during the run
+2026-11-14 19:17:14 summary: map0 settings=29B89D30A34E3B1A
+2026-11-14 19:17:14 summary: squads=1:Орлы#43A047[1|]; 2:Бета#1E88E5[2|231,234] rejected=4 drafted=[239]
+2026-11-14 19:17:14 summary: map0 designations=0 blueprints=0 zones=0; commands sent=0 executed=14 failed=0
+2026-11-14 19:17:14 run finished: file=hash-c2-20261114-191559.txt
+2026-11-14 19:17:14 queue: finished
+2026-11-14 19:17:14 lockstep: disconnect: прогон завершён
+2026-11-14 19:17:14 quitting game
