@@ -35,7 +35,7 @@ public class ProtocolRoundTripTests
         yield return new object[] { new NoticeMessage { Code = NoticeCode.NewerSaveOnClient, Text = "У игрока сейв новее" } };
         yield return new object[] { new SnapshotAppliedMessage { SnapshotId = 3, Tick = 20000 } };
         yield return new object[] { new NoticeMessage { Code = NoticeCode.Desync, Text = "карта 0 тик 15060: игрок 1 ≠ игрок 2" } };
-        yield return new object[] { new PlayersMessage { Players = { new PlayerInfo(1, "Хост", true, 48, 0xE6194B), new PlayerInfo(2, "B", false, -1) } } };
+        yield return new object[] { new PlayersMessage { Players = { new PlayerInfo(1, "Хост", true, 48, 0xE6194B), new PlayerInfo(2, "B", false, -1, PlayerColors.None) } } };
         yield return new object[] { new PlayersMessage() };
         yield return new object[] { new PingMessage { Timestamp = 0x0123456789ABCDEF } };
         yield return new object[] { new PongMessage { Timestamp = ulong.MaxValue } };
