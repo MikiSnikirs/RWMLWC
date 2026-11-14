@@ -1,0 +1,18 @@
+2026-11-14 21:12:40 autoload: loading save 'tst014'
+2026-11-14 21:12:48 lockstep: connecting to 127.0.0.1:62031 as 'c2'
+2026-11-14 21:12:49 lockstep: connected to quic:127.0.0.1:62031, Hello sent
+2026-11-14 21:12:49 lockstep: Welcome, playerId=1, serverTick=14998, seed=7
+2026-11-14 21:13:49 lockstep: hold is over, requesting speed 3
+2026-11-14 21:13:49 run started: #0, tick=14998, scenario=cursors, ticks=3000, trace=False, quit=True, file=hash-c2-20261114-211349.txt
+2026-11-14 21:13:54 cursors: camera on player 2 cursor
+2026-11-14 21:13:54 cursors: seen player 2 map 0 at 121.5,127.5 color 000000; drawn last frame 1, labels 1
+2026-11-14 21:14:00 summary: map0 drafted=0 forbidden=56 plants=[]
+2026-11-14 21:14:00 summary: map0 jobs=[231:GotoWander@(128, 0, 141),234:GotoWander@(131, 0, 139),239:GotoWander@(131, 0, 136)]
+2026-11-14 21:14:00 camera: this client moved its camera 5 times during the run
+2026-11-14 21:14:00 summary: map0 settings=29B89D30A34E3B1A
+2026-11-14 21:14:00 summary: squads= rejected=0 drafted=[]
+2026-11-14 21:14:00 summary: map0 designations=0 blueprints=0 zones=0; commands sent=0 executed=0 failed=0
+2026-11-14 21:14:00 run finished: file=hash-c2-20261114-211349.txt
+2026-11-14 21:14:00 queue: finished
+2026-11-14 21:14:00 lockstep: disconnect: прогон завершён
+2026-11-14 21:14:00 quitting game
