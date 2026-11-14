@@ -75,10 +75,15 @@ public static class CommandBus
     }
 
     /// <summary>Начать команду: записывает обстановку автора. Дальше вызывающий дописывает данные команды и зовёт Send.</summary>
-    public static PacketWriter Begin(Map map)
+    public static PacketWriter Begin(Map map, UnityEngine.Vector3? mouseMapPosition = null)
     {
         PacketWriter w = new PacketWriter(256);
-        CommandContext.Capture(map).Write(w);
+        CommandContext context = CommandContext.Capture(map);
+        if (mouseMapPosition.HasValue)
+        {
+            context.mouseMapPosition = mouseMapPosition.Value; // щелчок: мышь там, где щёлкнули
+        }
+        context.Write(w);
         return w;
     }
 
@@ -216,6 +221,9 @@ public sealed class CommandContext
     /// <summary>Автор держал клавишу «в очередь» (Shift): приказ добавляется к текущим, а не заменяет их.</summary>
     public bool queueOrder;
 
+    /// <summary>Где на карте был указатель мыши автора. Код приказов местами спрашивает мышь сам.</summary>
+    public UnityEngine.Vector3 mouseMapPosition;
+
     private readonly List<(byte kind, int id)> selection = new List<(byte, int)>();
 
     public static CommandContext Capture(Map map)
@@ -228,6 +236,14 @@ public sealed class CommandContext
         catch (Exception)
         {
             context.queueOrder = false;
+        }
+        try
+        {
+            context.mouseMapPosition = UI.MouseMapPosition();
+        }
+        catch (Exception)
+        {
+            context.mouseMapPosition = default;
         }
         List<object> selected = Find.Selector.SelectedObjects;
         for (int i = 0; i < selected.Count && context.selection.Count < MaxSelection; i++)
@@ -260,6 +276,8 @@ public sealed class CommandContext
     {
         w.WriteBool(godMode);
         w.WriteBool(queueOrder);
+        w.WriteInt32(BitConverter.SingleToInt32Bits(mouseMapPosition.x));
+        w.WriteInt32(BitConverter.SingleToInt32Bits(mouseMapPosition.z));
         w.WriteInt32(selection.Count);
         foreach ((byte kind, int id) in selection)
         {
@@ -272,6 +290,9 @@ public sealed class CommandContext
     {
         CommandContext context = new CommandContext { godMode = r.ReadBool() };
         context.queueOrder = r.ReadBool();
+        float mouseX = BitConverter.Int32BitsToSingle(r.ReadInt32());
+        float mouseZ = BitConverter.Int32BitsToSingle(r.ReadInt32());
+        context.mouseMapPosition = new UnityEngine.Vector3(mouseX, 0f, mouseZ);
         int count = r.ReadCount(MaxSelection, 5);
         for (int i = 0; i < count; i++)
         {

@@ -540,3 +540,36 @@ internal static class Patch_KeyBindingDef_InSimulation
         return false;
     }
 }
+
+// Мышь при исполнении команды. Код приказов местами сам спрашивает, где указатель (например,
+// GenUI.ThingsUnderMouse выбирает предмет из нескольких в одной клетке по расстоянию до мыши).
+// При исполнении команды указатель у всех там, где он был у автора.
+[HarmonyPatch(typeof(UI), nameof(UI.MouseMapPosition))]
+internal static class Patch_UI_MouseMapPosition
+{
+    private static bool Prefix(ref UnityEngine.Vector3 __result)
+    {
+        CommandContext? context = CommandBus.Context;
+        if (context == null)
+        {
+            return true;
+        }
+        __result = context.mouseMapPosition;
+        return false;
+    }
+}
+
+[HarmonyPatch(typeof(UI), nameof(UI.MouseCell))]
+internal static class Patch_UI_MouseCell
+{
+    private static bool Prefix(ref IntVec3 __result)
+    {
+        CommandContext? context = CommandBus.Context;
+        if (context == null)
+        {
+            return true;
+        }
+        __result = IntVec3.FromVector3(context.mouseMapPosition);
+        return false;
+    }
+}
