@@ -66,6 +66,7 @@ public static class SessionUi
 
     public static string NameOf(int playerId)
     {
+        if (playerId == 0) return "Сервер";
         foreach (PlayerInfo p in _players)
             if (p.PlayerId == playerId) return p.Name;
         return "игрок " + playerId;
@@ -224,6 +225,7 @@ internal static class Patch_MapInterface_SessionStatus
     private static void Postfix()
     {
         ChatSelfTest.Frame();
+        RWMLWC.Client.Net.NetworkGameMenu.Frame();
         string line = SessionUi.StatusLine();
         if (line.Length == 0) return;
         if (SessionUi.Unread > 0) line += $" · чат: {SessionUi.Unread}";
