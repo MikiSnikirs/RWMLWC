@@ -26,9 +26,16 @@ internal static class Program
         Console.OutputEncoding = System.Text.Encoding.UTF8;
         Console.WriteLine($"RWMLWC server, protocol v{ProtocolInfo.ProtocolVersion}");
 
-        int port = DefaultPort;
+        // Настройки: файл server.txt в папке данных; аргументы командной строки важнее файла.
         string dataDir = "server-data";
-        string? publicHost = null;
+        for (int i = 0; i < args.Length - 1; i++)
+            if (args[i] == "--data") dataDir = args[i + 1];
+        SettingsFile settings = SettingsFile.LoadOrCreate(Path.Combine(dataDir, "server.txt"), SettingsTemplate, w => Console.WriteLine("ВНИМАНИЕ: " + w));
+        Console.WriteLine((settings.Created ? "создан файл настроек: " : "настройки: ") + Path.GetFullPath(settings.Path));
+        int port = settings.GetInt("port", DefaultPort, 0, 65535);
+        string? publicHost = settings.GetString("public_host");
+        double autosaveMinutes = settings.GetDouble("autosave_minutes", 5, 0, 24 * 60);
+        int maxPlayers = settings.GetInt("max_players", 8, 1, 64);
         bool echo = false;
         int startTick = 0;
         uint? seed = null;
@@ -37,14 +44,14 @@ internal static class Program
             switch (args[i])
             {
                 case "--port": port = int.Parse(args[++i]); break;
-                case "--data": dataDir = args[++i]; break;
+                case "--data": i++; break;
                 case "--echo": echo = true; break;
                 case "--start-tick": startTick = int.Parse(args[++i]); break;
                 case "--seed": seed = uint.Parse(args[++i]); break;
                 case "--public-host": publicHost = args[++i]; break;
                 default:
                     Console.Error.WriteLine($"Неизвестный аргумент: {args[i]}");
-                    Console.Error.WriteLine($"Использование: RWMLWC.Server [--port N (по умолчанию {DefaultPort}; 0 — любой)] [--data папка] [--public-host адрес] [--start-tick T] [--seed S] [--echo]");
+                    Console.Error.WriteLine("Использование: RWMLWC.Server [--data папка] [--port N] [--public-host адрес] [--start-tick T] [--seed S] [--echo]. Остальное — в <папка>/server.txt.");
                     return 2;
             }
         }
@@ -85,8 +92,11 @@ internal static class Program
             SessionSeed = seed ?? (uint)System.Security.Cryptography.RandomNumberGenerator.GetInt32(int.MaxValue),
             Store = store,
             Dedicated = true,
+            MaxPlayers = maxPlayers,
+            AutosaveInterval = autosaveMinutes > 0 ? TimeSpan.FromMinutes(autosaveMinutes) : null,
         };
         Console.WriteLine($"SESSION startTick={options.StartTick} seed={options.SessionSeed}");
+        Console.WriteLine($"игроков до {options.MaxPlayers}, автосохранение {(options.AutosaveInterval is { } a ? $"каждые {a.TotalMinutes:0.##} мин" : "выключено")}");
         PrintConnectionCodes(server.LocalEndPoint.Port, ServerCertificate.Thumbprint(cert), publicHost);
         var host = new SessionHost(new Session(options, Console.WriteLine));
         _ = Task.Run(() => ConsoleLoop(host, store, stop));
@@ -97,6 +107,22 @@ internal static class Program
 
     /// <summary>Порт выделенного сервера по умолчанию (UDP: QUIC).</summary>
     public const int DefaultPort = 47800;
+
+    private const string SettingsTemplate =
+        "# Настройки выделенного сервера RWMLWC.\r\n" +
+        "# Строки «ключ = значение»; строки с # — комментарии. Изменения действуют после перезапуска сервера.\r\n" +
+        "\r\n" +
+        "# Порт UDP (QUIC). Для игры через интернет пробросьте его на роутере. 0 — любой свободный.\r\n" +
+        "port = 47800\r\n" +
+        "\r\n" +
+        "# Внешний адрес (IP или имя) — сервер напечатает готовый код подключения для друзей через интернет.\r\n" +
+        "public_host =\r\n" +
+        "\r\n" +
+        "# Автосохранение мира на сервер, минут (0 — выключено). Ещё сохраняется, когда кто-то выходит.\r\n" +
+        "autosave_minutes = 5\r\n" +
+        "\r\n" +
+        "# Сколько игроков одновременно.\r\n" +
+        "max_players = 8\r\n";
 
     private static void PrintConnectionCodes(int port, string thumbprint, string? publicHost)
     {

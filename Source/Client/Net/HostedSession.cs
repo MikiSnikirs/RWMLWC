@@ -31,6 +31,44 @@ public static class HostedSession
     public static string Thumbprint { get; private set; } = "";
     public static Session? Session => _host?.Session;
 
+    /// <summary>Порт прямого подключения из host.txt; 0 — только Steam.</summary>
+    public static int DirectPort { get; private set; }
+
+    /// <summary>Код прямого подключения (адрес в локальной сети); пусто — прямое подключение выключено.</summary>
+    public static string DirectCode { get; private set; } = "";
+
+    public static string SettingsPath => Path.Combine(GenFilePaths.SaveDataFolderPath, "RWMLWC", "host.txt");
+
+    private const string SettingsTemplate =
+        "# Настройки сессии в игре хоста (RWMLWC).\r\n" +
+        "# Строки «ключ = значение»; строки с # — комментарии. Действуют при следующем открытии сессии.\r\n" +
+        "\r\n" +
+        "# Друзья всегда могут войти через Steam. Чтобы пускать и по коду подключения (без Steam, в локальной сети\r\n" +
+        "# или через интернет с пробросом UDP-порта на роутере), укажите порт, например 47801. 0 — только Steam.\r\n" +
+        "direct_port = 0\r\n" +
+        "\r\n" +
+        "# Сколько игроков одновременно.\r\n" +
+        "max_players = 8\r\n";
+
+    private static string LocalAddress()
+    {
+        try
+        {
+            foreach (System.Net.NetworkInformation.NetworkInterface ni in System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces())
+            {
+                if (ni.OperationalStatus != System.Net.NetworkInformation.OperationalStatus.Up
+                    || ni.NetworkInterfaceType == System.Net.NetworkInformation.NetworkInterfaceType.Loopback
+                    || ni.GetIPProperties().GatewayAddresses.Count == 0) continue; // без шлюза — виртуальные адаптеры
+                foreach (System.Net.NetworkInformation.UnicastIPAddressInformation a in ni.GetIPProperties().UnicastAddresses)
+                    if (a.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork) return a.Address.ToString();
+            }
+        }
+        catch (Exception)
+        {
+        }
+        return "127.0.0.1";
+    }
+
     /// <summary>Папка сервера в данных игры: сертификат, копии мира, лог.</summary>
     public static string DataDir => Path.Combine(GenFilePaths.SaveDataFolderPath, "RWMLWC", "server");
 
@@ -43,21 +81,30 @@ public static class HostedSession
         if (Running) throw new InvalidOperationException("сессия уже запущена");
         Directory.CreateDirectory(DataDir);
         var cert = ServerCertificate.LoadOrCreate(Path.Combine(DataDir, "server.pfx"));
+        // Настройки хоста — RWMLWC/host.txt (T-062). direct_port > 0 — принимать и прямые подключения по коду.
+        SettingsFile settings = SettingsFile.LoadOrCreate(SettingsPath, SettingsTemplate, w => Write("ВНИМАНИЕ: " + w));
+        int directPort = settings.GetInt("direct_port", 0, 0, 65535);
+        int maxPlayers = settings.GetInt("max_players", 8, 1, 64);
+        DirectPort = directPort;
+        IPEndPoint bind = directPort > 0 ? new IPEndPoint(IPAddress.Any, directPort) : new IPEndPoint(IPAddress.Loopback, port);
         // Синхронное ожидание допустимо: ListenAsync завершается сразу, сети не ждёт.
-        _quic = QuicServer.StartAsync(new IPEndPoint(IPAddress.Loopback, port), cert).GetAwaiter().GetResult();
+        _quic = QuicServer.StartAsync(bind, cert).GetAwaiter().GetResult();
         Port = _quic.LocalEndPoint.Port;
         Thumbprint = ServerCertificate.Thumbprint(cert);
+        DirectCode = directPort > 0 ? ConnectionCode.Format(LocalAddress(), Port, Thumbprint) : "";
 
         var options = new SessionOptions
         {
             StartTick = startTick,
             SessionSeed = seed ?? (uint)System.Security.Cryptography.RandomNumberGenerator.GetInt32(int.MaxValue),
             Store = new SaveStore(DataDir),
+            MaxPlayers = maxPlayers,
         };
         _host = new SessionHost(new Session(options, Write));
         _cts = new CancellationTokenSource();
         _ = _host.RunAsync(_quic, _cts.Token, Write);
-        Write($"сессия запущена: тик {startTick}, seed {options.SessionSeed}, QUIC 127.0.0.1:{Port}");
+        Write($"сессия запущена: тик {startTick}, seed {options.SessionSeed}, QUIC {bind.Address}:{Port}");
+        if (DirectCode.Length > 0) Write("прямое подключение (локальная сеть; через интернет — проброс UDP-порта " + Port + "): " + DirectCode);
 
         if (steam && SteamNet.Available)
         {
@@ -86,7 +133,8 @@ public static class HostedSession
             UnityEngine.GUIUtility.systemCopyBuffer = id;
             SteamInvite.AdvertiseHost();
         }
-        Messages.Message($"RWMLWC: сессия открыта. Друг может нажать «Присоединиться» в списке друзей Steam или ввести SteamID {id} (скопирован в буфер обмена)", MessageTypeDefOf.PositiveEvent, false);
+        Messages.Message($"RWMLWC: сессия открыта. Друг может нажать «Присоединиться» в списке друзей Steam или ввести SteamID {id} (скопирован в буфер обмена)"
+            + (DirectCode.Length > 0 ? ". Прямое подключение — код в окне «Игроки и чат»" : ""), MessageTypeDefOf.PositiveEvent, false);
     }
 
     /// <summary>Выйти из сессии и закрыть её (хост).</summary>

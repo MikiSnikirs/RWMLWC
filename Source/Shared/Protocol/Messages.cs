@@ -63,6 +63,47 @@ public static class ProtocolIds
 {
     /// <summary><c>MapId</c> для команд и данных уровня мира, а не карты.</summary>
     public const int WorldMapId = -1;
+
+    /// <summary>
+    /// Вид команды «общий снимок мира» (вход без мира, лечение расхождения, общая перезагрузка).
+    /// Клиент шлёт её с пустым <c>Payload</c>; сервер (v4) записывает в <c>Payload</c> рассылаемой
+    /// <c>CommandOrdered</c> номер отдающего (<see cref="WorldSnapshotOrder"/>). Все с миром загружают снимок.
+    /// </summary>
+    public const int RequestWorldSnapshotKind = 100;
+
+    /// <summary>
+    /// Вид команды «сохранить мир на сервер» (v4, только от сервера, <c>PlayerId = 0</c>): отдающий из
+    /// <c>Payload</c> снимает мир и шлёт куски с <c>SnapshotId = Seq &amp; 0x7FFFFFFF</c>; остальные её пропускают.
+    /// </summary>
+    public const int SaveWorldSnapshotKind = 101;
+
+    /// <summary>Номер «игрока» для команд и сообщений самого сервера.</summary>
+    public const int ServerPlayerId = 0;
+}
+
+/// <summary>
+/// <c>Payload</c> команд <see cref="ProtocolIds.RequestWorldSnapshotKind"/> и <see cref="ProtocolIds.SaveWorldSnapshotKind"/>
+/// в <c>CommandOrdered</c> (v4): номер игрока, который отдаёт мир, int32. <see cref="ProtocolIds.ServerPlayerId"/> —
+/// мир отдаёт сам сервер (своя копия). Пустой <c>Payload</c> — назначения нет (сервер v3).
+/// </summary>
+public static class WorldSnapshotOrder
+{
+    public static byte[] Encode(int senderPlayerId)
+    {
+        var w = new PacketWriter();
+        w.WriteInt32(senderPlayerId);
+        return w.ToArray();
+    }
+
+    /// <summary>Номер отдающего или null, если назначения нет.</summary>
+    public static int? Sender(byte[]? payload)
+    {
+        if (payload == null || payload.Length < 4) return null;
+        return System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(payload);
+    }
+
+    /// <summary>Номер снимка, который ждут клиенты для этой команды.</summary>
+    public static int SnapshotId(long seq) => unchecked((int)(seq & 0x7FFFFFFF));
 }
 
 public abstract class Message
