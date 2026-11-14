@@ -25,6 +25,11 @@ public sealed class SessionHost
     /// <summary>Подключение из любого потока (принимающий цикл, Steam-мост в процессе и т. п.).</summary>
     public void Enqueue(IConnection connection) => _incoming.Enqueue(connection);
 
+    private readonly ConcurrentQueue<Action<Session>> _actions = new();
+
+    /// <summary>Выполнить действие над сессией в потоке цикла (команды консоли и т. п.).</summary>
+    public void Post(Action<Session> action) => _actions.Enqueue(action);
+
     public async Task RunAsync(QuicServer? server, CancellationToken ct, Action<string>? log = null)
     {
         if (server != null) _ = AcceptLoop(server, ct, log);
@@ -36,6 +41,7 @@ public sealed class SessionHost
             while (await timer.WaitForNextTickAsync(ct).ConfigureAwait(false))
             {
                 while (_incoming.TryDequeue(out IConnection? c)) _session.Accept(c);
+                while (_actions.TryDequeue(out Action<Session>? a)) a(_session);
                 _session.Pump();
                 TimeSpan now = clock.Elapsed;
                 _session.Advance(now - last);
