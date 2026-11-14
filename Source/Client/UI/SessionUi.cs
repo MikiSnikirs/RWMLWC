@@ -248,18 +248,103 @@ internal static class Patch_MapInterface_SessionStatus
     {
         ChatSelfTest.Frame();
         RWMLWC.Client.Net.NetworkGameMenu.Frame();
+        StatusLineView.OnGUI();
+    }
+}
+
+/// <summary>
+/// Строка состояния сессии (T-063): по умолчанию сверху справа, левее подсказок обучения
+/// (<c>LearningReadout</c>: ширина 200, отступ 8 от правого края). Перетаскивается мышью; место — отступы
+/// от правого и верхнего края — хранится в <c>RWMLWC/ui.txt</c> (личная настройка, не сейв).
+/// </summary>
+internal static class StatusLineView
+{
+    private const float DefaultRight = 8f + 200f + 8f; // правее — подсказки обучения
+    private const float DefaultTop = 8f;
+
+    private static float? _right;
+    private static float? _top;
+    private static bool _dragging;
+    private static Vector2 _grab;
+
+    private static string PathOnDisk => System.IO.Path.Combine(GenFilePaths.SaveDataFolderPath, "RWMLWC", "ui.txt");
+
+    internal static void OnGUI()
+    {
         string line = SessionUi.StatusLine();
         if (line.Length == 0) return;
         if (SessionUi.Unread > 0) line += $" · чат: {SessionUi.Unread}";
+        Load();
         Text.Font = GameFont.Tiny;
         Vector2 size = Text.CalcSize(line);
-        // Левее кнопок скорости (они занимают правые ~140 пикселей над рядом значков).
-        Rect r = new Rect(UI.screenWidth - 150f - size.x - 8f, UI.screenHeight - 165f, size.x + 8f, size.y + 2f);
-        Widgets.DrawBoxSolid(r, new Color(0f, 0f, 0f, 0.45f));
+        float w = size.x + 12f, h = size.y + 4f;
+        float x = Mathf.Clamp(UI.screenWidth - _right!.Value - w, 0f, UI.screenWidth - w);
+        float y = Mathf.Clamp(_top!.Value, 0f, UI.screenHeight - h);
+        var r = new Rect(x, y, w, h);
+
+        Event e = Event.current;
+        if (e.type == EventType.MouseDown && e.button == 0 && Mouse.IsOver(r))
+        {
+            _dragging = true;
+            _grab = e.mousePosition - r.position;
+            e.Use();
+        }
+        else if (_dragging && e.type == EventType.MouseDrag)
+        {
+            Vector2 pos = e.mousePosition - _grab;
+            _right = Mathf.Clamp(UI.screenWidth - pos.x - w, 0f, UI.screenWidth - w);
+            _top = Mathf.Clamp(pos.y, 0f, UI.screenHeight - h);
+            e.Use();
+        }
+        else if (_dragging && e.rawType == EventType.MouseUp)
+        {
+            _dragging = false;
+            Save();
+            e.Use();
+        }
+
+        Widgets.DrawBoxSolid(r, new Color(0f, 0f, 0f, _dragging ? 0.7f : 0.45f));
+        if (Mouse.IsOver(r)) Widgets.DrawHighlight(r);
         Text.Anchor = TextAnchor.MiddleCenter;
         Widgets.Label(r, line);
         Text.Anchor = TextAnchor.UpperLeft;
         Text.Font = GameFont.Small;
+        TooltipHandler.TipRegion(r, "Сетевая игра RWMLWC. Перетащите мышью, чтобы переместить. Игроки и чат — кнопка справа внизу.");
+    }
+
+    private static void Load()
+    {
+        if (_right.HasValue) return;
+        _right = DefaultRight;
+        _top = DefaultTop;
+        try
+        {
+            if (!System.IO.File.Exists(PathOnDisk)) return;
+            RWMLWC.Server.SettingsFile f = RWMLWC.Server.SettingsFile.LoadOrCreate(PathOnDisk, "");
+            _right = (float)f.GetDouble("status_right", DefaultRight, 0, 100000);
+            _top = (float)f.GetDouble("status_top", DefaultTop, 0, 100000);
+        }
+        catch (Exception)
+        {
+        }
+    }
+
+    private static void Save()
+    {
+        try
+        {
+            System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(PathOnDisk)!);
+            System.IO.File.WriteAllLines(PathOnDisk, new[]
+            {
+                "# Положение строки состояния RWMLWC: отступ от правого и верхнего края экрана, пиксели интерфейса.",
+                "# Удалите файл, чтобы вернуть место по умолчанию.",
+                "status_right = " + _right!.Value.ToString("0", System.Globalization.CultureInfo.InvariantCulture),
+                "status_top = " + _top!.Value.ToString("0", System.Globalization.CultureInfo.InvariantCulture),
+            });
+        }
+        catch (Exception)
+        {
+        }
     }
 }
 
