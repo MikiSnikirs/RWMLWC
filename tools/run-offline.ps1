@@ -19,7 +19,11 @@ param(
     [switch]$Trace,
     [int]$DenseFrom = -1,
     [int]$DenseTo = -1,
-    [switch]$Camera
+    [switch]$Camera,
+    [switch]$HostSession,       # TST-080: open a session in this game for a Steam friend
+    [int]$HoldSec = 180,        #   ... and hold the start until the friend is in
+    [switch]$JoinSteamFriend,   # TST-080: from the main menu, join the Steam friend who hosts a session
+    [int]$ConnectDelaySec = 20
 )
 
 $ErrorActionPreference = 'Stop'
@@ -74,6 +78,12 @@ Copy-Item -LiteralPath $saveFile (Join-Path $dir 'Saves\offline.rws')
 $arm = @('armed=1', 'save=offline', "scenarios=$($Queue -join ',')", "ticks=$Ticks", "trace=$(if ($Trace) { 1 } else { 0 })",
          'quit=1', "perprocess=$(if ($PerProcess) { 1 } else { 0 })", "camera=$(if ($Camera) { 1 } else { 0 })")
 if ($DenseFrom -ge 0 -and $DenseTo -gt $DenseFrom) { $arm += "densefrom=$DenseFrom"; $arm += "denseto=$DenseTo" }
+# Two machines, no server program (docs/TESTS.md, TST-080): the host opens a session inside its game and waits
+# for a Steam friend; the friend starts in the main menu and joins whoever of its Steam friends hosts a session.
+if ($HostSession) { $arm += 'hostsession=1'; $arm += "holdsec=$HoldSec"; $arm += 'name=hostA' }
+if ($JoinSteamFriend) {
+    $arm = @($arm | Where-Object { $_ -ne 'save=offline' -and $_ -notlike 'perprocess=*' }) + @('save=', 'steamhost=auto', "connectdelay=$ConnectDelaySec", 'name=friendB')
+}
 [IO.File]::WriteAllLines((Join-Path $dir 'RWMLWC\arm-determinism-run.txt'), $arm)
 [IO.File]::WriteAllText((Join-Path $dir 'RWMLWC\automation-progress.txt'), '0')
 
