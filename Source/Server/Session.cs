@@ -43,6 +43,14 @@ public sealed class Session
     private readonly List<Player> _players = new();
     private readonly Dictionary<(int map, int tick), (int playerId, MapHashMessage hash)> _hashes = new();
     private readonly Action<string> _log;
+    // Права по картам (T-031). Номер игрока постоянен в сессии (возврат по имени), поэтому храним номера.
+    private readonly SortedDictionary<int, MapRights> _maps = new();
+
+    private sealed class MapRights
+    {
+        public int Owner;
+        public readonly SortedDictionary<int, PermissionLevel> Grants = new();
+    }
     private int _nextPlayerId = 1;
     private long _nextSeq = 1;
     private double _tickAccumulator;
@@ -198,6 +206,7 @@ public sealed class Session
         }
 
         connection.Send(new WelcomeMessage { PlayerId = player.Id, ServerTick = TickUpTo, SessionSeed = _options.SessionSeed });
+        connection.Send(BuildPermissions());
         // Новому игроку — текущее разрешение, остальным — новая скорость (новый игрок держит паузу).
         connection.Send(new TickMessage { TickUpTo = TickUpTo, Speed = Speed });
         UpdateSpeed();
@@ -211,6 +220,13 @@ public sealed class Session
         switch (m)
         {
             case CommandMessage c:
+                PermissionLevel had = LevelOf(player.Id, c.MapId);
+                if (had < c.Required)
+                {
+                    _log($"отклонена команда игрока {player.Id} #{c.ClientSeq} на карте {c.MapId}: нужно {c.Required}, есть {had}");
+                    player.Connection.Send(new CommandRejectedMessage { ClientSeq = c.ClientSeq, MapId = c.MapId, Required = c.Required, Had = had });
+                    break;
+                }
                 // Исполняется всеми после тика TickUpTo: ни один клиент ещё не ушёл дальше него,
                 // а Tick с большим номером будет разослан только после этой команды.
                 Broadcast(new CommandOrderedMessage
@@ -223,6 +239,14 @@ public sealed class Session
                     Kind = c.Kind,
                     Payload = c.Payload,
                 });
+                break;
+
+            case MapClaimMessage claim:
+                Claim(player, claim.MapId);
+                break;
+
+            case GrantPermissionMessage grant:
+                Grant(player, grant);
                 break;
 
             case SpeedRequestMessage s:
@@ -263,6 +287,76 @@ public sealed class Session
             _log($"РАСХОЖДЕНИЕ карта {h.MapId} тик {h.Tick}: игрок {first.playerId} {first.hash.Total:X16}, игрок {player.Id} {h.Total:X16}");
             Desync?.Invoke(first.hash, first.playerId, h, player.Id);
         }
+    }
+
+    /// <summary>
+    /// Уровень прав игрока на карте: мир и карта без владельца — полный для всех; владелец — полный;
+    /// остальные — выданный владельцем уровень или «нет доступа».
+    /// </summary>
+    public PermissionLevel LevelOf(int playerId, int mapId)
+    {
+        if (mapId == ProtocolIds.WorldMapId || !_maps.TryGetValue(mapId, out MapRights? rights)) return PermissionLevel.Full;
+        if (rights.Owner == playerId) return PermissionLevel.Full;
+        return rights.Grants.TryGetValue(playerId, out PermissionLevel level) ? level : PermissionLevel.None;
+    }
+
+    /// <summary>Владелец карты или 0, если карта свободна.</summary>
+    public int OwnerOf(int mapId) => _maps.TryGetValue(mapId, out MapRights? r) ? r.Owner : 0;
+
+    private void Claim(Player player, int mapId)
+    {
+        if (mapId == ProtocolIds.WorldMapId)
+        {
+            _log($"игрок {player.Id}: заявка на мир как на карту — отклонена");
+            return;
+        }
+        if (_maps.TryGetValue(mapId, out MapRights? existing))
+        {
+            if (existing.Owner != player.Id)
+                _log($"игрок {player.Id}: карта {mapId} уже принадлежит игроку {existing.Owner} — заявка отклонена");
+            player.Connection.Send(BuildPermissions());
+            return;
+        }
+        if (_maps.Count >= ProtocolLimits.MaxMaps)
+        {
+            _log($"игрок {player.Id}: заявка на карту {mapId} — достигнут предел карт");
+            return;
+        }
+        _maps[mapId] = new MapRights { Owner = player.Id };
+        _log($"карта {mapId} принадлежит игроку {player.Id} «{player.Name}»");
+        Broadcast(BuildPermissions());
+    }
+
+    private void Grant(Player player, GrantPermissionMessage g)
+    {
+        if (!_maps.TryGetValue(g.MapId, out MapRights? rights) || rights.Owner != player.Id)
+        {
+            _log($"игрок {player.Id}: выдача прав на карту {g.MapId} — не владелец, отклонено");
+            player.Connection.Send(BuildPermissions());
+            return;
+        }
+        if (g.PlayerId == player.Id || _players.All(p => p.Id != g.PlayerId))
+        {
+            _log($"игрок {player.Id}: выдача прав на карту {g.MapId} игроку {g.PlayerId} — нет такого игрока или это владелец");
+            return;
+        }
+        if (g.Level == PermissionLevel.None) rights.Grants.Remove(g.PlayerId);
+        else if (rights.Grants.Count < ProtocolLimits.MaxGrantsPerMap || rights.Grants.ContainsKey(g.PlayerId)) rights.Grants[g.PlayerId] = g.Level;
+        else return;
+        _log($"карта {g.MapId}: игрок {g.PlayerId} — {g.Level}");
+        Broadcast(BuildPermissions());
+    }
+
+    private PermissionsMessage BuildPermissions()
+    {
+        var msg = new PermissionsMessage();
+        foreach (var (mapId, rights) in _maps)
+        {
+            var m = new MapPermissions { MapId = mapId, OwnerPlayerId = rights.Owner };
+            foreach (var (pid, level) in rights.Grants) m.Grants.Add(new PermissionGrant(pid, level));
+            msg.Maps.Add(m);
+        }
+        return msg;
     }
 
     /// <summary>Правило меньшей скорости: игра идёт на минимальной из скоростей игроков в сети; пауза любого — пауза всех.</summary>

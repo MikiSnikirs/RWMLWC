@@ -18,6 +18,26 @@ public enum MessageType : ushort
     SpeedRequest = 7,
     SnapshotChunk = 8,
     MapHash = 9,
+    MapClaim = 10,
+    GrantPermission = 11,
+    Permissions = 12,
+    CommandRejected = 13,
+}
+
+/// <summary>
+/// Уровень прав игрока на карте (T-031). Владелец карты всегда <see cref="Full"/>.
+/// Карта без владельца и уровень мира (<see cref="ProtocolIds.WorldMapId"/>) — <see cref="Full"/> для всех.
+/// </summary>
+public enum PermissionLevel : byte
+{
+    /// <summary>Нет доступа.</summary>
+    None = 0,
+    /// <summary>Видит карту, команд не отдаёт.</summary>
+    Observer = 1,
+    /// <summary>Строительство и разметка (дезигнаторы, чертежи, зоны).</summary>
+    Build = 2,
+    /// <summary>Всё, включая приказы пешкам.</summary>
+    Full = 3,
 }
 
 /// <summary>Причина отказа сервера в подключении.</summary>
@@ -141,6 +161,11 @@ public sealed class CommandMessage : Message
     public int MapId;
     /// <summary>Вид команды. Реестр видов ведёт клиент (зона A, T-020–T-023).</summary>
     public int Kind;
+    /// <summary>
+    /// Какой уровень прав нужен на карте <see cref="MapId"/>, чтобы сервер принял команду (T-031).
+    /// Его ставит механизм перехвата ввода: разметка и чертежи — <see cref="PermissionLevel.Build"/>, остальное — <see cref="PermissionLevel.Full"/>.
+    /// </summary>
+    public PermissionLevel Required = PermissionLevel.Full;
     public byte[] Payload = Array.Empty<byte>();
 
     public override void Write(PacketWriter w)
@@ -148,6 +173,7 @@ public sealed class CommandMessage : Message
         w.WriteInt32(ClientSeq);
         w.WriteInt32(MapId);
         w.WriteInt32(Kind);
+        w.WriteByte((byte)Required);
         w.WriteBytes(Payload);
     }
 
@@ -156,8 +182,16 @@ public sealed class CommandMessage : Message
         ClientSeq = r.ReadInt32(),
         MapId = r.ReadInt32(),
         Kind = r.ReadInt32(),
+        Required = ReadLevel(ref r),
         Payload = r.ReadBytes(),
     };
+
+    internal static PermissionLevel ReadLevel(ref PacketReader r)
+    {
+        byte b = r.ReadByte();
+        if (b > (byte)PermissionLevel.Full) throw new ProtocolException($"Неверный уровень прав: {b}");
+        return (PermissionLevel)b;
+    }
 }
 
 /// <summary>
@@ -329,4 +363,119 @@ public sealed class MapHashMessage : Message
             m.Parts.Add(new HashPart(r.ReadString(), r.ReadUInt64()));
         return m;
     }
+}
+
+/// <summary>Клиент → сервер: «эта карта моя» (основал поселение, хост своей колонии). Свободную карту сервер отдаёт заявителю.</summary>
+public sealed class MapClaimMessage : Message
+{
+    public override MessageType Type => MessageType.MapClaim;
+
+    public int MapId;
+
+    public override void Write(PacketWriter w) => w.WriteInt32(MapId);
+
+    internal static MapClaimMessage Read(ref PacketReader r) => new() { MapId = r.ReadInt32() };
+}
+
+/// <summary>Клиент → сервер: владелец карты выдаёт игроку уровень прав; <see cref="PermissionLevel.None"/> — отзыв.</summary>
+public sealed class GrantPermissionMessage : Message
+{
+    public override MessageType Type => MessageType.GrantPermission;
+
+    public int MapId;
+    public int PlayerId;
+    public PermissionLevel Level;
+
+    public override void Write(PacketWriter w)
+    {
+        w.WriteInt32(MapId);
+        w.WriteInt32(PlayerId);
+        w.WriteByte((byte)Level);
+    }
+
+    internal static GrantPermissionMessage Read(ref PacketReader r) => new()
+    {
+        MapId = r.ReadInt32(),
+        PlayerId = r.ReadInt32(),
+        Level = CommandMessage.ReadLevel(ref r),
+    };
+}
+
+/// <summary>Выданные права на одной карте.</summary>
+public readonly record struct PermissionGrant(int PlayerId, PermissionLevel Level);
+
+/// <summary>Владелец и выданные права одной карты.</summary>
+public sealed class MapPermissions
+{
+    public int MapId;
+    public int OwnerPlayerId;
+    public List<PermissionGrant> Grants = new();
+}
+
+/// <summary>Сервер → все: полная таблица владельцев и прав. Рассылается при входе игрока и при каждом изменении.</summary>
+public sealed class PermissionsMessage : Message
+{
+    public override MessageType Type => MessageType.Permissions;
+
+    public List<MapPermissions> Maps = new();
+
+    public override void Write(PacketWriter w)
+    {
+        if (Maps.Count > ProtocolLimits.MaxMaps) throw new ProtocolException($"Карт больше {ProtocolLimits.MaxMaps}");
+        w.WriteInt32(Maps.Count);
+        foreach (MapPermissions m in Maps)
+        {
+            if (m.Grants.Count > ProtocolLimits.MaxGrantsPerMap) throw new ProtocolException($"Выданных прав больше {ProtocolLimits.MaxGrantsPerMap}");
+            w.WriteInt32(m.MapId);
+            w.WriteInt32(m.OwnerPlayerId);
+            w.WriteInt32(m.Grants.Count);
+            foreach (PermissionGrant g in m.Grants)
+            {
+                w.WriteInt32(g.PlayerId);
+                w.WriteByte((byte)g.Level);
+            }
+        }
+    }
+
+    internal static PermissionsMessage Read(ref PacketReader r)
+    {
+        var msg = new PermissionsMessage();
+        int maps = r.ReadCount(ProtocolLimits.MaxMaps, 12);
+        for (int i = 0; i < maps; i++)
+        {
+            var m = new MapPermissions { MapId = r.ReadInt32(), OwnerPlayerId = r.ReadInt32() };
+            int grants = r.ReadCount(ProtocolLimits.MaxGrantsPerMap, 5);
+            for (int j = 0; j < grants; j++)
+                m.Grants.Add(new PermissionGrant(r.ReadInt32(), CommandMessage.ReadLevel(ref r)));
+            msg.Maps.Add(m);
+        }
+        return msg;
+    }
+}
+
+/// <summary>Сервер → автору: команда отклонена (нет прав) и никому не разослана.</summary>
+public sealed class CommandRejectedMessage : Message
+{
+    public override MessageType Type => MessageType.CommandRejected;
+
+    public int ClientSeq;
+    public int MapId;
+    public PermissionLevel Required;
+    public PermissionLevel Had;
+
+    public override void Write(PacketWriter w)
+    {
+        w.WriteInt32(ClientSeq);
+        w.WriteInt32(MapId);
+        w.WriteByte((byte)Required);
+        w.WriteByte((byte)Had);
+    }
+
+    internal static CommandRejectedMessage Read(ref PacketReader r) => new()
+    {
+        ClientSeq = r.ReadInt32(),
+        MapId = r.ReadInt32(),
+        Required = CommandMessage.ReadLevel(ref r),
+        Had = CommandMessage.ReadLevel(ref r),
+    };
 }

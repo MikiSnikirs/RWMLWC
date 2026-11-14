@@ -7,8 +7,11 @@ namespace RWMLWC.Shared;
 /// </summary>
 public static class ProtocolInfo
 {
-    /// <summary>Версия протокола. 1 — протокол v0 (T-011): рукопожатие, команды, тик, снимок, хеш.</summary>
-    public const int ProtocolVersion = 1;
+    /// <summary>
+    /// Версия протокола. 1 — протокол v0 (T-011): рукопожатие, команды, тик, снимок, хеш.
+    /// 2 — права на карты (T-031): <c>Command.Required</c>, <c>MapClaim</c>, <c>GrantPermission</c>, <c>Permissions</c>, <c>CommandRejected</c>.
+    /// </summary>
+    public const int ProtocolVersion = 2;
 
     /// <summary>Идентификатор мода: packageId в About.xml и id экземпляра Harmony.</summary>
     public const string ModId = "MikiSnikirs.RWMLWC";
