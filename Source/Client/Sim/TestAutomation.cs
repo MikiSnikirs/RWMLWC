@@ -14,6 +14,9 @@ namespace RWMLWC.Client.Sim;
 ///   armed=0            — метка выключена (то же, что отсутствие файла);
 ///   save=Имя           — сразу после запуска игры загрузить этот сейв;
 ///   scenario=none|raid|twomaps|twomaps-freeze — что сделать в первом тике прогона;
+///   scenarios=a,b,c    — очередь сценариев: прогоны идут подряд в одном запуске игры, сейв
+///                        перезагружается между ними; пройденное число хранится в automation-progress.txt,
+///                        когда очередь пройдена, метка считается выключенной;
 ///   ticks=10000        — длительность прогона;
 ///   trace=0|1          — писать ли трассировку Rand (большой файл);
 ///   quit=1             — после прогона закрыть игру.
@@ -26,14 +29,49 @@ public static class TestAutomation
         public bool armed;
         public string? save;
         public string scenario = "none";
+        public List<string>? queue;
+        public int queueIndex;
         public int ticks = HashRecorder.AutoRunTicks;
         public bool trace = true;
         public bool quit;
     }
 
+    private static Config? activeConfig;
     private static string? pendingScenario;
     private static bool quitWhenDone;
     private static bool automationActive;
+    private static bool reloadPending;
+    private static string? reloadSave;
+
+    public static string ProgressPath => Path.Combine(GenFilePaths.SaveDataFolderPath, "RWMLWC", "automation-progress.txt");
+
+    private static int ReadProgress()
+    {
+        try
+        {
+            string path = ProgressPath;
+            if (File.Exists(path) && int.TryParse(File.ReadAllText(path).Trim(), out int value) && value >= 0)
+            {
+                return value;
+            }
+        }
+        catch (Exception)
+        {
+        }
+        return 0;
+    }
+
+    private static void WriteProgress(int value)
+    {
+        try
+        {
+            File.WriteAllText(ProgressPath, value.ToString());
+        }
+        catch (Exception ex)
+        {
+            Note("cannot write progress: " + ex.Message);
+        }
+    }
 
     /// <summary>Идёт автоматический прогон: игра сама снимает паузу и сама закроется.</summary>
     public static bool AutomationActive => automationActive;
@@ -70,6 +108,17 @@ public static class TestAutomation
                 case "scenario":
                     cfg.scenario = value.Length > 0 ? value.ToLowerInvariant() : "none";
                     break;
+                case "scenarios":
+                    cfg.queue = new List<string>();
+                    foreach (string part in value.Split(','))
+                    {
+                        string name = part.Trim().ToLowerInvariant();
+                        if (name.Length > 0)
+                        {
+                            cfg.queue.Add(name);
+                        }
+                    }
+                    break;
                 case "ticks":
                     if (int.TryParse(value, out int ticks) && ticks > 0)
                     {
@@ -82,6 +131,18 @@ public static class TestAutomation
                 case "quit":
                     cfg.quit = value == "1";
                     break;
+            }
+        }
+        if (cfg.queue != null)
+        {
+            cfg.queueIndex = ReadProgress();
+            if (cfg.queueIndex >= cfg.queue.Count)
+            {
+                cfg.armed = false; // очередь пройдена
+            }
+            else
+            {
+                cfg.scenario = cfg.queue[cfg.queueIndex];
             }
         }
         return cfg;
@@ -111,7 +172,8 @@ public static class TestAutomation
         {
             Find.TickManager.CurTimeSpeed = TimeSpeed.Superfast;
         }
-        Note($"run started: tick={startTick}, scenario={cfg.scenario}, ticks={cfg.ticks}, trace={cfg.trace}, quit={cfg.quit}, file={Path.GetFileName(hashFile)}");
+        activeConfig = cfg;
+        Note($"run started: #{cfg.queueIndex}, tick={startTick}, scenario={cfg.scenario}, ticks={cfg.ticks}, trace={cfg.trace}, quit={cfg.quit}, file={Path.GetFileName(hashFile)}");
     }
 
     /// <summary>Вызывается в первом тике прогона, уже в контексте симуляции (после MapRandContext.BeginTick).</summary>
@@ -151,6 +213,23 @@ public static class TestAutomation
     public static void OnRunFinished(string? hashFile)
     {
         Note("run finished: file=" + Path.GetFileName(hashFile));
+        Config? cfg = activeConfig;
+        activeConfig = null;
+        if (cfg != null && cfg.queue != null)
+        {
+            int next = cfg.queueIndex + 1;
+            WriteProgress(next);
+            if (next < cfg.queue.Count && cfg.save != null)
+            {
+                // Следующий прогон очереди: перезагрузить сейв. Делается из кадра, не из тика.
+                PerMapSim.SetEnabled(false);
+                reloadSave = cfg.save;
+                reloadPending = true;
+                Note("queue: reloading save for run #" + next + " (" + cfg.queue[next] + ")");
+                return;
+            }
+            Note("queue: finished");
+        }
         automationActive = false;
         if (quitWhenDone)
         {
@@ -163,6 +242,24 @@ public static class TestAutomation
     /// <summary>Вызывается раз в кадр во время автоматического прогона: снять автопаузу (например, от письма о рейде).</summary>
     public static void KeepRunning()
     {
+        if (reloadPending)
+        {
+            reloadPending = false;
+            string? save = reloadSave;
+            reloadSave = null;
+            if (save != null)
+            {
+                try
+                {
+                    GameDataSaveLoader.CheckVersionAndLoadGame(save);
+                }
+                catch (Exception ex)
+                {
+                    Note("queue: reload FAILED: " + ex);
+                }
+            }
+            return;
+        }
         if (automationActive && Current.Game != null && Find.TickManager.CurTimeSpeed == TimeSpeed.Paused)
         {
             Find.TickManager.CurTimeSpeed = TimeSpeed.Superfast;
