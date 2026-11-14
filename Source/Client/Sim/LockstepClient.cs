@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using HarmonyLib;
 using RimWorld;
 using RWMLWC.Client.Input;
+using RWMLWC.Client.Maps;
 using RWMLWC.Net;
 using RWMLWC.Shared;
 using RWMLWC.Shared.Protocol;
@@ -24,8 +25,12 @@ namespace RWMLWC.Client.Sim;
 /// Команды игроков (T-020): SendCommand отправляет действие серверу; пришедшие в общем порядке
 /// команды (CommandOrdered) исполняются между тиками — команда с Tick = T после тика T и до тика T+1.
 ///
-/// Нет: переподключения, догона (T-045),
-/// реакции на рассинхронизацию (T-034).
+/// Вход в идущую игру (T-045, первая версия): клиент без мира или с другим тиком просит снимок командой
+/// RequestSnapshot. Команда стоит в общем порядке, поэтому все исполняют её в одной точке: клиент-хост
+/// снимает снимок всей игры и рассылает его кусками, после чего снимок загружают все, включая хоста
+/// (загруженная игра и непрерывная идут по-разному, см. docs/research/sim.md, 6д).
+///
+/// Нет: переподключения, реакции на рассинхронизацию (T-034), отдачи копии с сервера без хоста.
 /// </summary>
 public static class LockstepClient
 {
@@ -35,7 +40,19 @@ public static class LockstepClient
         Connecting,
         WaitingWelcome,
         InSession,
+
+        /// <summary>В сессии, но ждём куски снимка мира (вошли без мира либо идёт общая перезагрузка).</summary>
+        WaitingSnapshot,
+
+        /// <summary>Снимок получен, игра загружается.</summary>
+        Loading,
     }
+
+    /// <summary>Вид команды «нужен снимок мира»; исполняет её сам LockstepClient, не CommandBus.</summary>
+    public const int RequestSnapshotKind = 100;
+
+    private const byte SnapshotFormat = 1;
+    private const int SnapshotChunkPayload = 200_000;
 
     /// <summary>Не дольше стольких миллисекунд за кадр тратим на догон тиков.</summary>
     private const int FrameBudgetMs = 25;
@@ -52,6 +69,18 @@ public static class LockstepClient
     private static int sentSpeed = -1;
     private static bool applyingServerSpeed;
     private static int nextClientSeq = 1;
+    private static uint sessionSeed;
+    private static int expectedSnapshotId = -1;
+    private static bool snapshotRequestSeen;
+    private static readonly Dictionary<int, byte[]?[]> incomingSnapshots = new Dictionary<int, byte[]?[]>();
+    private static bool gameLoadedPending;
+    private static bool forcePauseActive;
+    private static int speedBeforeForcePause;
+
+    /// <summary>Для тестов с отдельным сервером: этот клиент отдаёт снимок (в обычной игре — тот, кто держит сессию).</summary>
+    public static bool ForceSnapshotSender;
+
+    private static bool IsSnapshotSender => ForceSnapshotSender || RWMLWC.Client.Net.HostedSession.Running;
     private static readonly Queue<CommandOrderedMessage> pendingCommands = new Queue<CommandOrderedMessage>();
 
     /// <summary>Сколько команд этот клиент отправил серверу.</summary>
@@ -116,6 +145,12 @@ public static class LockstepClient
         nextClientSeq = 1;
         pendingCommands.Clear();
         CommandBus.Reset();
+        expectedSnapshotId = -1;
+        snapshotRequestSeen = false;
+        incomingSnapshots.Clear();
+        gameLoadedPending = false;
+        forcePauseActive = false;
+        MapAccess.Reset();
         connecting = connectingTask;
         state = State.Connecting;
         TestAutomation.Note($"lockstep: connecting to {description} as '{name}'");
@@ -145,11 +180,48 @@ public static class LockstepClient
     /// </summary>
     public static bool OnFrame(TickManager tickManager)
     {
+        return Pump(tickManager);
+    }
+
+    /// <summary>Раз в кадр, пока игры нет или она загружается (главное меню, экран загрузки).</summary>
+    public static void PumpWithoutGame()
+    {
+        if (state == State.Off)
+        {
+            return;
+        }
+        if (state == State.InSession && Current.Game == null)
+        {
+            Disconnect("игра закрыта"); // игрок вышел в главное меню
+            return;
+        }
+        Pump(null);
+    }
+
+    /// <summary>Игра загружена (любая). Если это наш снимок — продолжим сессию со следующего кадра.</summary>
+    public static void OnGameLoaded()
+    {
+        if (state == State.Loading)
+        {
+            gameLoadedPending = true;
+        }
+        else if (state != State.Off)
+        {
+            TestAutomation.Note("lockstep: another game was loaded during the session, state=" + state);
+            Disconnect("загружена другая игра");
+        }
+    }
+
+    private static bool Pump(TickManager? tickManager)
+    {
         if (state == State.Off)
         {
             return false;
         }
-        ticksThisFrameRef(tickManager) = 0;
+        if (tickManager != null)
+        {
+            ticksThisFrameRef(tickManager) = 0;
+        }
 
         if (state == State.Connecting)
         {
@@ -173,7 +245,7 @@ public static class LockstepClient
                 ModListHash = ModListHash(),
                 // Версия локальной копии сейва (контракт v2): мир и тик, на котором стоит игра.
                 SaveWorldId = Current.Game != null ? unchecked((uint)Find.World.info.persistentRandomValue) : 0UL,
-                SaveTick = Current.Game != null ? tickManager.TicksGame : 0,
+                SaveTick = tickManager != null ? tickManager.TicksGame : 0,
             });
             state = State.WaitingWelcome;
             TestAutomation.Note("lockstep: connected to " + connection.Remote + ", Hello sent");
@@ -204,8 +276,30 @@ public static class LockstepClient
             return false;
         }
 
-        if (state == State.InSession)
+        if (state == State.Loading && gameLoadedPending && tickManager != null)
         {
+            FinishSnapshotLoad(tickManager);
+        }
+
+        if (state == State.InSession && tickManager != null)
+        {
+            // Окно, которое в одиночной игре останавливает время (торговля, выбор в письме, меню),
+            // в сессии просит паузу у сервера — для всех; закрылось — возвращаем прежнюю скорость.
+            bool forcePaused = tickManager.ForcePaused;
+            if (forcePaused && !forcePauseActive)
+            {
+                forcePauseActive = true;
+                speedBeforeForcePause = sentSpeed;
+                RequestSpeed(0);
+            }
+            else if (!forcePaused && forcePauseActive)
+            {
+                forcePauseActive = false;
+                if (speedBeforeForcePause > 0)
+                {
+                    RequestSpeed(speedBeforeForcePause);
+                }
+            }
             TestAutomation.SessionFrame();
             if (heldSpeed >= 0 && !Holding)
             {
@@ -219,19 +313,31 @@ public static class LockstepClient
         return true;
     }
 
-    private static void Handle(TickManager tickManager, Message message)
+    private static void Handle(TickManager? tickManager, Message message)
     {
         switch (message)
         {
             case WelcomeMessage welcome:
                 PlayerId = welcome.PlayerId;
+                MapAccess.NotePlayer(welcome.PlayerId);
                 tickUpTo = welcome.ServerTick;
-                if (welcome.ServerTick != tickManager.TicksGame)
+                sessionSeed = welcome.SessionSeed;
+                if (tickManager == null || welcome.ServerTick != tickManager.TicksGame)
                 {
-                    // Клиент и сервер должны стартовать с одного тика (догон — T-045).
-                    TestAutomation.Note($"lockstep: tick mismatch, server={welcome.ServerTick}, game={tickManager.TicksGame}");
-                    Disconnect("несовпадение тика с сервером");
-                    return;
+                    // Мира нет или он на другом тике: просим снимок. Пока не пришлём SpeedRequest,
+                    // сервер держит паузу для всех, так что мир за это время не уйдёт вперёд.
+                    TestAutomation.Note($"lockstep: Welcome, playerId={welcome.PlayerId}, serverTick={welcome.ServerTick}, game={(tickManager != null ? tickManager.TicksGame.ToString() : "none")}: requesting world snapshot");
+                    state = State.WaitingSnapshot;
+                    snapshotRequestSeen = false;
+                    expectedSnapshotId = -1;
+                    connection?.Send(new CommandMessage
+                    {
+                        ClientSeq = nextClientSeq++,
+                        MapId = ProtocolIds.WorldMapId,
+                        Kind = RequestSnapshotKind,
+                        Required = PermissionLevel.Observer,
+                    });
+                    break;
                 }
                 SimSession.Begin(welcome.SessionSeed);
                 state = State.InSession;
@@ -248,6 +354,11 @@ public static class LockstepClient
 
             case TickMessage tick:
                 tickUpTo = tick.TickUpTo;
+                if (tickManager == null || state != State.InSession)
+                {
+                    serverSpeed = tick.Speed; // применим, когда игра загрузится
+                    break;
+                }
                 if (tick.Speed != serverSpeed || (int)tickManager.CurTimeSpeed != tick.Speed)
                 {
                     serverSpeed = tick.Speed;
@@ -265,7 +376,32 @@ public static class LockstepClient
                 break;
 
             case CommandOrderedMessage ordered:
+                MapAccess.NotePlayer(ordered.PlayerId);
+                if (state == State.WaitingSnapshot && !snapshotRequestSeen)
+                {
+                    // Вошли без мира. Всё, что стоит в общем порядке до нашей просьбы, уже будет внутри снимка.
+                    if (ordered.Kind == RequestSnapshotKind && ordered.PlayerId == PlayerId)
+                    {
+                        snapshotRequestSeen = true;
+                        expectedSnapshotId = SnapshotIdFor(ordered);
+                        pendingCommands.Clear();
+                        TryLoadExpectedSnapshot();
+                    }
+                    break;
+                }
                 pendingCommands.Enqueue(ordered);
+                break;
+
+            case SnapshotChunkMessage chunk:
+                OnSnapshotChunk(chunk);
+                break;
+
+            case NoticeMessage notice:
+                OnNotice(notice);
+                break;
+
+            case PermissionsMessage permissions:
+                MapAccess.OnPermissions(permissions);
                 break;
 
             case CommandRejectedMessage rejected:
@@ -278,12 +414,30 @@ public static class LockstepClient
         }
     }
 
+    /// <summary>Отправить серверу служебное сообщение (заявка на карту, выдача прав). Вне сессии — ничего.</summary>
+    public static void SendRaw(Message message)
+    {
+        if (state == State.InSession)
+        {
+            connection?.Send(message);
+        }
+    }
+
     /// <summary>Отправить команду игрока серверу. Исполнится у всех, когда вернётся в общем порядке.</summary>
     public static int SendCommand(int mapId, int kind, PermissionLevel required, byte[] payload)
     {
         IConnection? conn = connection;
         if (state != State.InSession || conn == null)
         {
+            return -1;
+        }
+        if (MapAccess.MyLevel(mapId) < required)
+        {
+            // Сервер такую команду отклонит; не шлём и говорим игроку сразу.
+            if (Current.ProgramState == ProgramState.Playing)
+            {
+                Messages.Message("RWMLWC: на этой карте у вас права «" + MapAccess.LevelLabel(MapAccess.MyLevel(mapId)) + "», для этого действия нужны «" + MapAccess.LevelLabel(required) + "»", MessageTypeDefOf.RejectInput, false);
+            }
             return -1;
         }
         int clientSeq = nextClientSeq++;
@@ -304,6 +458,11 @@ public static class LockstepClient
         while (pendingCommands.Count > 0 && pendingCommands.Peek().Tick <= tickManager.TicksGame && state == State.InSession)
         {
             CommandOrderedMessage command = pendingCommands.Dequeue();
+            if (command.Kind == RequestSnapshotKind)
+            {
+                BeginSnapshotRound(command);
+                continue; // состояние сменилось: цикл остановится, остальные команды — после загрузки
+            }
             if (command.Tick < tickManager.TicksGame)
             {
                 // Сервер обещает прислать команду раньше разрешения на следующий тик; сюда попадать не должны.
@@ -313,17 +472,205 @@ public static class LockstepClient
         }
     }
 
+    // ---------- сообщения сервера игроку; расхождение ----------
+
+    /// <summary>
+    /// Код Notice «состояния игроков разошлись» (T-034). В NoticeCode его пока нет — предложение
+    /// агенту B (КОНТРАКТ); число выбрано следующим свободным. Пока сервер его не шлёт, код не срабатывает.
+    /// </summary>
+    public const ushort NoticeDesync = 3;
+
+    private static readonly Stopwatch resyncClock = new Stopwatch();
+
+    /// <summary>Сколько раз этот клиент запускал общую перезагрузку из-за расхождения.</summary>
+    public static int ResyncsStarted { get; private set; }
+
+    private static void OnNotice(NoticeMessage notice)
+    {
+        TestAutomation.Note($"lockstep: notice {(ushort)notice.Code}: {notice.Text}");
+        if ((ushort)notice.Code != NoticeDesync)
+        {
+            if (Current.ProgramState == ProgramState.Playing)
+            {
+                Messages.Message("RWMLWC: " + notice.Text, MessageTypeDefOf.CautionInput, false);
+            }
+            return;
+        }
+        // Лечение расхождения (T-034, первая версия): тот же общий снимок, что при входе игрока.
+        // Просит его клиент, который держит сессию; не чаще раза в 10 секунд.
+        if (!IsSnapshotSender || state != State.InSession || (resyncClock.IsRunning && resyncClock.ElapsedMilliseconds < 10_000))
+        {
+            return;
+        }
+        resyncClock.Restart();
+        ResyncsStarted++;
+        TestAutomation.Note("lockstep: desync reported, requesting a common snapshot");
+        if (Current.ProgramState == ProgramState.Playing)
+        {
+            Messages.Message("RWMLWC: игра разошлась между игроками — перезагружаем общий снимок", MessageTypeDefOf.CautionInput, false);
+        }
+        connection?.Send(new CommandMessage
+        {
+            ClientSeq = nextClientSeq++,
+            MapId = ProtocolIds.WorldMapId,
+            Kind = RequestSnapshotKind,
+            Required = PermissionLevel.Observer,
+        });
+    }
+
+    // ---------- снимок мира: вход в идущую игру ----------
+
+    // Снимок опознаётся номером команды-просьбы в общем порядке: так нельзя принять снимок, снятый раньше просьбы.
+    private static int SnapshotIdFor(CommandOrderedMessage request) => unchecked((int)(request.Seq & 0x7FFFFFFF));
+
+    // Все клиенты с миром приходят сюда в одной и той же точке общего порядка.
+    private static void BeginSnapshotRound(CommandOrderedMessage request)
+    {
+        TickManager tickManager = Find.TickManager;
+        expectedSnapshotId = SnapshotIdFor(request);
+        snapshotRequestSeen = true;
+        // На время перезагрузки просим паузу; после загрузки каждый вернёт скорость, что была в мире на момент снимка.
+        RequestSpeed(0);
+        state = State.WaitingSnapshot;
+        HashRecorder.Instance?.SuspendForSnapshotReload();
+        if (!IsSnapshotSender)
+        {
+            TestAutomation.Note($"lockstep: player {request.PlayerId} asked for a snapshot at tick {tickManager.TicksGame}; waiting for it");
+            TryLoadExpectedSnapshot(); // куски могли прийти раньше
+            return;
+        }
+        IConnection? conn = connection;
+        if (conn == null)
+        {
+            return;
+        }
+        byte[] packed = GameSnapshot.Take(out GameSnapshot.Stats stats);
+        byte[] data = new byte[packed.Length + 1];
+        data[0] = SnapshotFormat;
+        Buffer.BlockCopy(packed, 0, data, 1, packed.Length);
+        int count = (data.Length + SnapshotChunkPayload - 1) / SnapshotChunkPayload;
+        for (int i = 0; i < count; i++)
+        {
+            int offset = i * SnapshotChunkPayload;
+            int length = Math.Min(SnapshotChunkPayload, data.Length - offset);
+            byte[] part = new byte[length];
+            Buffer.BlockCopy(data, offset, part, 0, length);
+            conn.Send(new SnapshotChunkMessage
+            {
+                SnapshotId = expectedSnapshotId,
+                MapId = ProtocolIds.WorldMapId,
+                Tick = tickManager.TicksGame,
+                ChunkIndex = i,
+                ChunkCount = count,
+                Data = part,
+            });
+        }
+        TestAutomation.Note($"lockstep: snapshot for player {request.PlayerId} at tick {tickManager.TicksGame}: {stats}, {count} chunks sent; reloading it here too");
+        // Отправитель загружает тот же снимок, что и остальные.
+        state = State.Loading;
+        gameLoadedPending = false;
+        GameSnapshot.Apply(packed);
+    }
+
+    // Куски копятся при любом состоянии: отстающий клиент может получить их раньше, чем дойдёт до просьбы в общем порядке.
+    private static void OnSnapshotChunk(SnapshotChunkMessage chunk)
+    {
+        if (chunk.MapId != ProtocolIds.WorldMapId)
+        {
+            return; // пересылка одной карты — T-034
+        }
+        if (!incomingSnapshots.TryGetValue(chunk.SnapshotId, out byte[]?[]? parts) || parts.Length != chunk.ChunkCount)
+        {
+            parts = new byte[]?[chunk.ChunkCount];
+            incomingSnapshots[chunk.SnapshotId] = parts;
+        }
+        parts[chunk.ChunkIndex] = chunk.Data;
+        TryLoadExpectedSnapshot();
+    }
+
+    private static void TryLoadExpectedSnapshot()
+    {
+        if (state != State.WaitingSnapshot || expectedSnapshotId < 0
+            || !incomingSnapshots.TryGetValue(expectedSnapshotId, out byte[]?[]? parts))
+        {
+            return;
+        }
+        int total = 0;
+        for (int i = 0; i < parts.Length; i++)
+        {
+            byte[]? part = parts[i];
+            if (part == null)
+            {
+                return; // ещё не все куски
+            }
+            total += part.Length;
+        }
+        byte[] data = new byte[total];
+        int offset = 0;
+        for (int i = 0; i < parts.Length; i++)
+        {
+            byte[] part = parts[i]!;
+            Buffer.BlockCopy(part, 0, data, offset, part.Length);
+            offset += part.Length;
+        }
+        incomingSnapshots.Clear();
+        if (data.Length < 2 || data[0] != SnapshotFormat)
+        {
+            TestAutomation.Note("lockstep: snapshot has unknown format " + (data.Length > 0 ? data[0].ToString() : "empty"));
+            Disconnect("неизвестный формат снимка");
+            return;
+        }
+        byte[] packed = new byte[data.Length - 1];
+        Buffer.BlockCopy(data, 1, packed, 0, packed.Length);
+        TestAutomation.Note($"lockstep: snapshot {expectedSnapshotId} received, {data.Length} bytes; loading");
+        state = State.Loading;
+        gameLoadedPending = false;
+        try
+        {
+            GameSnapshot.Apply(packed);
+        }
+        catch (Exception ex)
+        {
+            TestAutomation.Note("lockstep: snapshot load FAILED: " + ex);
+            Disconnect("снимок не загрузился");
+        }
+    }
+
+    // Первый кадр после загрузки снимка: все GameComponent.LoadedGame уже отработали.
+    private static void FinishSnapshotLoad(TickManager tickManager)
+    {
+        gameLoadedPending = false;
+        SimSession.Begin(sessionSeed);
+        VirtualUi.Reset();
+        state = State.InSession;
+        holdClock.Restart();
+        connection?.Send(new SnapshotAppliedMessage { SnapshotId = expectedSnapshotId, Tick = tickManager.TicksGame });
+        TestAutomation.Note($"lockstep: snapshot loaded, tick {tickManager.TicksGame}, serverTick={tickUpTo}, perMapSim={PerMapSim.Enabled}");
+        // Скорость — та, что была в мире на момент снимка; на паузе остаёмся на паузе, пока кто-то её не снимет.
+        sentSpeed = -1;
+        RequestSpeed((int)tickManager.CurTimeSpeed);
+        applyingServerSpeed = true;
+        try
+        {
+            curTimeSpeedRef(tickManager) = (TimeSpeed)serverSpeed;
+        }
+        finally
+        {
+            applyingServerSpeed = false;
+        }
+    }
+
     private static void RunTicks(TickManager tickManager)
     {
         // Команды, пришедшие, пока игра стоит на этом тике (в том числе на паузе).
         ExecuteDueCommands(tickManager);
-        if (tickManager.TicksGame >= tickUpTo)
+        if (state != State.InSession || tickManager.TicksGame >= tickUpTo)
         {
             return;
         }
         frameClock.Restart();
         int done = 0;
-        while (tickManager.TicksGame < tickUpTo)
+        while (tickManager.TicksGame < tickUpTo && state == State.InSession)
         {
             tickManager.DoSingleTick();
             done++;
@@ -425,6 +772,8 @@ public static class LockstepClient
             }
             hash.Add(-1);
         }
+        // Язык игры в хеш не входит: игроки с разными языками могут играть вместе. Тексты, которые
+        // игра собирает из правил языка через Rand, изолированы от симуляции (TextRandIsolation).
         return hash.Value;
     }
 }
@@ -486,5 +835,28 @@ internal static class Patch_TickManager_TogglePaused
         }
         LockstepClient.RequestTogglePause();
         return false;
+    }
+}
+
+// Пока игры нет или она загружается, штатный цикл тиков не вызывается; сообщения сервера читаем отсюда.
+[HarmonyPatch(typeof(Root_Entry), nameof(Root_Entry.Update))]
+internal static class Patch_Root_Entry_Update
+{
+    private static void Postfix()
+    {
+        TestAutomation.EntryFrame();
+        LockstepClient.PumpWithoutGame();
+    }
+}
+
+[HarmonyPatch(typeof(Root_Play), nameof(Root_Play.Update))]
+internal static class Patch_Root_Play_Update
+{
+    private static void Postfix()
+    {
+        if (Current.ProgramState != ProgramState.Playing)
+        {
+            LockstepClient.PumpWithoutGame();
+        }
     }
 }

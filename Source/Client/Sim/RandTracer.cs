@@ -18,7 +18,8 @@ namespace RWMLWC.Client.Sim;
 /// </summary>
 public static class RandTracer
 {
-    private const int MaxFrames = 7;
+    /// <summary>Сколько кадров стека писать на вызов. Задаётся ключом traceframes файла-метки.</summary>
+    public static int MaxFrames = 7;
 
     private static bool active;
     private static string? filePath;

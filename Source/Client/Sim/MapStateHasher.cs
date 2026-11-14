@@ -38,6 +38,8 @@ public static class MapStateHasher
     private static readonly List<Thing> tmpThings = new List<Thing>();
     private static readonly List<Pawn> tmpPawns = new List<Pawn>();
 
+    private static readonly System.Predicate<Thing> IsPresentationOnly = thing => thing is Mote;
+
     public static MapStateHash Compute(Map map)
     {
         MapStateHash result = default;
@@ -45,6 +47,8 @@ public static class MapStateHasher
         // Вещи: порядок в списках игры зависит от истории, поэтому сортируем по номеру.
         tmpThings.Clear();
         tmpThings.AddRange(map.listerThings.AllThings);
+        // Мошки (Mote) — вещи только для показа: есть они или нет, зависит от камеры и реального времени.
+        tmpThings.RemoveAll(IsPresentationOnly);
         tmpThings.Sort(CompareThings);
         Fnv64 th = Fnv64.Create();
         Fnv64 hId = Fnv64.Create();
@@ -151,6 +155,8 @@ public static class MapStateHasher
     {
         tmpThings.Clear();
         tmpThings.AddRange(map.listerThings.AllThings);
+        // Мошки (Mote) — вещи только для показа: есть они или нет, зависит от камеры и реального времени.
+        tmpThings.RemoveAll(IsPresentationOnly);
         tmpThings.Sort(CompareThings);
         for (int i = 0; i < tmpThings.Count; i++)
         {
@@ -173,7 +179,22 @@ public static class MapStateHasher
     //
     // Поворот пешек входит: при включённой раздельной симуляции он обновляется по тикам
     // (см. TickDrivenRotation), а не по кадрам, как в игре.
-    internal static int StableRotation(Thing t) => t.def.randomizeRotationOnSpawn ? 0 : t.Rotation.AsInt;
+    //
+    // У двери 1×1 поворот ставит отрисовка (Building_Door.DoorPreDraw), то есть он меняется в тот кадр,
+    // когда дверь впервые попала в камеру игрока. На симуляцию он не влияет (стены вокруг двери
+    // проверяются только у больших дверей), поэтому в хеш идёт 0. Найдено агентом B (TST-018 с камерой).
+    internal static int StableRotation(Thing t)
+    {
+        if (t.def.randomizeRotationOnSpawn)
+        {
+            return 0;
+        }
+        if (t is RimWorld.Building_Door && t.def.size == IntVec2.One)
+        {
+            return 0;
+        }
+        return t.Rotation.AsInt;
+    }
 
     /// <summary>
     /// Диагностика: дописывает строки о вещах, у которых поворот изменился с прошлого вызова.
@@ -184,6 +205,8 @@ public static class MapStateHasher
         bool first = lastRot.Count == 0;
         tmpThings.Clear();
         tmpThings.AddRange(map.listerThings.AllThings);
+        // Мошки (Mote) — вещи только для показа: есть они или нет, зависит от камеры и реального времени.
+        tmpThings.RemoveAll(IsPresentationOnly);
         tmpThings.Sort(CompareThings);
         for (int i = 0; i < tmpThings.Count; i++)
         {
