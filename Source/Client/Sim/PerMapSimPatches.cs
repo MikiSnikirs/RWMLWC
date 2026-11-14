@@ -109,6 +109,9 @@ internal static class Patch_TickManager_DoSingleTick
         {
             MapRandContext.BeginTick();
             RandTracer.BeginTick();
+            TextRandIsolation.BeginTick();
+            // Покадровое состояние карт приводится к виду «как после кадра» перед каждым тиком.
+            FrameIndependentState.BeforeTick();
             // Сценарий тестового прогона исполняется уже в контексте симуляции.
             TestAutomation.ApplyScenarioIfPending();
         }
