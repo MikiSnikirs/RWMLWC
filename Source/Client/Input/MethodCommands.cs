@@ -127,6 +127,10 @@ public static class MethodCommands
         {
             return true; // игры с картами нет (не должно случаться в сессии)
         }
+        if (!RWMLWC.Client.Maps.SquadRules.LocalMay(RWMLWC.Client.Maps.SquadRules.PawnOf(__instance)))
+        {
+            return false; // отряды (T-061): настройку чужой пешки не меняем и не отправляем
+        }
         PacketWriter w = CommandBus.Begin(map);
         w.WriteInt32(index);
         w.WriteString(entry.key);
@@ -185,6 +189,11 @@ public static class MethodCommands
         {
             TestAutomation.Note("method: " + key + ": object is gone, dropped");
             return;
+        }
+        if (RWMLWC.Client.Maps.SquadRules.RejectAtExecution(
+                RWMLWC.Client.Maps.SquadRules.Forbidden(RWMLWC.Client.Maps.SquadRules.PawnOf(instance), CommandBus.CurrentPlayerId), CommandBus.CurrentSeq))
+        {
+            return; // отряды (T-061): настройка чужой пешки
         }
         ParameterInfo[] parameters = entry.method.GetParameters();
         if (parameters.Length != count)
