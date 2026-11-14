@@ -22,6 +22,11 @@ param(
     [string]$Name = 'tst014',
     [int]$HostTicks = 40000,
     [int]$ConnectDelaySec = 45,
+    [int[]]$Tpf = @(),          # ticks per frame cap per client, e.g. -Tpf 1,30 (0 = normal)
+    [switch]$Trace,             # Rand trace (slow); with -Tpf the tempo stays fixed
+    [int]$DenseFrom = -1,       # hash every tick in this window (ticks from run start)
+    [int]$DenseTo = -1,
+    [int]$Camera = -1,          # camera wander for c2: 1/0 (default 1)
     [switch]$NoBuild
 )
 
@@ -41,6 +46,11 @@ $game = [Environment]::GetEnvironmentVariable('RIMWORLD_DIR', 'User')
 if (-not $game) { $game = 'C:\Program Files (x86)\Steam\steamapps\common\RimWorld' }
 $exe = Join-Path $game 'RimWorld.exe'
 if (-not (Test-Path $exe)) { Fail "RimWorld.exe not found in '$game'." }
+# Without a running Steam client the game does not see Workshop mods (Harmony), drops the mod list
+# and the run hangs in the main menu until the timeout.
+if (-not (Get-Process steam -ErrorAction SilentlyContinue)) {
+    Fail 'Steam is not running. Start Steam (Harmony comes from the Workshop), then run again.'
+}
 
 $data = Join-Path $env:USERPROFILE 'AppData\LocalLow\Ludeon Studios\RimWorld by Ludeon Studios'
 if (-not $Save) {
@@ -99,6 +109,15 @@ for ($c = 1; $c -le $Clients; $c++) {
     }
     $add = $xml.CreateElement('li'); $add.InnerText = 'mikisnikirs.rwmlwc'; [void]$active.AppendChild($add)
     $xml.Save($mc)
+    # Two windows share the screen: the one without focus must keep running (Options: "Run in background").
+    $pf = Join-Path $dir 'Config\Prefs.xml'
+    if (Test-Path -LiteralPath $pf) {
+        $px = [xml](Get-Content -LiteralPath $pf -Raw -Encoding UTF8)
+        $node = $px.PrefsData.SelectSingleNode('runInBackground')
+        if (-not $node) { $node = $px.CreateElement('runInBackground'); [void]$px.PrefsData.AppendChild($node) }
+        $node.InnerText = 'True'
+        $px.Save($pf)
+    }
     Copy-Item -LiteralPath $saveFile (Join-Path $dir 'Saves\tst014.rws')
     $armTicks = $Ticks
     $armScenario = $Scenario
@@ -117,9 +136,12 @@ for ($c = 1; $c -le $Clients; $c++) {
         if ($c -eq 1) { $extra = @('snapsender=1') } else { $extra = @('desync=1') }
     }
     $arm = @(
-        'armed=1', $saveLine, "scenarios=$armScenario", "ticks=$armTicks", 'trace=0', 'quit=1',
-        "server=127.0.0.1:$port", "thumbprint=$thumb", "name=c$c", "holdsec=$armHold", "issuer=$(if ($c -eq 1) { 1 } else { 0 })", "camera=$(if ($c -eq 2) { 1 } else { 0 })"
+        'armed=1', $saveLine, "scenarios=$armScenario", "ticks=$armTicks", "trace=$(if ($Trace) { 1 } else { 0 })", 'quit=1',
+        "server=127.0.0.1:$port", "thumbprint=$thumb", "name=c$c", "holdsec=$armHold", "issuer=$(if ($c -eq 1) { 1 } else { 0 })",
+        "camera=$(if ($c -eq 2 -and $Camera -ne 0) { 1 } else { 0 })"
     ) + $extra
+    if ($Tpf.Count -ge $c) { $arm += "tpf=$($Tpf[$c - 1])" }
+    if ($DenseFrom -ge 0 -and $DenseTo -gt $DenseFrom) { $arm += "densefrom=$DenseFrom"; $arm += "denseto=$DenseTo" }
     [IO.File]::WriteAllLines((Join-Path $dir 'RWMLWC\arm-determinism-run.txt'), $arm)
     [IO.File]::WriteAllText((Join-Path $dir 'RWMLWC\automation-progress.txt'), '0')
     $procs += Start-Process $exe -ArgumentList "-savedatafolder=$dir" -WorkingDirectory $game -PassThru

@@ -30,7 +30,6 @@ internal static class FrameIndependentState
     private static readonly MethodInfo? currentSkyTarget = AccessTools.Method(typeof(SkyManager), "CurrentSkyTarget");
     private static readonly AccessTools.FieldRef<SignalManager, int>? signalsThisFrame = FieldRefOrNull<SignalManager, int>("signalsThisFrame");
     private static readonly FieldInfo? accessibleThingsFrame = AccessTools.Field(typeof(PlayerItemAccessibilityUtility), "cachedAccessibleThingsForFrame");
-    private static readonly FieldInfo? chunkskipFrame = AccessTools.Field(typeof(CompAbilityEffect_Chunkskip), "lastChunkUpdateFrame");
     private static bool warned;
 
     private static AccessTools.FieldRef<T, F>? FieldRefOrNull<T, F>(string name)
@@ -80,8 +79,26 @@ internal static class FrameIndependentState
             signalsThisFrame(Current.Game.signalManager) = 0;
         }
         // Кэши «на один кадр»: при нескольких тиках за кадр второй тик читал бы данные первого.
+        // Поле статическое. Кэш способности «Скачок обломков» — поле экземпляра, его сбрасывает
+        // Patch_CompAbilityEffect_Chunkskip_FindClosestChunks.
         accessibleThingsFrame?.SetValue(null, -1);
-        chunkskipFrame?.SetValue(null, -1);
+    }
+}
+
+/// <summary>
+/// CompAbilityEffect_Chunkskip.FindClosestChunks хранит найденные обломки до конца кадра
+/// (поле экземпляра lastChunkUpdateFrame). В сессии кэш не используется: список считается заново
+/// при каждом вызове, результат зависит только от состояния карты.
+/// </summary>
+[HarmonyPatch(typeof(CompAbilityEffect_Chunkskip), "FindClosestChunks")]
+internal static class Patch_CompAbilityEffect_Chunkskip_FindClosestChunks
+{
+    private static void Prefix(ref int ___lastChunkUpdateFrame)
+    {
+        if (PerMapSim.Enabled)
+        {
+            ___lastChunkUpdateFrame = -1;
+        }
     }
 }
 

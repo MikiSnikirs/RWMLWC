@@ -1,0 +1,21 @@
+2026-11-14 18:07:16 autoload: loading save 'tst014'
+2026-11-14 18:07:23 lockstep: connecting to 127.0.0.1:56731 as 'c1'
+2026-11-14 18:07:24 lockstep: connected to quic:127.0.0.1:56731, Hello sent
+2026-11-14 18:07:24 lockstep: Welcome, playerId=2, serverTick=14998, seed=7
+2026-11-14 18:08:24 lockstep: hold is over, requesting speed 3
+2026-11-14 18:08:24 run started: #0, tick=14998, scenario=desync, ticks=6000, trace=False, quit=True, file=hash-c1-20261114-180824.txt
+2026-11-14 18:08:28 lockstep: notice 3: карта 0 тик 15660: игрок 2 ≠ игрок 1
+2026-11-14 18:08:28 lockstep: desync reported, requesting a common snapshot
+2026-11-14 18:08:29 lockstep: snapshot for player 2 at tick 16283: raw=15753615 bytes, packed=2596514 bytes (16.5%), save=751 ms, pack=23 ms, 13 chunks sent; reloading it here too
+2026-11-14 18:08:29 lockstep: notice 3: карта 0 тик 16260: игрок 2 ≠ игрок 1
+2026-11-14 18:08:32 lockstep: snapshot loaded, tick 16283, serverTick=16310, perMapSim=True
+2026-11-14 18:08:32 resumed after snapshot reload at tick 16283, perMapSim=True
+2026-11-14 18:09:32 lockstep: hold is over, requesting speed 3
+2026-11-14 18:09:46 summary: map0 drafted=0 forbidden=56 plants=[]
+2026-11-14 18:09:46 summary: map0 jobs=[231:GotoWander@(125, 0, 133),234:GotoWander@(126, 0, 130),239:GotoWander@(125, 0, 123)]
+2026-11-14 18:09:46 summary: map0 settings=29B89D30A34E3B1A
+2026-11-14 18:09:46 summary: map0 designations=0 blueprints=0 zones=0; commands sent=1 executed=0 failed=0
+2026-11-14 18:09:46 run finished: file=hash-c1-20261114-180824.txt
+2026-11-14 18:09:46 queue: finished
+2026-11-14 18:09:46 lockstep: disconnect: прогон завершён
+2026-11-14 18:09:46 quitting game

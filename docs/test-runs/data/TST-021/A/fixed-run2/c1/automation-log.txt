@@ -1,0 +1,19 @@
+2026-11-14 17:47:03 autoload: loading save 'tst014'
+2026-11-14 17:47:10 lockstep: connecting to 127.0.0.1:54891 as 'c1'
+2026-11-14 17:47:12 lockstep: connected to quic:127.0.0.1:54891, Hello sent
+2026-11-14 17:47:12 lockstep: Welcome, playerId=2, serverTick=14998, seed=7
+2026-11-14 17:48:12 lockstep: hold is over, requesting speed 3
+2026-11-14 17:48:12 run started: #0, tick=14998, scenario=gizmo, ticks=3000, trace=False, quit=True, file=hash-c1-20261114-174812.txt
+2026-11-14 17:48:15 gizmo: draft Ross (id 231): sent=True
+2026-11-14 17:48:15 gizmo: forbid серебро (id 3446, forbidden before=True): sent=True
+2026-11-14 17:48:15 gizmo: attack синешейка (id 37624) by Ross, drafted=False: sent=1
+2026-11-14 17:48:15 gizmo: plant menu: no growing zone in this save
+2026-11-14 17:48:15 gizmo: first menu option: sent=False
+2026-11-14 17:48:20 summary: map0 drafted=1 forbidden=56 plants=[]
+2026-11-14 17:48:20 summary: map0 jobs=[231:Wait_Combat@(134, 0, 121),234:Wait_Wander@(136, 0, 123),239:GotoWander@(135, 0, 122)]
+2026-11-14 17:48:20 summary: map0 settings=29B89D30A34E3B1A
+2026-11-14 17:48:20 summary: map0 designations=0 blueprints=0 zones=0; commands sent=3 executed=3 failed=0
+2026-11-14 17:48:20 run finished: file=hash-c1-20261114-174812.txt
+2026-11-14 17:48:20 queue: finished
+2026-11-14 17:48:20 lockstep: disconnect: прогон завершён
+2026-11-14 17:48:20 quitting game
