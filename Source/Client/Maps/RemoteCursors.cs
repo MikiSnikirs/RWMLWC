@@ -74,6 +74,10 @@ public static class RemoteCursors
         }
     }
 
+    // Сглаживание: чем больше, тем быстрее стрелка догоняет полученную точку (в секунду).
+    private const float SmoothPerSecond = 14f;
+    private static readonly Dictionary<int, Vector3> shown = new Dictionary<int, Vector3>();
+
     // Тот же курсор, что у самой игры (Verse.CustomCursor): стрелка, острие в точке (3, 3) текстуры.
     private static Texture2D? cursorTex;
     private static readonly Vector2 Hotspot = new Vector2(3f, 3f);
@@ -83,8 +87,17 @@ public static class RemoteCursors
     {
         cursorTex ??= ContentFinder<Texture2D>.Get("UI/Cursors/CursorCustom");
         int drawn = 0;
-        foreach ((int playerId, Vector3 at) in Visible())
+        float dt = Mathf.Min(Time.unscaledDeltaTime, 0.1f);
+        foreach ((int playerId, Vector3 target) in Visible())
         {
+            // Положение приходит не чаще 10 раз в секунду: стрелка плавно догоняет последнюю точку,
+            // на большом скачке (другая карта, телепорт камеры) — сразу встаёт на место.
+            Vector3 at = target;
+            if (shown.TryGetValue(playerId, out Vector3 was) && (was - target).sqrMagnitude < 30f * 30f)
+            {
+                at = Vector3.Lerp(was, target, 1f - Mathf.Exp(-dt * SmoothPerSecond));
+            }
+            shown[playerId] = at;
             Vector2 screen = Find.Camera.WorldToScreenPoint(new Vector3(at.x, 0f, at.z)) / Prefs.UIScale;
             screen.y = UI.screenHeight - screen.y;
             Color color = ColorOf(playerId);
