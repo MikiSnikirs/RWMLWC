@@ -249,6 +249,19 @@ public static class TestAutomation
         }
         activeConfig = cfg;
         sessionSteps.Clear();
+        if (cfg.scenario == "ui")
+        {
+            // T-024: интерфейс во время прогона не должен менять симуляцию. Без сессии, один процесс.
+            sessionSteps.Enqueue((startTick + 200, "ui: select pawn", UiSelectPawn));
+            sessionSteps.Enqueue((startTick + 500, "ui: tab Architect", () => UiTab("Architect")));
+            sessionSteps.Enqueue((startTick + 800, "ui: tab Work", () => UiTab("Work")));
+            sessionSteps.Enqueue((startTick + 1100, "ui: tab Research", () => UiTab("Research")));
+            sessionSteps.Enqueue((startTick + 1400, "ui: tab Quests", () => UiTab("Quests")));
+            sessionSteps.Enqueue((startTick + 1700, "ui: tab Factions", () => UiTab("Factions")));
+            sessionSteps.Enqueue((startTick + 2000, "ui: info card", UiInfoCard));
+            sessionSteps.Enqueue((startTick + 2300, "ui: select item", UiSelectItem));
+            sessionSteps.Enqueue((startTick + 2600, "ui: close all", UiCloseAll));
+        }
         if (cfg.issuer && cfg.scenario == "rightclick")
         {
             sessionSteps.Enqueue((startTick + 300, "rightclick: draft", GizmoDraft));
@@ -311,6 +324,7 @@ public static class TestAutomation
                 case "twomaps-freeze":
                     ScenarioSecondMap(true);
                     break;
+                case "ui":
                 case "designate":
                 case "gizmo":
                 case "rightclick":
@@ -347,6 +361,63 @@ public static class TestAutomation
             Note("step '" + name + "' FAILED: " + ex);
             Log.Error("[RWMLWC] шаг сценария " + name + " упал: " + ex);
         }
+    }
+
+    // --- сценарий ui (T-024): окна и выделение во время прогона ---
+
+    private static void UiSelectPawn()
+    {
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        Pawn? pawn = map.mapPawns.FreeColonistsSpawned.OrderBy(p => p.thingIDNumber).FirstOrDefault();
+        if (pawn != null)
+        {
+            SelectOnly(pawn);
+        }
+        Note("ui: selected " + (pawn != null ? pawn.LabelShort : "nobody"));
+    }
+
+    private static void UiTab(string defName)
+    {
+        MainButtonDef? tab = DefDatabase<MainButtonDef>.GetNamedSilentFail(defName);
+        if (tab == null)
+        {
+            Note("ui: no tab " + defName);
+            return;
+        }
+        Find.MainTabsRoot.SetCurrentTab(tab, false);
+        Note("ui: opened tab " + defName);
+    }
+
+    private static void UiInfoCard()
+    {
+        Find.MainTabsRoot.EscapeCurrentTab(false);
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        Pawn? pawn = map.mapPawns.FreeColonistsSpawned.OrderBy(p => p.thingIDNumber).FirstOrDefault();
+        if (pawn != null)
+        {
+            Find.WindowStack.Add(new Dialog_InfoCard(pawn));
+        }
+        Note("ui: info card " + (pawn != null ? pawn.LabelShort : "nobody"));
+    }
+
+    private static void UiSelectItem()
+    {
+        Find.WindowStack.TryRemove(typeof(Dialog_InfoCard), false);
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        Thing? item = map.listerThings.ThingsInGroup(ThingRequestGroup.HaulableEver)
+            .Where(t => t.Spawned && !t.Fogged()).OrderBy(t => t.thingIDNumber).FirstOrDefault();
+        if (item != null)
+        {
+            SelectOnly(item);
+        }
+        Note("ui: selected item " + (item != null ? item.LabelShort : "none"));
+    }
+
+    private static void UiCloseAll()
+    {
+        Find.MainTabsRoot.EscapeCurrentTab(false);
+        Find.Selector.ClearSelection();
+        Note("ui: closed");
     }
 
     // --- сценарий gizmo (T-021): нажатия кнопок выделенных объектов, приказ атаки, меню ---
@@ -619,6 +690,10 @@ public static class TestAutomation
 
     public static void KeepRunning()
     {
+        if (!LockstepClient.OwnsTicking)
+        {
+            SessionFrame(); // шаги сценариев без сессии (ui)
+        }
         if (snapshotToApply != null)
         {
             byte[] data = snapshotToApply;
