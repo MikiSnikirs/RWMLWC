@@ -410,6 +410,8 @@ public static class LockstepClient
                 break;
 
             default:
+                // Сообщения не про симуляцию (чат, состав сессии) — интерфейсу сессии (T-025, зона B).
+                RWMLWC.Client.SessionView.SessionUi.Receive(message);
                 break;
         }
     }
@@ -711,6 +713,42 @@ public static class LockstepClient
             conn.Send(message);
         }
     }
+
+    /// <summary>Отправить серверу сообщение не про симуляцию (чат и т. п., T-025). false — нет сессии.</summary>
+    public static bool TrySend(Message message)
+    {
+        IConnection? conn = connection;
+        if (state != State.InSession || conn == null)
+        {
+            return false;
+        }
+        conn.Send(message);
+        return true;
+    }
+
+    /// <summary>
+    /// Время туда-обратно до сервера в мс, свой замер (T-025); -1 — нет данных. Чтение не чаще раза в секунду
+    /// отправляет новый <c>Ping</c> — ответ обрабатывает транспорт.
+    /// </summary>
+    public static int RoundTripMs
+    {
+        get
+        {
+            IConnection? conn = connection;
+            if (conn == null)
+            {
+                return -1;
+            }
+            if (conn.RoundTripMs < 0 || pingClock.ElapsedMilliseconds >= 1000 || !pingClock.IsRunning)
+            {
+                pingClock.Restart();
+                conn.SendPing();
+            }
+            return conn.RoundTripMs;
+        }
+    }
+
+    private static readonly Stopwatch pingClock = new Stopwatch();
 
     /// <summary>Попросить у сервера скорость (0 — пауза, 1..4 — как TimeSpeed). Повторы не шлём.</summary>
     public static void RequestSpeed(int speed)
