@@ -22,7 +22,9 @@ namespace RWMLWC.Client.Sim;
 ///   densefrom=0, denseto=300 — окно (в тиках от старта), где хеш пишется каждый тик и идёт трассировка;
 ///   perprocess=1       — между прогонами очереди перезапускать игру, а не перезагружать сейв;
 ///   snapat=2000        — тик от старта, на котором сценарии snap-save и snap-reload снимают снимок игры;
-///   quit=1             — после прогона закрыть игру.
+///   quit=1             — после прогона закрыть игру;
+///   server=адрес:порт, thumbprint=отпечаток, name=имя — после загрузки сейва подключиться к серверу
+///                        сессии; тики идут под управлением сервера, прогон только пишет хеши.
 /// Файл без строк ключ=значение означает прежнее поведение: автостарт при загрузке, без сценария.
 /// </summary>
 public static class TestAutomation
@@ -40,6 +42,11 @@ public static class TestAutomation
         public int denseTo = HashRecorder.DenseTicks;
         public bool perProcess;
         public int snapAt = 2000;
+        public string? serverHost;
+        public int serverPort;
+        public string thumbprint = "";
+        public string playerName = "player";
+        public int holdSec;
         public bool quit;
     }
 
@@ -146,6 +153,36 @@ public static class TestAutomation
                         cfg.denseTo = to;
                     }
                     break;
+                case "server":
+                    {
+                        int colon = value.LastIndexOf(':');
+                        if (colon > 0 && int.TryParse(value.Substring(colon + 1), out int port))
+                        {
+                            cfg.serverHost = value.Substring(0, colon);
+                            cfg.serverPort = port;
+                        }
+                    }
+                    break;
+                case "thumbprint":
+                    cfg.thumbprint = value;
+                    break;
+                case "holdsec":
+                    if (int.TryParse(value, out int holdSec) && holdSec >= 0)
+                    {
+                        cfg.holdSec = holdSec;
+                    }
+                    break;
+                case "name":
+                    if (value == "auto")
+                    {
+                        // Два экземпляра игры на одной машине читают один файл-метку: имя по номеру процесса.
+                        cfg.playerName = "p" + Environment.ProcessId;
+                    }
+                    else if (value.Length > 0)
+                    {
+                        cfg.playerName = value;
+                    }
+                    break;
                 case "snapat":
                     if (int.TryParse(value, out int snap) && snap > 0)
                     {
@@ -206,6 +243,21 @@ public static class TestAutomation
         snapshotDone = false;
         snapshotToApply = null;
         Note($"run started: #{cfg.queueIndex}, tick={startTick}, scenario={cfg.scenario}, ticks={cfg.ticks}, trace={cfg.trace}, quit={cfg.quit}, file={Path.GetFileName(hashFile)}");
+    }
+
+    /// <summary>Сейв загружен при включённой метке. Если задан сервер — подключаемся до первого тика.</summary>
+    public static void OnGameLoaded(Config cfg)
+    {
+        if (cfg.quit)
+        {
+            // Автоматический прогон: снимать паузу с самого начала (в сессии это просьба серверу).
+            automationActive = true;
+        }
+        if (cfg.serverHost != null && LockstepClient.CurrentState == LockstepClient.State.Off)
+        {
+            LockstepClient.HoldSeconds = cfg.holdSec;
+            LockstepClient.Connect(cfg.serverHost, cfg.serverPort, cfg.thumbprint, cfg.playerName);
+        }
     }
 
     /// <summary>Вызывается в первом тике прогона, уже в контексте симуляции (после MapRandContext.BeginTick).</summary>
@@ -278,6 +330,7 @@ public static class TestAutomation
         if (quitWhenDone)
         {
             quitWhenDone = false;
+            LockstepClient.Disconnect("прогон завершён");
             Note("quitting game");
             Root.Shutdown();
         }
