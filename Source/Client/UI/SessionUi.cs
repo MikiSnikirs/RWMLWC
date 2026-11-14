@@ -345,6 +345,7 @@ internal static class Patch_MapInterface_SessionStatus
         ChatSelfTest.Frame();
         RWMLWC.Client.Absence.IdleAlarm.Frame();
         RWMLWC.Client.Net.Reconnect.Frame();
+        RWMLWC.Client.World.CaravanSelfTest.Frame();
         RWMLWC.Client.Net.NetworkGameMenu.Frame();
         StatusLineView.OnGUI();
     }
