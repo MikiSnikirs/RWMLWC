@@ -147,6 +147,7 @@ public static class LockstepClient
         snapshotRequestSeen = false;
         incomingSnapshots.Clear();
         gameLoadedPending = false;
+        MapAccess.Reset();
         connecting = connectingTask;
         state = State.Connecting;
         TestAutomation.Note($"lockstep: connecting to {description} as '{name}'");
@@ -298,6 +299,7 @@ public static class LockstepClient
         {
             case WelcomeMessage welcome:
                 PlayerId = welcome.PlayerId;
+                MapAccess.NotePlayer(welcome.PlayerId);
                 tickUpTo = welcome.ServerTick;
                 sessionSeed = welcome.SessionSeed;
                 if (tickManager == null || welcome.ServerTick != tickManager.TicksGame)
@@ -354,6 +356,7 @@ public static class LockstepClient
                 break;
 
             case CommandOrderedMessage ordered:
+                MapAccess.NotePlayer(ordered.PlayerId);
                 if (state == State.WaitingSnapshot && !snapshotRequestSeen)
                 {
                     // Вошли без мира. Всё, что стоит в общем порядке до нашей просьбы, уже будет внутри снимка.
@@ -377,6 +380,10 @@ public static class LockstepClient
                 OnNotice(notice);
                 break;
 
+            case PermissionsMessage permissions:
+                MapAccess.OnPermissions(permissions);
+                break;
+
             case CommandRejectedMessage rejected:
                 TestAutomation.Note($"lockstep: command #{rejected.ClientSeq} REJECTED on map {rejected.MapId}: need {rejected.Required}, have {rejected.Had}");
                 Messages.Message("RWMLWC: нет прав на это действие на этой карте", MessageTypeDefOf.RejectInput, false);
@@ -387,12 +394,30 @@ public static class LockstepClient
         }
     }
 
+    /// <summary>Отправить серверу служебное сообщение (заявка на карту, выдача прав). Вне сессии — ничего.</summary>
+    public static void SendRaw(Message message)
+    {
+        if (state == State.InSession)
+        {
+            connection?.Send(message);
+        }
+    }
+
     /// <summary>Отправить команду игрока серверу. Исполнится у всех, когда вернётся в общем порядке.</summary>
     public static int SendCommand(int mapId, int kind, PermissionLevel required, byte[] payload)
     {
         IConnection? conn = connection;
         if (state != State.InSession || conn == null)
         {
+            return -1;
+        }
+        if (MapAccess.MyLevel(mapId) < required)
+        {
+            // Сервер такую команду отклонит; не шлём и говорим игроку сразу.
+            if (Current.ProgramState == ProgramState.Playing)
+            {
+                Messages.Message("RWMLWC: на этой карте у вас права «" + MapAccess.LevelLabel(MapAccess.MyLevel(mapId)) + "», для этого действия нужны «" + MapAccess.LevelLabel(required) + "»", MessageTypeDefOf.RejectInput, false);
+            }
             return -1;
         }
         int clientSeq = nextClientSeq++;
