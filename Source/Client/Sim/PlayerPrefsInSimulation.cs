@@ -28,3 +28,26 @@ internal static class Patch_Prefs_PreferredNames
         return false;
     }
 }
+
+/// <summary>
+/// Лимит поселений игрока (Prefs.MaxNumberOfPlayerSettlements) — тоже личная настройка (по умолчанию 1), а от неё
+/// зависит, включена ли кнопка «Основать поселение»; кнопки объектов мира проверяются ещё и при исполнении
+/// команды (T-073). В сессии лимит у всех один — <see cref="SessionLimit"/> (максимум настройки игры), чтобы
+/// в кооперативе каждый мог основать своё поселение. Решение B на время отсутствия A; вынести в настройки
+/// сессии (host.txt / server.txt) — вопрос владельцу.
+/// </summary>
+[HarmonyPatch(typeof(Prefs), nameof(Prefs.MaxNumberOfPlayerSettlements), MethodType.Getter)]
+internal static class Patch_Prefs_MaxNumberOfPlayerSettlements
+{
+    public const int SessionLimit = 5;
+
+    private static bool Prefix(ref int __result)
+    {
+        if (!LockstepClient.InSession)
+        {
+            return true;
+        }
+        __result = SessionLimit;
+        return false;
+    }
+}

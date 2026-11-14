@@ -1,0 +1,91 @@
+2026-11-15 04:50:19 autoload: loading save 'tst014'
+2026-11-15 04:50:28 lockstep: connecting to 127.0.0.1:52396 as 'c1'
+2026-11-15 04:50:30 lockstep: connected to quic:127.0.0.1:52396, Hello sent
+2026-11-15 04:50:30 lockstep: Welcome, playerId=1, serverTick=14998, seed=7
+2026-11-15 04:50:30 presence: player 1 online
+2026-11-15 04:50:30 presence: player 2 online
+2026-11-15 04:51:30 lockstep: hold is over, requesting speed 3
+2026-11-15 04:51:30 run started: #0, tick=14998, scenario=none, ticks=20000, trace=False, quit=True, file=hash-c1-20261115-045130.txt
+2026-11-15 04:51:35 world: caravan form sent, pawns 1+0, item groups 1
+2026-11-15 04:51:35 caravan: form — отправка принята, колонист 231, цель 240934,0
+2026-11-15 04:51:36 world: caravan forming started by player 1, pawns 1+0, item groups 1
+2026-11-15 04:51:37 caravan summary: tick 15502, forming lords 1, caravans 0, player settlements 1, maps 1
+2026-11-15 04:51:37 world: caravan form sent, pawns 2+0, item groups 2
+2026-11-15 04:51:37 caravan: form 2 — отправка принята, колонист 234, цель 82924,0
+2026-11-15 04:51:37 world: caravan forming started by player 1, pawns 2+0, item groups 2
+2026-11-15 04:51:38 caravan summary: tick 16002, forming lords 2, caravans 0, player settlements 1, maps 1
+2026-11-15 04:51:39 caravan summary: tick 16507, forming lords 2, caravans 0, player settlements 1, maps 1
+2026-11-15 04:51:41 caravan summary: tick 17009, forming lords 2, caravans 0, player settlements 1, maps 1
+2026-11-15 04:51:42 caravan summary: tick 17512, forming lords 2, caravans 0, player settlements 1, maps 1
+2026-11-15 04:51:44 caravan summary: tick 18025, forming lords 1, caravans 1, player settlements 1, maps 1, caravan at 240937,0 moving to 240934,0
+2026-11-15 04:51:45 caravan summary: tick 18528, forming lords 1, caravans 1, player settlements 1, maps 1, caravan at 240937,0 moving to 240934,0
+2026-11-15 04:51:46 caravan summary: tick 19032, forming lords 0, caravans 2, player settlements 1, maps 1, caravan at 240937,0 moving to 240934,0
+2026-11-15 04:51:48 caravan summary: tick 19535, forming lords 0, caravans 2, player settlements 1, maps 1, caravan at 240936,0 moving to 240934,0
+2026-11-15 04:51:49 caravan summary: tick 20038, forming lords 0, caravans 2, player settlements 1, maps 1, caravan at 240936,0 moving to 240934,0
+2026-11-15 04:51:51 caravan summary: tick 20542, forming lords 0, caravans 2, player settlements 1, maps 1, caravan at 240936,0 moving to 240934,0
+2026-11-15 04:51:52 caravan summary: tick 21046, forming lords 0, caravans 2, player settlements 1, maps 1, caravan at 240936,0 moving to 240934,0
+2026-11-15 04:51:53 world: settle sent, caravan 252
+2026-11-15 04:51:53 caravan: settle — вызвано на тайле 240934,0
+2026-11-15 04:51:53 world: settled by player 1, caravan 252
+2026-11-15 04:51:57 caravan: map 1 generated at tick 21371: 35694 things, 53 pawns, global rand 00000117FB25C5A1
+2026-11-15 04:51:58 caravan: new map 1 dumped at tick 21371: 35694 things, 53 pawns
+2026-11-15 04:51:58 caravan summary: tick 21548, forming lords 0, caravans 1, player settlements 2, maps 2, caravan at 240936,0 moving to 82924,0
+2026-11-15 04:52:00 caravan summary: tick 22048, forming lords 0, caravans 1, player settlements 2, maps 2, caravan at 240936,0 moving to 82924,0
+2026-11-15 04:52:00 world: split sent, caravan 253, pawns 1, groups 1
+2026-11-15 04:52:00 caravan: split — «Принять» — принято, караван 253 (2 пешек), колонист 234
+2026-11-15 04:52:00 world: split by player 1, caravan 253: done
+2026-11-15 04:52:00 world: gizmo 0 of Caravan 253 sent
+2026-11-15 04:52:00 caravan: merge — кнопка 0 (Объединиться) отправлена, караван 253, выделено 2
+2026-11-15 04:52:00 world: gizmo 0 (Объединиться) of Caravan 253 pressed by player 1
+2026-11-15 04:52:00 world: gizmo 2 of Caravan 253 sent
+2026-11-15 04:52:00 caravan: camp — кнопка 2 (Разбить лагерь) отправлена, караван 253, выделено 1
+2026-11-15 04:52:00 world: gizmo 2 (Разбить лагерь) of Caravan 253 pressed by player 1
+2026-11-15 04:52:02 caravan: map 2 generated at tick 22191: 23231 things, 32 pawns, global rand 0000014FFB25C5A1
+2026-11-15 04:52:02 caravan: new map 2 dumped at tick 22197: 23233 things, 34 pawns
+2026-11-15 04:52:03 caravan summary: tick 22548, forming lords 0, caravans 0, player settlements 2, maps 3
+2026-11-15 04:52:04 caravan summary: tick 23056, forming lords 0, caravans 0, player settlements 2, maps 3
+2026-11-15 04:52:06 caravan summary: tick 23556, forming lords 0, caravans 0, player settlements 2, maps 3
+2026-11-15 04:52:07 caravan summary: tick 24060, forming lords 0, caravans 0, player settlements 2, maps 3
+2026-11-15 04:52:09 caravan summary: tick 24562, forming lords 0, caravans 0, player settlements 2, maps 3
+2026-11-15 04:52:10 caravan summary: tick 25066, forming lords 0, caravans 0, player settlements 2, maps 3
+2026-11-15 04:52:11 caravan summary: tick 25567, forming lords 0, caravans 0, player settlements 2, maps 3
+2026-11-15 04:52:13 caravan summary: tick 26070, forming lords 0, caravans 0, player settlements 2, maps 3
+2026-11-15 04:52:14 caravan summary: tick 26575, forming lords 0, caravans 0, player settlements 2, maps 3
+2026-11-15 04:52:16 caravan summary: tick 27075, forming lords 0, caravans 0, player settlements 2, maps 3
+2026-11-15 04:52:17 caravan summary: tick 27578, forming lords 0, caravans 0, player settlements 2, maps 3
+2026-11-15 04:52:18 caravan summary: tick 28079, forming lords 0, caravans 0, player settlements 2, maps 3
+2026-11-15 04:52:20 caravan summary: tick 28588, forming lords 0, caravans 0, player settlements 2, maps 3
+2026-11-15 04:52:21 caravan summary: tick 29091, forming lords 0, caravans 0, player settlements 2, maps 3
+2026-11-15 04:52:23 caravan summary: tick 29594, forming lords 0, caravans 0, player settlements 2, maps 3
+2026-11-15 04:52:24 caravan summary: tick 30096, forming lords 0, caravans 0, player settlements 2, maps 3
+2026-11-15 04:52:25 caravan summary: tick 30599, forming lords 0, caravans 0, player settlements 2, maps 3
+2026-11-15 04:52:27 caravan summary: tick 31102, forming lords 0, caravans 0, player settlements 2, maps 3
+2026-11-15 04:52:28 caravan summary: tick 31604, forming lords 0, caravans 0, player settlements 2, maps 3
+2026-11-15 04:52:30 caravan summary: tick 32107, forming lords 0, caravans 0, player settlements 2, maps 3
+2026-11-15 04:52:31 caravan summary: tick 32612, forming lords 0, caravans 0, player settlements 2, maps 3
+2026-11-15 04:52:32 caravan summary: tick 33116, forming lords 0, caravans 0, player settlements 2, maps 3
+2026-11-15 04:52:34 caravan summary: tick 33620, forming lords 0, caravans 0, player settlements 2, maps 3
+2026-11-15 04:52:35 caravan summary: tick 34121, forming lords 0, caravans 0, player settlements 2, maps 3
+2026-11-15 04:52:37 caravan summary: tick 34624, forming lords 0, caravans 0, player settlements 2, maps 3
+2026-11-15 04:52:38 summary: map0 drafted=0 forbidden=56 plants=[]
+2026-11-15 04:52:38 summary: map0 jobs=[]
+2026-11-15 04:52:38 summary: map0 settings=994F76653E2A3951
+2026-11-15 04:52:38 summary: absence= offline=[]
+2026-11-15 04:52:38 summary: squads= rejected=0 drafted=[]
+2026-11-15 04:52:38 summary: map0 designations=0 blueprints=0 zones=0; commands sent=6 executed=6 failed=0
+2026-11-15 04:52:38 summary: map1 drafted=0 forbidden=0 plants=[]
+2026-11-15 04:52:38 summary: map1 jobs=[231:GotoWander@(134, 0, 97)]
+2026-11-15 04:52:38 summary: map1 settings=C875778D3C81DEA7
+2026-11-15 04:52:38 summary: absence= offline=[]
+2026-11-15 04:52:38 summary: squads= rejected=0 drafted=[]
+2026-11-15 04:52:38 summary: map1 designations=0 blueprints=0 zones=0; commands sent=6 executed=6 failed=0
+2026-11-15 04:52:38 summary: map2 drafted=0 forbidden=0 plants=[]
+2026-11-15 04:52:38 summary: map2 jobs=[234:Skygaze@(70, 0, 142),239:GotoWander@(67, 0, 125)]
+2026-11-15 04:52:38 summary: map2 settings=7C47AC7B3149885C
+2026-11-15 04:52:38 summary: absence= offline=[]
+2026-11-15 04:52:38 summary: squads= rejected=0 drafted=[]
+2026-11-15 04:52:38 summary: map2 designations=0 blueprints=0 zones=0; commands sent=6 executed=6 failed=0
+2026-11-15 04:52:38 run finished: file=hash-c1-20261115-045130.txt
+2026-11-15 04:52:38 queue: finished
+2026-11-15 04:52:38 lockstep: disconnect: прогон завершён
+2026-11-15 04:52:38 quitting game

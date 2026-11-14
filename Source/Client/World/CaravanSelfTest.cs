@@ -6,6 +6,7 @@ using RimWorld;
 using RimWorld.Planet;
 using RWMLWC.Client.Sim;
 using Verse;
+using Verse.AI.Group;
 
 namespace RWMLWC.Client.World;
 
@@ -29,6 +30,11 @@ public static class CaravanSelfTest
     private static bool _settled;
     private static int _nextSummary;
     private static PlanetTile _destination = PlanetTile.Invalid;
+    private static bool _formed2;
+    private static bool _camped;
+    private static int _step2; // второй караван: 0 — идёт, 1 — разделён, 2 — объединён, 3 — лагерь
+    private static PlanetTile _destination2 = PlanetTile.Invalid;
+    private static int _dumpedMaps = int.MaxValue;
 
     private static bool Enabled
     {
@@ -59,6 +65,7 @@ public static class CaravanSelfTest
         {
             _startTick = tick;
             CaptureErrors();
+            _dumpedMaps = Find.Maps.Count;
             _nextSummary = tick + 500;
         }
         bool issuer = LockstepClient.PlayerId == 1;
@@ -66,14 +73,44 @@ public static class CaravanSelfTest
         if (issuer && !_formed && tick >= _startTick + 300)
         {
             _formed = true;
-            TestAutomation.Note("caravan: form — " + TryForm());
+            TestAutomation.Note("caravan: form — " + TryForm(second: false));
+        }
+        if (issuer && !_formed2 && tick >= _startTick + 600)
+        {
+            _formed2 = true;
+            TestAutomation.Note("caravan: form 2 — " + TryForm(second: true));
         }
 
-        Caravan? caravan = Find.WorldObjects.Caravans.FirstOrDefault(c => c.Faction == Faction.OfPlayer);
-        if (issuer && !_settled && caravan != null && !caravan.pather.Moving && caravan.Tile == _destination)
+        Caravan? caravan = Find.WorldObjects.Caravans.FirstOrDefault(c => c.Faction == Faction.OfPlayer && !c.pather.Moving && c.Tile == _destination);
+        if (issuer && !_settled && caravan != null)
         {
             _settled = true;
             TestAutomation.Note("caravan: settle — " + TrySettle(caravan));
+        }
+        if (issuer && !_camped && _destination2.Valid)
+        {
+            List<Caravan> there = Find.WorldObjects.Caravans.Where(c => c.Faction == Faction.OfPlayer && !c.pather.Moving && c.Tile == _destination2).ToList();
+            if (_step2 == 0 && there.Count == 1)
+            {
+                _step2 = 1;
+                TestAutomation.Note("caravan: split — " + TrySplit(there[0]));
+            }
+            else if (_step2 == 1 && there.Count == 2)
+            {
+                _step2 = 2;
+                TestAutomation.Note("caravan: merge — " + TryPress(there[0], there, "MergeCaravans"));
+            }
+            else if (_step2 == 2 && there.Count == 1)
+            {
+                _step2 = 3;
+                _camped = true;
+                TestAutomation.Note("caravan: camp — " + TryPress(there[0], new List<Caravan> { there[0] }, "CreateCamp"));
+            }
+        }
+
+        if (_dumpedMaps < Find.Maps.Count)
+        {
+            DumpNewMaps(tick);
         }
 
         if (tick >= _nextSummary)
@@ -93,6 +130,16 @@ public static class CaravanSelfTest
             var harmony = new Harmony("rwmlwc.caravantest");
             harmony.Patch(AccessTools.Method(typeof(Log), nameof(Log.Error), new[] { typeof(string) }),
                 postfix: new HarmonyMethod(typeof(CaravanSelfTest), nameof(AfterError)));
+            harmony.Patch(AccessTools.Method(typeof(GetOrGenerateMapUtility), nameof(GetOrGenerateMapUtility.GetOrGenerateMap),
+                    new[] { typeof(PlanetTile), typeof(IntVec3), typeof(WorldObjectDef), typeof(IEnumerable<GenStepWithParams>), typeof(bool) }),
+                prefix: new HarmonyMethod(typeof(CaravanSelfTest), nameof(BeforeGenerate)),
+                postfix: new HarmonyMethod(typeof(CaravanSelfTest), nameof(AfterGenerate)));
+            harmony.Patch(AccessTools.Method(typeof(ThingMaker), nameof(ThingMaker.MakeThing)),
+                postfix: new HarmonyMethod(typeof(CaravanSelfTest), nameof(AfterMakeThing)));
+            harmony.Patch(AccessTools.PropertyGetter(typeof(Rand), nameof(Rand.Value)),
+                prefix: new HarmonyMethod(typeof(CaravanSelfTest), nameof(OnRand)));
+            harmony.Patch(AccessTools.PropertyGetter(typeof(Rand), nameof(Rand.Int)),
+                prefix: new HarmonyMethod(typeof(CaravanSelfTest), nameof(OnRand)));
             AppDomain.CurrentDomain.UnhandledException += (_, e) => TestAutomation.Note("caravan: UNHANDLED " + e.ExceptionObject);
         }
         catch (Exception e)
@@ -101,24 +148,126 @@ public static class CaravanSelfTest
         }
     }
 
+    // Узкая трассировка Rand во время генерации: после появления вещи-метки — следующие TraceCalls вызовов со стеком.
+    private const string TraceTrigger = "AncientMechDropBeacon";
+    private const int TraceCalls = 4000;
+    private static bool _generating;
+    private static int _traceLeft;
+    private static readonly System.Text.StringBuilder _trace = new();
+
+    private static void BeforeGenerate()
+    {
+        _generating = true;
+        _traceLeft = 0;
+        _trace.Clear();
+    }
+
+    private static void AfterMakeThing(Thing __result)
+    {
+        if (_generating && _traceLeft == 0 && _trace.Length == 0 && __result?.def?.defName == TraceTrigger)
+        {
+            _traceLeft = TraceCalls;
+            _trace.Append("# trigger ").Append(TraceTrigger).Append(" id ").Append(__result.thingIDNumber).AppendLine();
+        }
+    }
+
+    private static void OnRand()
+    {
+        if (_traceLeft <= 0) return;
+        _traceLeft--;
+        var st = new System.Diagnostics.StackTrace(2, false);
+        int n = Math.Min(st.FrameCount, 9);
+        for (int i = 0; i < n; i++)
+        {
+            System.Reflection.MethodBase? m = st.GetFrame(i)?.GetMethod();
+            if (i > 0) _trace.Append(" < ");
+            _trace.Append(m?.DeclaringType?.Name).Append('.').Append(m?.Name);
+        }
+        _trace.AppendLine();
+    }
+
+    /// <summary>Сразу после генерации, до входа каравана: только то, что сделал генератор.</summary>
+    private static void AfterGenerate(Map __result)
+    {
+        _generating = false;
+        _traceLeft = 0;
+        if (__result == null) return;
+        try
+        {
+            if (_trace.Length > 0)
+            {
+                System.IO.File.WriteAllText(System.IO.Path.Combine(GenFilePaths.SaveDataFolderPath, "RWMLWC", $"genrand-{__result.uniqueID}.txt"), _trace.ToString());
+                _trace.Clear();
+            }
+            var sb = new System.Text.StringBuilder();
+            sb.Append("# generated, tick ").Append(Find.TickManager.TicksGame).Append(", map ").Append(__result.uniqueID)
+              .Append(", inTick ").Append(MapRandContext.InTick).Append(", ctx ").Append(MapRandContext.Current?.uniqueID.ToString() ?? "global")
+              .Append(", global rand ").Append(MapRandContext.GlobalState.ToString("X16")).AppendLine();
+            MapStateHasher.DumpThings(__result, sb);
+            string file = System.IO.Path.Combine(GenFilePaths.SaveDataFolderPath, "RWMLWC", $"genmap-{__result.uniqueID}.txt");
+            System.IO.File.WriteAllText(file, sb.ToString());
+            TestAutomation.Note($"caravan: map {__result.uniqueID} generated at tick {Find.TickManager.TicksGame}: {__result.listerThings.AllThings.Count} things, {__result.mapPawns.AllPawnsSpawnedCount} pawns, global rand {MapRandContext.GlobalState:X16}");
+        }
+        catch (Exception e)
+        {
+            TestAutomation.Note("caravan: generated map dump failed: " + e.Message);
+        }
+    }
+
     private static void AfterError(string text)
     {
         TestAutomation.Note("caravan: ERROR " + text);
     }
 
-    private static string TryForm()
+    /// <summary>
+    /// Вещи новой карты (поселения) — в файл в первом кадре после её появления: сравнив файлы двух клиентов,
+    /// видно, чем отличается генерация. Генерация в сессии идёт сразу после тика команды, у всех на одном тике.
+    /// </summary>
+    private static void DumpNewMaps(int tick)
+    {
+        try
+        {
+            string dir = System.IO.Path.Combine(GenFilePaths.SaveDataFolderPath, "RWMLWC");
+            for (int i = _dumpedMaps; i < Find.Maps.Count; i++)
+            {
+                Map map = Find.Maps[i];
+                var sb = new System.Text.StringBuilder();
+                sb.Append("# tick ").Append(tick).Append(", map ").Append(map.uniqueID).Append(", tile ").Append(map.Tile)
+                  .Append(", size ").Append(map.Size).Append(", global rand ").Append(MapRandContext.GlobalState.ToString("X16")).AppendLine();
+                MapStateHasher.DumpThings(map, sb);
+                string file = System.IO.Path.Combine(dir, $"newmap-{map.uniqueID}-tick{tick}.txt");
+                System.IO.File.WriteAllText(file, sb.ToString());
+                TestAutomation.Note($"caravan: new map {map.uniqueID} dumped at tick {tick}: {map.listerThings.AllThings.Count} things, {map.mapPawns.AllPawnsSpawnedCount} pawns");
+            }
+        }
+        catch (Exception e)
+        {
+            TestAutomation.Note("caravan: new map dump failed: " + e.Message);
+        }
+        _dumpedMaps = Find.Maps.Count;
+    }
+
+    private static string TryForm(bool second)
     {
         try
         {
             Map map = Find.AnyPlayerHomeMap ?? Find.CurrentMap;
             var dialog = new Dialog_FormCaravan(map);
             AccessTools.Method(typeof(Dialog_FormCaravan), "CalculateAndRecacheTransferables").Invoke(dialog, null);
-            TransferableOneWay? colonist = dialog.transferables.FirstOrDefault(t => t.AnyThing is Pawn p && p.IsColonist && !p.Downed);
+            TransferableOneWay? colonist = dialog.transferables.FirstOrDefault(t => t.AnyThing is Pawn p && p.IsColonist && !p.Downed
+                && !(p.GetLord()?.LordJob is LordJob_FormAndSendCaravan));
             if (colonist == null) return "нет колониста";
             colonist.AdjustTo(1);
-            PlanetTile dest = TileTwoAway(map.Tile);
+            if (second)
+            {
+                // Второму каравану — два колониста: его будем делить и объединять.
+                TransferableOneWay? other = dialog.transferables.FirstOrDefault(t => t != colonist && t.AnyThing is Pawn p && p.IsColonist && !p.Downed
+                    && !(p.GetLord()?.LordJob is LordJob_FormAndSendCaravan));
+                other?.AdjustTo(1);
+            }
+            PlanetTile dest = TileTwoAway(map.Tile, second ? _destination : PlanetTile.Invalid);
             if (!dest.Valid) return "нет тайла для поселения в двух шагах";
-            _destination = dest;
+            if (second) _destination2 = dest; else _destination = dest;
             dialog.Notify_ChoseRoute(dest);
             bool ok = (bool)AccessTools.Method(typeof(Dialog_FormCaravan), "TryFormAndSendCaravan").Invoke(dialog, null);
             return "отправка " + (ok ? "принята" : "отклонена") + ", колонист " + ((Pawn)colonist.AnyThing).thingIDNumber + ", цель " + dest;
@@ -130,7 +279,7 @@ public static class CaravanSelfTest
     }
 
     /// <summary>Тайл в двух шагах от колонии, на котором кнопка «Основать поселение» разрешена (не рядом с поселением).</summary>
-    private static PlanetTile TileTwoAway(PlanetTile home)
+    private static PlanetTile TileTwoAway(PlanetTile home, PlanetTile exclude)
     {
         var first = new List<PlanetTile>();
         var second = new List<PlanetTile>();
@@ -141,7 +290,7 @@ public static class CaravanSelfTest
             Find.WorldGrid.GetTileNeighbors(n, second);
             foreach (PlanetTile t in second)
             {
-                if (t != home && !first.Contains(t) && !Find.World.Impassable(t) && !Find.WorldObjects.AnyWorldObjectAt(t)
+                if (t != home && t != exclude && !first.Contains(t) && !Find.World.Impassable(t) && !Find.WorldObjects.AnyWorldObjectAt(t)
                     && TileFinder.IsValidTileForNewSettlement(t) && Find.WorldReachability.CanReach(home, t))
                 {
                     return t;
@@ -149,6 +298,62 @@ public static class CaravanSelfTest
             }
         }
         return PlanetTile.Invalid;
+    }
+
+    /// <summary>«Разделить караван»: окно, один колонист в новый караван, «Принять» — уходит командой (T-073).</summary>
+    private static string TrySplit(Caravan caravan)
+    {
+        try
+        {
+            var dialog = new Dialog_SplitCaravan(caravan);
+            AccessTools.Method(typeof(Dialog_SplitCaravan), "CalculateAndRecacheTransferables").Invoke(dialog, null);
+            var transferables = (List<TransferableOneWay>)AccessTools.Field(typeof(Dialog_SplitCaravan), "transferables").GetValue(dialog);
+            TransferableOneWay? colonist = transferables.FirstOrDefault(t => t.AnyThing is Pawn p && p.IsColonist && !p.Downed);
+            if (colonist == null) return "нет колониста";
+            colonist.AdjustTo(1);
+            bool ok = (bool)RWMLWC.Client.Input.WorldCommands.SplitMethod.Invoke(dialog, null);
+            return $"«Принять» — {(ok ? "принято" : "отклонено")}, караван {caravan.ID} ({caravan.PawnsListForReading.Count} пешек), колонист {((Pawn)colonist.AnyThing).thingIDNumber}";
+        }
+        catch (Exception e)
+        {
+            return "ОШИБКА " + e;
+        }
+    }
+
+    /// <summary>
+    /// Нажать кнопку каравана с значком <paramref name="iconName"/> при выделении <paramref name="selection"/> на карте мира —
+    /// общим механизмом кнопок объектов мира (T-073): уходит команда с номером кнопки, как при настоящем щелчке.
+    /// </summary>
+    private static string TryPress(Caravan caravan, List<Caravan> selection, string iconName)
+    {
+        List<WorldObject> selected = Find.WorldSelector.SelectedObjects;
+        var saved = new List<WorldObject>(selected);
+        try
+        {
+            selected.Clear();
+            selected.AddRange(selection);
+            int index = 0;
+            foreach (Gizmo g in caravan.GetGizmos())
+            {
+                if (g is Command c && (c.icon as UnityEngine.Texture2D)?.name == iconName)
+                {
+                    if (c.Disabled) return "кнопка выключена: " + c.disabledReason;
+                    RWMLWC.Client.Input.WorldCommands.CaptureWorldGizmo(caravan, index, RWMLWC.Client.Input.GizmoCommands.Signature(g));
+                    return $"кнопка {index} ({c.defaultLabel}) отправлена, караван {caravan.ID}, выделено {selection.Count}";
+                }
+                index++;
+            }
+            return $"кнопки {iconName} нет";
+        }
+        catch (Exception e)
+        {
+            return "ОШИБКА " + e;
+        }
+        finally
+        {
+            selected.Clear();
+            selected.AddRange(saved);
+        }
     }
 
     /// <summary>То же, что кнопка каравана: её проверки, затем <see cref="SettleInEmptyTileUtility.Settle"/>.</summary>

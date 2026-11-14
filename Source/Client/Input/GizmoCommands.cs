@@ -99,6 +99,13 @@ public static class GizmoCommands
         capturedGroup = group;
 
         Map map = Find.CurrentMap;
+        if (map != null && Locate(interacted, map, out Entry worldEntry) && worldEntry.owner is RimWorld.Planet.WorldObject worldObject)
+        {
+            // Кнопка объекта мира (караван, поселение…): своя команда без карты (T-073).
+            WorldCommands.CaptureWorldGizmo(worldObject, worldEntry.index, Signature(interacted));
+            Captured++;
+            return false;
+        }
         if (map == null || !Locate(interacted, map, out Entry entry))
         {
             Messages.Message("RWMLWC: эта кнопка пока не работает в сетевой игре", MessageTypeDefOf.RejectInput, false);
@@ -167,7 +174,8 @@ public static class GizmoCommands
         }
         entry = rebuilt[position];
         // Владелец должен передаваться по сети (вещь или зона этой карты), а кнопка — быть той же.
-        bool ownerOk = (entry.owner is Thing thing && thing.Spawned && thing.Map == map) || (entry.owner is Zone zone && zone.Map == map);
+        bool ownerOk = (entry.owner is Thing thing && thing.Spawned && thing.Map == map) || (entry.owner is Zone zone && zone.Map == map)
+            || (entry.owner is RimWorld.Planet.WorldObject && entry.source == SourceOwn);
         return ownerOk && Signature(entry.gizmo) == Signature(gizmo);
     }
 
@@ -303,7 +311,7 @@ public static class GizmoCommands
     }
 
     // Исполнение идёт вне обработки событий интерфейса; кнопкам нужен хоть какой-то Event.
-    private static Event ReplayEvent()
+    internal static Event ReplayEvent()
     {
         Event? current = Event.current;
         if (current != null)
@@ -331,7 +339,7 @@ public static class GizmoCommands
     /// Признак кнопки, не зависящий от языка игры: тип, клавиша, имя значка. Нужен, чтобы не нажать
     /// другую кнопку, если набор кнопок объекта изменился за время доставки команды.
     /// </summary>
-    private static ulong Signature(Gizmo gizmo)
+    internal static ulong Signature(Gizmo gizmo)
     {
         Fnv64 hash = Fnv64.Create();
         AddString(ref hash, gizmo.GetType().FullName);
