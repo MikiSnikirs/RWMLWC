@@ -78,6 +78,7 @@ if ($DenseFrom -ge 0 -and $DenseTo -gt $DenseFrom) { $arm += "densefrom=$DenseFr
 Step "Starting the game: queue $($Queue -join ','), $Ticks ticks each"
 # Without taking focus from the person's own game (tools/StartQuiet.ps1).
 . (Join-Path $PSScriptRoot 'StartQuiet.ps1')
+[RwmlwcQuiet]::Guard()   # remember the person's window before the game takes it
 $p = Start-GameQuiet $exe "-savedatafolder=$dir" $game
 Write-Host "pid $($p.Id), data $dir"
 [void](Show-GameQuiet $p)
@@ -92,12 +93,12 @@ $log = Join-Path $dir 'RWMLWC\automation-log.txt'
 $deadline = (Get-Date).AddMinutes($TimeoutMin)
 $finished = $false
 while ((Get-Date) -lt $deadline) {
-    Start-Sleep -Seconds 3
+    Wait-GuardingFocus 3
     $finished = (Test-Path $log) -and (Select-String -Path $log -Pattern 'queue: finished' -Quiet)
     if ($finished -and (GameProcs).Count -eq 0) { break }
     # A restart has a short gap with no process; give up only when there is none for a while.
     if (-not $finished -and (GameProcs).Count -eq 0) {
-        Start-Sleep -Seconds 20
+        Wait-GuardingFocus 20
         if ((GameProcs).Count -eq 0 -and -not (Select-String -Path $log -Pattern 'queue: finished' -Quiet)) { break }
     }
 }

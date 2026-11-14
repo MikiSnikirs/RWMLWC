@@ -43,8 +43,48 @@ public static class RwmlwcQuiet
         CloseHandle(pi.hProcess);
         return pi.dwProcessId;
     }
+
+    // ---- focus guard: the game activates its own window on creation; give focus back at once ----
+
+    [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] static extern int GetWindowThreadProcessId(IntPtr h, out int pid);
+    [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);
+    [DllImport("user32.dll")] static extern bool IsWindow(IntPtr h);
+    [DllImport("user32.dll")] static extern void keybd_event(byte vk, byte scan, int flags, IntPtr extra);
+
+    static IntPtr saved = IntPtr.Zero;
+    public static int Restored;
+
+    static string NameOf(IntPtr h)
+    {
+        int pid;
+        GetWindowThreadProcessId(h, out pid);
+        try { return System.Diagnostics.Process.GetProcessById(pid).ProcessName; } catch { return ""; }
+    }
+
+    /// Called often while test instances run: remembers the person's window, and if a test instance
+    /// (RimWorld) took the foreground, hands it back to that window.
+    public static void Guard()
+    {
+        IntPtr fg = GetForegroundWindow();
+        if (fg == IntPtr.Zero) return;
+        bool game = string.Equals(NameOf(fg), "RimWorld", StringComparison.OrdinalIgnoreCase);
+        if (!game) { saved = fg; return; }
+        if (saved == IntPtr.Zero || !IsWindow(saved)) return;
+        // SetForegroundWindow works for a process that produced the last input: a bare Alt tap to the
+        // foreground window (the test instance itself) gives us that right.
+        keybd_event(0x12, 0, 0, IntPtr.Zero);
+        keybd_event(0x12, 0, 2, IntPtr.Zero);
+        if (SetForegroundWindow(saved)) Restored++;
+    }
 }
 '@
+}
+
+# Poll the focus guard for $Seconds (use instead of Start-Sleep while test instances run).
+function Wait-GuardingFocus([double]$Seconds) {
+    $until = (Get-Date).AddSeconds($Seconds)
+    do { [RwmlwcQuiet]::Guard(); Start-Sleep -Milliseconds 100 } while ((Get-Date) -lt $until)
 }
 
 function Start-GameQuiet([string]$Exe, [string]$Arguments, [string]$WorkDir) {
@@ -58,11 +98,11 @@ function Show-GameQuiet($Process, [int]$TimeoutSec = 90) {
     while ((Get-Date) -lt $deadline -and -not $Process.HasExited) {
         $Process.Refresh()
         if ($Process.MainWindowHandle -ne [IntPtr]::Zero) {
-            Start-Sleep -Seconds 2   # let the game finish creating the window first
+            Wait-GuardingFocus 2   # let the game finish creating the window first
             [void][RwmlwcQuiet]::ShowWindow($Process.MainWindowHandle, [RwmlwcQuiet]::SW_SHOWNOACTIVATE)
             return $true
         }
-        Start-Sleep -Milliseconds 500
+        Wait-GuardingFocus 0.5
     }
     return $false
 }
