@@ -15,9 +15,9 @@ namespace RWMLWC.Client.World;
 /// сводки разойдутся, сервер заметит расхождение хешей.
 /// <list type="number">
 /// <item>+300 тиков: «Сформировать караван» — то же, что кнопка «Отправить» окна <see cref="Dialog_FormCaravan"/>
-/// (один колонист, маршрут на соседний тайл), без открытия окна (оно уводит камеру на карту мира).</item>
-/// <item>Когда караван игрока появился на карте мира: «Основать поселение» — то же, что кнопка каравана
-/// (<see cref="SettleInEmptyTileUtility.Settle"/> после подтверждения).</item>
+/// (один колонист, маршрут на тайл в двух шагах, где можно основать поселение), без открытия окна (оно уводит камеру на карту мира).</item>
+/// <item>Когда караван дошёл до цели: «Основать поселение» — то же, что кнопка каравана (её проверки, затем
+/// <see cref="SettleInEmptyTileUtility.Settle"/>).</item>
 /// <item>Раз в 500 тиков и в конце — сводка: ходят ли пешки формировать караван, сколько караванов и поселений игрока.</item>
 /// </list>
 /// </summary>
@@ -28,6 +28,7 @@ public static class CaravanSelfTest
     private static bool _formed;
     private static bool _settled;
     private static int _nextSummary;
+    private static PlanetTile _destination = PlanetTile.Invalid;
 
     private static bool Enabled
     {
@@ -69,18 +70,10 @@ public static class CaravanSelfTest
         }
 
         Caravan? caravan = Find.WorldObjects.Caravans.FirstOrDefault(c => c.Faction == Faction.OfPlayer);
-        if (issuer && !_settled && caravan != null)
+        if (issuer && !_settled && caravan != null && !caravan.pather.Moving && caravan.Tile == _destination)
         {
             _settled = true;
-            try
-            {
-                SettleInEmptyTileUtility.Settle(caravan);
-                TestAutomation.Note("caravan: settle called on tile " + caravan.Tile);
-            }
-            catch (Exception e)
-            {
-                TestAutomation.Note("caravan: settle FAILED: " + e.Message);
-            }
+            TestAutomation.Note("caravan: settle — " + TrySettle(caravan));
         }
 
         if (tick >= _nextSummary)
@@ -123,17 +116,61 @@ public static class CaravanSelfTest
             TransferableOneWay? colonist = dialog.transferables.FirstOrDefault(t => t.AnyThing is Pawn p && p.IsColonist && !p.Downed);
             if (colonist == null) return "нет колониста";
             colonist.AdjustTo(1);
-            var neighbors = new List<PlanetTile>();
-            Find.WorldGrid.GetTileNeighbors(map.Tile, neighbors);
-            PlanetTile dest = neighbors.FirstOrDefault(t => !Find.World.Impassable(t));
-            if (!dest.Valid) return "нет проходимого соседнего тайла";
+            PlanetTile dest = TileTwoAway(map.Tile);
+            if (!dest.Valid) return "нет тайла для поселения в двух шагах";
+            _destination = dest;
             dialog.Notify_ChoseRoute(dest);
             bool ok = (bool)AccessTools.Method(typeof(Dialog_FormCaravan), "TryFormAndSendCaravan").Invoke(dialog, null);
-            return "отправка " + (ok ? "принята" : "отклонена") + ", колонист " + ((Pawn)colonist.AnyThing).thingIDNumber;
+            return "отправка " + (ok ? "принята" : "отклонена") + ", колонист " + ((Pawn)colonist.AnyThing).thingIDNumber + ", цель " + dest;
         }
         catch (Exception e)
         {
             return "ошибка: " + (e.InnerException ?? e).Message;
+        }
+    }
+
+    /// <summary>Тайл в двух шагах от колонии, на котором кнопка «Основать поселение» разрешена (не рядом с поселением).</summary>
+    private static PlanetTile TileTwoAway(PlanetTile home)
+    {
+        var first = new List<PlanetTile>();
+        var second = new List<PlanetTile>();
+        Find.WorldGrid.GetTileNeighbors(home, first);
+        foreach (PlanetTile n in first)
+        {
+            second.Clear();
+            Find.WorldGrid.GetTileNeighbors(n, second);
+            foreach (PlanetTile t in second)
+            {
+                if (t != home && !first.Contains(t) && !Find.World.Impassable(t) && !Find.WorldObjects.AnyWorldObjectAt(t)
+                    && TileFinder.IsValidTileForNewSettlement(t) && Find.WorldReachability.CanReach(home, t))
+                {
+                    return t;
+                }
+            }
+        }
+        return PlanetTile.Invalid;
+    }
+
+    /// <summary>То же, что кнопка каравана: её проверки, затем <see cref="SettleInEmptyTileUtility.Settle"/>.</summary>
+    private static string TrySettle(Caravan caravan)
+    {
+        try
+        {
+            var reason = new System.Text.StringBuilder();
+            if (!TileFinder.IsValidTileForNewSettlement(caravan.Tile, reason)) return "кнопка выключена: " + reason;
+            string limit = "";
+            if (SettleUtility.PlayerSettlementsCountLimitReached)
+            {
+                // Как игрок в настройках игры: по умолчанию одно поселение, кнопка второго выключена.
+                limit = $" (лимит поселений {Prefs.MaxNumberOfPlayerSettlements} достигнут — кнопка была бы выключена; поднят до 5 локально)";
+                Prefs.MaxNumberOfPlayerSettlements = 5;
+            }
+            SettleInEmptyTileUtility.Settle(caravan);
+            return "вызвано на тайле " + caravan.Tile + limit;
+        }
+        catch (Exception e)
+        {
+            return "ОШИБКА " + e;
         }
     }
 
@@ -143,6 +180,8 @@ public static class CaravanSelfTest
         int caravans = Find.WorldObjects.Caravans.Count(c => c.Faction == Faction.OfPlayer);
         int settlements = Find.WorldObjects.Settlements.Count(s => s.Faction == Faction.OfPlayer);
         int maps = Find.Maps.Count;
-        return $"tick {Find.TickManager.TicksGame}, forming lords {forming}, caravans {caravans}, player settlements {settlements}, maps {maps}";
+        Caravan? c = Find.WorldObjects.Caravans.FirstOrDefault(x => x.Faction == Faction.OfPlayer);
+        string where = c == null ? "" : $", caravan at {c.Tile}{(c.pather.Moving ? " moving to " + c.pather.Destination : "")}";
+        return $"tick {Find.TickManager.TicksGame}, forming lords {forming}, caravans {caravans}, player settlements {settlements}, maps {maps}{where}";
     }
 }
