@@ -270,6 +270,21 @@ public sealed class WorldSenderTests : IDisposable
     }
 
     [Fact]
+    public void WorldHashMismatchOrdersACommonSnapshot()
+    {
+        // Карта поселения есть только у одного игрока: по картам сравнивать не с чем, разойдётся хеш мира.
+        Session s = NewSession();
+        C a = Join(s, "a", 40, withWorld: true);
+        C b = Join(s, "b", 20, withWorld: true);
+        a.Conn.Send(new MapHashMessage { MapId = ProtocolIds.WorldMapId, Tick = Tick + 60, Total = 1 });
+        b.Conn.Send(new MapHashMessage { MapId = ProtocolIds.WorldMapId, Tick = Tick + 60, Total = 2 });
+        s.Pump();
+        a.Drain();
+        Assert.Equal(b.Id, WorldSnapshotOrder.Sender(a.Ordered(ProtocolIds.RequestWorldSnapshotKind).Single().Payload));
+        Assert.Contains(a.Got.OfType<NoticeMessage>(), n => n.Code == NoticeCode.Desync && n.Text.StartsWith("мир "));
+    }
+
+    [Fact]
     public void ResyncWaitsForMissingHashesOnlyUntilTheDeadline()
     {
         Session s = NewSession();

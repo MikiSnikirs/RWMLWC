@@ -644,7 +644,7 @@ public sealed class Session
         reports[player.Id] = h.Total;
         if (reports.Count < 2 || firstTotal == h.Total) return;
 
-        _log($"РАСХОЖДЕНИЕ карта {h.MapId} тик {h.Tick}: игрок {firstId} {firstTotal:X16}, игрок {player.Id} {h.Total:X16}");
+        _log($"РАСХОЖДЕНИЕ {Where(h.MapId)} тик {h.Tick}: игрок {firstId} {firstTotal:X16}, игрок {player.Id} {h.Total:X16}");
         Desync?.Invoke(new MapHashMessage { MapId = h.MapId, Tick = h.Tick, Total = firstTotal }, firstId, h, player.Id);
         // Хеш тика не позже уже заказанного общего снимка: этот снимок его и вылечит, второй не нужен.
         // (Клиенты присылают хеши с отставанием — без этой проверки за время одной перезагрузки заказывалось несколько.)
@@ -655,7 +655,7 @@ public sealed class Session
             Broadcast(new NoticeMessage
             {
                 Code = NoticeCode.Desync,
-                Text = $"карта {h.MapId} тик {h.Tick}: игрок {firstId} ≠ игрок {player.Id}",
+                Text = $"{Where(h.MapId)} тик {h.Tick}: игрок {firstId} ≠ игрок {player.Id}",
             });
             // v4: лечит сервер. Отдающего выбираем из большинства (T-066): ждём хеши остальных, но не дольше MajorityWait.
             _pendingResync = (key, _clockMs + _options.MajorityWait.TotalMilliseconds);
@@ -664,6 +664,13 @@ public sealed class Session
     }
 
     private ((int map, int tick) key, double deadlineMs)? _pendingResync;
+
+    /// <summary>
+    /// Что разошлось: карта или мир. Хеш с <see cref="ProtocolIds.WorldMapId"/> сравнивается так же, как хеш карты, —
+    /// он ловит то, чего не видит сверка по картам: карта (поселение, лагерь), которая есть только у одного игрока,
+    /// не попадает ни в одну пару для сравнения.
+    /// </summary>
+    private static string Where(int mapId) => mapId == ProtocolIds.WorldMapId ? "мир" : $"карта {mapId}";
 
     /// <summary>
     /// Заказать лечебный снимок, когда известны хеши всех игроков с миром за тик расхождения (или вышло время).
@@ -683,7 +690,7 @@ public sealed class Session
         if (groups.Count > 1 && groups[0].Count() > groups[1].Count())
             among = new HashSet<int>(groups[0].Select(r => r.Key));
         string note = among == null ? "большинства нет" : $"большинство: {string.Join(", ", among.OrderBy(x => x))}";
-        OrderWorldSnapshot(null, 0, $"расхождение карты {pending.key.map} на тике {pending.key.tick}; {note}", among);
+        OrderWorldSnapshot(null, 0, $"расхождение: {Where(pending.key.map)} на тике {pending.key.tick}; {note}", among);
     }
 
     /// <summary>
