@@ -53,7 +53,7 @@ public static class ProtocolLimits
     public const int PlayersRefreshMs = 2000;
 
     /// <summary>Курсоров от игрока в секунду (v5); лишние сервер отбрасывает.</summary>
-    public const int MaxCursorsPerSecond = 10;
+    public const int MaxCursorsPerSecond = 20;
 
     /// <summary>Тревога по одной карте — не чаще раза в столько секунд (v6).</summary>
     public const int AlarmRepeatSeconds = 120;
