@@ -402,6 +402,17 @@ public static class TestAutomation
             sessionSteps.Enqueue((startTick + 1400, "squads: draft foreign bypassing UI", () => SquadDraft(0, true)));
             sessionSteps.Enqueue((startTick + 1600, "squads: draft common pawn", () => SquadDraft(2, false)));
             sessionSteps.Enqueue((startTick + 1800, "squads: work of foreign bypassing UI", SquadForeignWork));
+            // T-062: имя и цвет своего отряда меняются, чужого — нет (c1 — участник «Альфы», не «Беты»).
+            sessionSteps.Enqueue((startTick + 2000, "squads: rename and recolor own", () => SquadsStep(map =>
+            {
+                RWMLWC.Client.Maps.Squads.Rename(map, 1, "Орлы");
+                RWMLWC.Client.Maps.Squads.SetColor(map, 1, RWMLWC.Client.Maps.Squads.Palette[2]);
+            })));
+            sessionSteps.Enqueue((startTick + 2100, "squads: rename and recolor foreign", () => SquadsStep(map =>
+            {
+                RWMLWC.Client.Maps.Squads.Rename(map, 2, "Чужие");
+                RWMLWC.Client.Maps.Squads.SetColor(map, 2, RWMLWC.Client.Maps.Squads.Palette[3]);
+            })));
         }
         if (cfg.issuer && cfg.scenario == "gizmo")
         {
