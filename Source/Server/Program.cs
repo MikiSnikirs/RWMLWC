@@ -17,6 +17,8 @@ internal static class Program
 {
     private static async Task<int> Main(string[] args)
     {
+        // Консоль Windows по умолчанию не в UTF-8 — русские сообщения сервера выходили нечитаемыми.
+        Console.OutputEncoding = System.Text.Encoding.UTF8;
         Console.WriteLine($"RWMLWC server, protocol v{ProtocolInfo.ProtocolVersion}");
 
         int port = 0;
@@ -59,10 +61,22 @@ internal static class Program
             return 0;
         }
 
+        var store = new SaveStore(dataDir);
+        SaveCopy? latest = store.Latest;
+        if (latest != null)
+        {
+            Console.WriteLine($"SAVE world={latest.WorldId:X16} tick={latest.Tick} saved={latest.SavedUtc:u} size={latest.Size}");
+            if (startTick == 0) startTick = latest.Tick;
+        }
+        else
+        {
+            Console.WriteLine("SAVE нет — ждём снимок мира от хоста");
+        }
         var options = new SessionOptions
         {
             StartTick = startTick,
             SessionSeed = seed ?? (uint)System.Security.Cryptography.RandomNumberGenerator.GetInt32(int.MaxValue),
+            Store = store,
         };
         Console.WriteLine($"SESSION startTick={options.StartTick} seed={options.SessionSeed}");
         var host = new SessionHost(new Session(options, Console.WriteLine));
