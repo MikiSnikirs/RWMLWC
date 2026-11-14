@@ -3,8 +3,10 @@
     <OutputType>Exe</OutputType>
     <AssemblyName>RWMLWC.Server</AssemblyName>
     <RootNamespace>RWMLWC.Server</RootNamespace>
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../Shared/RWMLWC.Shared.csproj" />
+    <ProjectReference Include="../Net/RWMLWC.Net.csproj" />
   </ItemGroup>
 </Project>
