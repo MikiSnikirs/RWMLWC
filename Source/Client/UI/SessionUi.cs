@@ -134,6 +134,15 @@ public class Dialog_Session : Window
         Widgets.Label(new Rect(inRect.x, y, inRect.width, 24f), SessionUi.StatusLine());
         y += 26f;
 
+        // У хоста — как друзьям подключиться.
+        if (RWMLWC.Client.Net.HostedSession.Running)
+        {
+            if (RWMLWC.Client.Net.SteamNet.Available)
+                y = CopyRow(inRect, y, "SteamID: " + RWMLWC.Client.Net.SteamNet.MySteamId, RWMLWC.Client.Net.SteamNet.MySteamId.ToString());
+            if (RWMLWC.Client.Net.HostedSession.DirectCode.Length > 0)
+                y = CopyRow(inRect, y, "Код: " + RWMLWC.Client.Net.HostedSession.DirectCode, RWMLWC.Client.Net.HostedSession.DirectCode);
+        }
+
         // Игроки.
         foreach (PlayerInfo p in SessionUi.Players)
         {
@@ -186,6 +195,19 @@ public class Dialog_Session : Window
         {
             Send();
         }
+    }
+
+    private static float CopyRow(Rect inRect, float y, string label, string value)
+    {
+        Text.Font = GameFont.Tiny;
+        Widgets.Label(new Rect(inRect.x + 8f, y + 3f, inRect.width - 110f, 22f), label);
+        Text.Font = GameFont.Small;
+        if (Widgets.ButtonText(new Rect(inRect.xMax - 100f, y, 100f, 24f), "Копировать"))
+        {
+            GUIUtility.systemCopyBuffer = value;
+            Messages.Message("RWMLWC: скопировано", MessageTypeDefOf.SilentInput, false);
+        }
+        return y + 26f;
     }
 
     private void Send()
