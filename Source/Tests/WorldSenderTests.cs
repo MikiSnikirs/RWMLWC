@@ -52,11 +52,11 @@ public sealed class WorldSenderTests : IDisposable
         public IEnumerable<CommandOrderedMessage> Ordered(int kind) => Got.OfType<CommandOrderedMessage>().Where(c => c.Kind == kind);
     }
 
-    private Session NewSession(bool dedicated = true, TimeSpan? autosave = null, byte[]? stored = null, List<string>? log = null)
+    private Session NewSession(bool dedicated = true, TimeSpan? autosave = null, byte[]? stored = null, List<string>? log = null, int maxLead = 0)
     {
         var store = new SaveStore(_dir);
         if (stored != null) store.Store(World, Tick, stored);
-        return new Session(new SessionOptions { StartTick = Tick, Store = store, Dedicated = dedicated, AutosaveInterval = autosave }, (log ?? new List<string>()).Add);
+        return new Session(new SessionOptions { StartTick = Tick, Store = store, Dedicated = dedicated, AutosaveInterval = autosave, MaxLeadTicks = maxLead }, (log ?? new List<string>()).Add);
     }
 
     private static C Join(Session s, string name, int rtt, bool withWorld)
@@ -226,5 +226,65 @@ public sealed class WorldSenderTests : IDisposable
         Pair(s.TickUpTo + 60);
         a.Drain();
         Assert.Equal(2, a.Ordered(ProtocolIds.RequestWorldSnapshotKind).Count());
+    }
+
+    [Fact]
+    public void ClockDoesNotRunAheadOfTheSlowestPlayer()
+    {
+        Session s = NewSession(maxLead: 120);
+        C a = Join(s, "a", 10, withWorld: true);
+        C b = Join(s, "b", 10, withWorld: true);
+        a.Conn.Send(new SpeedRequestMessage { Speed = 3 });
+        b.Conn.Send(new SpeedRequestMessage { Speed = 3 });
+        s.Pump();
+        s.Advance(TimeSpan.FromSeconds(5)); // без ограничения было бы +1800
+        Assert.Equal(Tick + 120, s.TickUpTo);
+
+        a.Conn.Send(new MapHashMessage { MapId = 0, Tick = Tick + 60, Total = 1 });
+        s.Pump();
+        s.Advance(TimeSpan.FromSeconds(1));
+        Assert.Equal(Tick + 120, s.TickUpTo); // b ещё не сообщил, где он
+
+        b.Conn.Send(new MapHashMessage { MapId = 0, Tick = Tick + 60, Total = 1 });
+        s.Pump();
+        s.Advance(TimeSpan.FromSeconds(1));
+        Assert.Equal(Tick + 180, s.TickUpTo);
+    }
+
+    [Fact]
+    public void ResyncSenderIsChosenFromTheMajority()
+    {
+        Session s = NewSession();
+        C broken = Join(s, "broken", 1, withWorld: true);   // лучший пинг, но испорченный мир
+        C x = Join(s, "x", 50, withWorld: true);
+        C y = Join(s, "y", 30, withWorld: true);
+        void Report(C c, ulong total) { c.Conn.Send(new MapHashMessage { MapId = 0, Tick = Tick + 60, Total = total }); s.Pump(); }
+        Report(broken, 7);
+        Report(x, 1);           // расхождение замечено — ждём третий хеш
+        x.Drain();
+        Assert.Empty(x.Ordered(ProtocolIds.RequestWorldSnapshotKind));
+        Report(y, 1);
+        x.Drain();
+        CommandOrderedMessage order = x.Ordered(ProtocolIds.RequestWorldSnapshotKind).Single();
+        Assert.Equal(y.Id, WorldSnapshotOrder.Sender(order.Payload)); // лучший пинг среди большинства (x, y)
+    }
+
+    [Fact]
+    public void ResyncWaitsForMissingHashesOnlyUntilTheDeadline()
+    {
+        Session s = NewSession();
+        C a = Join(s, "a", 40, withWorld: true);
+        C b = Join(s, "b", 20, withWorld: true);
+        C silent = Join(s, "silent", 5, withWorld: true);
+        a.Conn.Send(new MapHashMessage { MapId = 0, Tick = Tick + 60, Total = 1 });
+        b.Conn.Send(new MapHashMessage { MapId = 0, Tick = Tick + 60, Total = 2 });
+        s.Pump();
+        s.Advance(TimeSpan.FromSeconds(1));
+        a.Drain();
+        Assert.Empty(a.Ordered(ProtocolIds.RequestWorldSnapshotKind));
+        s.Advance(TimeSpan.FromSeconds(1.5));
+        a.Drain();
+        // Большинства нет (1:1) — лучший пинг среди всех с миром.
+        Assert.Equal(silent.Id, WorldSnapshotOrder.Sender(a.Ordered(ProtocolIds.RequestWorldSnapshotKind).Single().Payload));
     }
 }
