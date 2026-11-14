@@ -199,4 +199,32 @@ public sealed class WorldSenderTests : IDisposable
         Assert.Empty(a.Ordered(ProtocolIds.SaveWorldSnapshotKind));
         Assert.Contains(log, l => l.Contains("только от сервера"));
     }
+
+    [Fact]
+    public void LateHashesBeforeTheOrderedSnapshotDoNotOrderAnotherOne()
+    {
+        Session s = NewSession();
+        C a = Join(s, "a", 40, withWorld: true);
+        C b = Join(s, "b", 15, withWorld: true);
+        a.Conn.Send(new SpeedRequestMessage { Speed = 3 });
+        b.Conn.Send(new SpeedRequestMessage { Speed = 3 });
+        s.Pump();
+        s.Advance(TimeSpan.FromSeconds(10)); // сервер ушёл далеко вперёд, хеши приходят с отставанием
+        void Pair(int tick)
+        {
+            a.Conn.Send(new MapHashMessage { MapId = 0, Tick = tick, Total = 1 });
+            b.Conn.Send(new MapHashMessage { MapId = 0, Tick = tick, Total = 2 });
+            s.Pump();
+        }
+        Pair(Tick + 60);
+        Pair(Tick + 60 + ProtocolLimits.DesyncNoticeIntervalTicks);
+        Pair(Tick + 60 + 2 * ProtocolLimits.DesyncNoticeIntervalTicks);
+        a.Drain();
+        Assert.Single(a.Ordered(ProtocolIds.RequestWorldSnapshotKind));
+
+        // После тика снимка расхождение — снова лечится.
+        Pair(s.TickUpTo + 60);
+        a.Drain();
+        Assert.Equal(2, a.Ordered(ProtocolIds.RequestWorldSnapshotKind).Count());
+    }
 }
