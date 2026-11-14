@@ -126,6 +126,9 @@ public sealed class Session
         /// <summary>Мир и тик локальной копии сейва, о которых игрок сообщил в <c>Hello</c>.</summary>
         public ulong SaveWorldId { get; internal set; }
         public int SaveTick { get; internal set; }
+
+        /// <summary>Когда (часы сессии, мс) игрок писал в чат в последнем окне — для ограничения частоты.</summary>
+        internal Queue<double> ChatTimes { get; } = new();
     }
 
     private sealed class Pending
@@ -157,7 +160,34 @@ public sealed class Session
                 Handle(player, m);
         }
 
+        BroadcastPlayersIfChanged();
         UpdateSpeed();
+    }
+
+    // Часы сессии (сумма elapsed из Advance) — для пинга и ограничения чата.
+    private double _clockMs;
+    private double _lastPingMs;
+    private double _lastPlayersRefreshMs;
+    private string _lastPings = "";
+
+    // Состав, разосланный последним: номер и «в сети» каждого игрока. Уход замечается здесь же, в Pump.
+    private string _lastRoster = "";
+
+    private bool BroadcastPlayersIfChanged()
+    {
+        string roster = string.Join(",", _players.Select(p => p.Online ? p.Id.ToString() : "-" + p.Id));
+        if (roster == _lastRoster) return false;
+        _lastRoster = roster;
+        Broadcast(BuildPlayers());
+        return true;
+    }
+
+    private PlayersMessage BuildPlayers()
+    {
+        var msg = new PlayersMessage();
+        foreach (Player p in _players)
+            msg.Players.Add(new PlayerInfo(p.Id, p.Name, p.Online, p.Online ? p.Connection.RoundTripMs : -1));
+        return msg;
     }
 
     /// <summary>Продвинуть общие часы на прошедшее реальное время и разослать разрешение тикать.</summary>
@@ -170,6 +200,24 @@ public sealed class Session
             {
                 _pending[i].Connection.Close("нет Hello за " + _options.HelloTimeout.TotalSeconds + " с");
                 _pending.RemoveAt(i);
+            }
+        }
+
+        _clockMs += elapsed.TotalMilliseconds;
+        if (_clockMs - _lastPingMs >= ProtocolLimits.PingIntervalMs)
+        {
+            _lastPingMs = _clockMs;
+            foreach (Player p in _players)
+                if (p.Online) p.Connection.SendPing();
+        }
+        if (_clockMs - _lastPlayersRefreshMs >= ProtocolLimits.PlayersRefreshMs)
+        {
+            _lastPlayersRefreshMs = _clockMs;
+            string pings = string.Join(",", _players.Select(p => p.Online ? p.Connection.RoundTripMs : -1));
+            if (pings != _lastPings)
+            {
+                _lastPings = pings;
+                Broadcast(BuildPlayers());
             }
         }
 
@@ -249,6 +297,9 @@ public sealed class Session
             SaveTick = SaveTick,
         });
         connection.Send(BuildPermissions());
+        // Состав: всем в сети, включая нового (он идёт сразу после Welcome и Permissions). Если игрок вернулся
+        // раньше, чем сервер заметил его уход, состав не изменился — тогда только ему.
+        if (!BroadcastPlayersIfChanged()) connection.Send(BuildPlayers());
         CheckSaveVersion(player);
         // Новому игроку — текущее разрешение, остальным — новая скорость (новый игрок держит паузу).
         connection.Send(new TickMessage { TickUpTo = TickUpTo, Speed = Speed });
@@ -306,6 +357,10 @@ public sealed class Session
                 CompareHash(player, h);
                 break;
 
+            case ChatMessage chat:
+                Chat(player, chat.Text);
+                break;
+
             case SnapshotChunkMessage chunk:
                 // Пересылка снимка остальным; кому и когда — уточнят T-032/T-034/T-045.
                 foreach (Player other in _players)
@@ -319,6 +374,9 @@ public sealed class Session
                 break;
         }
     }
+
+    // Тик последнего Notice Desync по каждой карте.
+    private readonly Dictionary<int, int> _desyncNoticeTick = new();
 
     private void CompareHash(Player player, MapHashMessage h)
     {
@@ -336,6 +394,15 @@ public sealed class Session
         {
             _log($"РАСХОЖДЕНИЕ карта {h.MapId} тик {h.Tick}: игрок {first.playerId} {first.hash.Total:X16}, игрок {player.Id} {h.Total:X16}");
             Desync?.Invoke(first.hash, first.playerId, h, player.Id);
+            if (!_desyncNoticeTick.TryGetValue(h.MapId, out int last) || h.Tick - last >= ProtocolLimits.DesyncNoticeIntervalTicks || h.Tick < last)
+            {
+                _desyncNoticeTick[h.MapId] = h.Tick;
+                Broadcast(new NoticeMessage
+                {
+                    Code = NoticeCode.Desync,
+                    Text = $"карта {h.MapId} тик {h.Tick}: игрок {first.playerId} ≠ игрок {player.Id}",
+                });
+            }
         }
     }
 
@@ -481,6 +548,23 @@ public sealed class Session
             msg.Maps.Add(m);
         }
         return msg;
+    }
+
+    private void Chat(Player player, string text)
+    {
+        text = (text ?? "").Trim();
+        if (text.Length == 0) return;
+        if (text.Length > ProtocolLimits.MaxChatChars) text = text.Substring(0, ProtocolLimits.MaxChatChars);
+        Queue<double> recent = player.ChatTimes;
+        while (recent.Count > 0 && _clockMs - recent.Peek() >= ProtocolLimits.ChatWindowMs) recent.Dequeue();
+        if (recent.Count >= ProtocolLimits.MaxChatPerWindow)
+        {
+            _log($"чат: игрок {player.Id} пишет слишком часто, сообщение отброшено");
+            return;
+        }
+        recent.Enqueue(_clockMs);
+        _log($"чат {player.Id} «{player.Name}»: {text}");
+        Broadcast(new ChatMessage { PlayerId = player.Id, Text = text });
     }
 
     /// <summary>Правило меньшей скорости: игра идёт на минимальной из скоростей игроков в сети; пауза любого — пауза всех.</summary>

@@ -32,6 +32,12 @@ public interface IConnection : IAsyncDisposable
     ValueTask<Message> ReceiveAsync(CancellationToken ct = default);
 
     void Close(string reason);
+
+    /// <summary>Отправить проверку связи (<c>Ping</c>); ответ соединение обработает само.</summary>
+    void SendPing();
+
+    /// <summary>Последнее измеренное время туда-обратно в мс; -1 — ещё не измерено.</summary>
+    int RoundTripMs { get; }
 }
 
 public sealed class ConnectionClosedException : Exception
