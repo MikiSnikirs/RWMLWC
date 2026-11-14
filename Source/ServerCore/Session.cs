@@ -39,6 +39,16 @@ public sealed class SessionOptions
     /// null — выключено (сессия в игре хоста: у хоста свои сейвы).
     /// </summary>
     public TimeSpan? AutosaveInterval;
+
+    /// <summary>
+    /// Насколько часы сервера могут уйти вперёд от самого медленного игрока с миром (T-066). Где игрок, сервер знает
+    /// по его хешам (раз в 60 тиков). 0 — без ограничения. Меньше отставание — быстрее исполняются команды,
+    /// лечится расхождение и входит новичок.
+    /// </summary>
+    public int MaxLeadTicks;
+
+    /// <summary>Сколько ждать хеши остальных игроков, чтобы выбрать отдающего из большинства при расхождении.</summary>
+    public TimeSpan MajorityWait = TimeSpan.FromSeconds(2);
 }
 
 /// <summary>
@@ -66,7 +76,8 @@ public sealed class Session
     private readonly SessionOptions _options;
     private readonly List<Pending> _pending = new();
     private readonly List<Player> _players = new();
-    private readonly Dictionary<(int map, int tick), (int playerId, MapHashMessage hash)> _hashes = new();
+    // Хеши по (карта, тик): игрок → Total. Нужны все, чтобы при расхождении найти большинство (T-066).
+    private readonly Dictionary<(int map, int tick), Dictionary<int, ulong>> _hashes = new();
     private readonly Action<string> _log;
     // Права по картам (T-031). Номер игрока постоянен в сессии (возврат по имени), поэтому храним номера.
     private readonly SortedDictionary<int, MapRights> _maps = new();
@@ -159,6 +170,9 @@ public sealed class Session
         /// (<c>SnapshotApplied</c>). Только такой может отдавать мир другим.
         /// </summary>
         public bool HasWorld { get; internal set; }
+
+        /// <summary>До какого тика игрок точно дошёл: Welcome с миром, SnapshotApplied, последний присланный хеш.</summary>
+        public int LastTick { get; internal set; }
     }
 
     private sealed class Pending
@@ -191,6 +205,7 @@ public sealed class Session
         }
 
         BroadcastPlayersIfChanged();
+        TryResolveResync();
         UpdateSpeed();
     }
 
@@ -234,6 +249,7 @@ public sealed class Session
         }
 
         _clockMs += elapsed.TotalMilliseconds;
+        TryResolveResync();
         Autosave();
         if (_clockMs - _lastPingMs >= ProtocolLimits.PingIntervalMs)
         {
@@ -259,7 +275,20 @@ public sealed class Session
             _tickAccumulator += elapsed.TotalSeconds * TicksPerSecondAtSpeed1 * SpeedMultiplier[Speed];
             int whole = (int)Math.Floor(_tickAccumulator);
             _tickAccumulator -= whole;
-            TickUpTo += whole;
+            int target = TickUpTo + whole;
+            // Не уходить вперёд от самого медленного игрока с миром больше чем на MaxLeadTicks (T-066).
+            if (_options.MaxLeadTicks > 0)
+            {
+                int slowest = int.MaxValue;
+                foreach (Player p in _players)
+                    if (p.Online && p.HasWorld && p.LastTick < slowest) slowest = p.LastTick;
+                if (slowest != int.MaxValue && target > slowest + _options.MaxLeadTicks)
+                {
+                    target = Math.Max(TickUpTo, slowest + _options.MaxLeadTicks);
+                    _tickAccumulator = 0; // не копим «долг»: после отставания часы не рвутся вперёд
+                }
+            }
+            TickUpTo = target;
         }
         if (TickUpTo != before || Speed != _lastSentSpeed)
         {
@@ -334,6 +363,7 @@ public sealed class Session
         player.SaveTick = hello.SaveTick;
         // Мир есть, если сейв на тике сервера (иначе клиент сейчас попросит снимок).
         player.HasWorld = hello.SaveWorldId != 0 && hello.SaveTick == TickUpTo;
+        player.LastTick = TickUpTo;
         if (player.HasWorld && WorldId == 0) WorldId = hello.SaveWorldId;
         connection.Send(new WelcomeMessage
         {
@@ -404,6 +434,7 @@ public sealed class Session
                 // Поток «снимок → все загружают → все подтвердили → тики дальше» — T-032/T-034/T-045.
                 _log($"игрок {player.Id}: снимок {applied.SnapshotId} применён, тик {applied.Tick}");
                 player.HasWorld = true;
+                player.LastTick = Math.Max(player.LastTick, applied.Tick);
                 break;
 
             case SpeedRequestMessage s:
@@ -439,35 +470,63 @@ public sealed class Session
 
     private void CompareHash(Player player, MapHashMessage h)
     {
+        if (h.Tick > player.LastTick) player.LastTick = h.Tick;
         var key = (h.MapId, h.Tick);
-        if (!_hashes.TryGetValue(key, out var first))
+        if (!_hashes.TryGetValue(key, out var reports))
         {
-            _hashes[key] = (player.Id, h);
+            reports = new Dictionary<int, ulong>();
+            _hashes[key] = reports;
             // Держим ограниченную историю: старые тики больше не сравниваются.
             if (_hashes.Count > 4096)
                 foreach (var k in _hashes.Keys.OrderBy(k => k.tick).Take(1024).ToList()) _hashes.Remove(k);
-            return;
         }
-        if (first.playerId == player.Id) return;
-        if (first.hash.Total != h.Total)
+        if (reports.ContainsKey(player.Id)) return;
+        // С кем сравнивать: первый присланный хеш этого тика.
+        int firstId = reports.Count > 0 ? reports.Keys.First() : 0;
+        ulong firstTotal = reports.Count > 0 ? reports[firstId] : 0;
+        reports[player.Id] = h.Total;
+        if (reports.Count < 2 || firstTotal == h.Total) return;
+
+        _log($"РАСХОЖДЕНИЕ карта {h.MapId} тик {h.Tick}: игрок {firstId} {firstTotal:X16}, игрок {player.Id} {h.Total:X16}");
+        Desync?.Invoke(new MapHashMessage { MapId = h.MapId, Tick = h.Tick, Total = firstTotal }, firstId, h, player.Id);
+        // Хеш тика не позже уже заказанного общего снимка: этот снимок его и вылечит, второй не нужен.
+        // (Клиенты присылают хеши с отставанием — без этой проверки за время одной перезагрузки заказывалось несколько.)
+        if (h.Tick <= _lastWorldSnapshotTick || _pendingResync != null) return;
+        if (!_desyncNoticeTick.TryGetValue(h.MapId, out int last) || h.Tick - last >= ProtocolLimits.DesyncNoticeIntervalTicks || h.Tick < last)
         {
-            _log($"РАСХОЖДЕНИЕ карта {h.MapId} тик {h.Tick}: игрок {first.playerId} {first.hash.Total:X16}, игрок {player.Id} {h.Total:X16}");
-            Desync?.Invoke(first.hash, first.playerId, h, player.Id);
-            // Хеш тика не позже уже заказанного общего снимка: этот снимок его и вылечит, второй не нужен.
-            // (Клиенты присылают хеши с отставанием — без этой проверки за время одной перезагрузки заказывалось несколько.)
-            if (h.Tick <= _lastWorldSnapshotTick) return;
-            if (!_desyncNoticeTick.TryGetValue(h.MapId, out int last) || h.Tick - last >= ProtocolLimits.DesyncNoticeIntervalTicks || h.Tick < last)
+            _desyncNoticeTick[h.MapId] = h.Tick;
+            Broadcast(new NoticeMessage
             {
-                _desyncNoticeTick[h.MapId] = h.Tick;
-                Broadcast(new NoticeMessage
-                {
-                    Code = NoticeCode.Desync,
-                    Text = $"карта {h.MapId} тик {h.Tick}: игрок {first.playerId} ≠ игрок {player.Id}",
-                });
-                // v4: лечит сервер — общий снимок от игрока с лучшим пингом (не чаще Notice).
-                OrderWorldSnapshot(null, 0, $"расхождение карты {h.MapId} на тике {h.Tick}");
-            }
+                Code = NoticeCode.Desync,
+                Text = $"карта {h.MapId} тик {h.Tick}: игрок {firstId} ≠ игрок {player.Id}",
+            });
+            // v4: лечит сервер. Отдающего выбираем из большинства (T-066): ждём хеши остальных, но не дольше MajorityWait.
+            _pendingResync = (key, _clockMs + _options.MajorityWait.TotalMilliseconds);
+            TryResolveResync();
         }
+    }
+
+    private ((int map, int tick) key, double deadlineMs)? _pendingResync;
+
+    /// <summary>
+    /// Заказать лечебный снимок, когда известны хеши всех игроков с миром за тик расхождения (или вышло время).
+    /// Отдающий — лучший пинг среди большинства; при равенстве групп — среди всех.
+    /// </summary>
+    private void TryResolveResync()
+    {
+        if (_pendingResync is not { } pending) return;
+        if (!_hashes.TryGetValue(pending.key, out var reports)) { _pendingResync = null; return; }
+        var expected = _players.Where(p => p.Online && p.HasWorld).Select(p => p.Id).ToList();
+        bool all = expected.All(reports.ContainsKey);
+        if (!all && _clockMs < pending.deadlineMs) return;
+        _pendingResync = null;
+
+        var groups = reports.Where(r => expected.Contains(r.Key)).GroupBy(r => r.Value).OrderByDescending(g => g.Count()).ToList();
+        HashSet<int>? among = null;
+        if (groups.Count > 1 && groups[0].Count() > groups[1].Count())
+            among = new HashSet<int>(groups[0].Select(r => r.Key));
+        string note = among == null ? "большинства нет" : $"большинство: {string.Join(", ", among.OrderBy(x => x))}";
+        OrderWorldSnapshot(null, 0, $"расхождение карты {pending.key.map} на тике {pending.key.tick}; {note}", among);
     }
 
     /// <summary>
@@ -672,12 +731,12 @@ public sealed class Session
     /// Путь «отдающий → сервер → получатель» короче всего через того, кто ближе к серверу; пинг между двумя
     /// игроками напрямую сервер не знает. Неизмеренный пинг считается худшим. 0 — отдать некому.
     /// </summary>
-    public int ChooseWorldSender(Player? except = null)
+    public int ChooseWorldSender(Player? except = null, ISet<int>? among = null)
     {
         Player? best = null;
         foreach (Player p in _players)
         {
-            if (!p.Online || !p.HasWorld || p == except) continue;
+            if (!p.Online || !p.HasWorld || p == except || (among != null && !among.Contains(p.Id))) continue;
             int rtt = p.Connection.RoundTripMs < 0 ? int.MaxValue : p.Connection.RoundTripMs;
             int bestRtt = best == null ? int.MaxValue : (best.Connection.RoundTripMs < 0 ? int.MaxValue : best.Connection.RoundTripMs);
             if (best == null || rtt < bestRtt) best = p;
@@ -689,9 +748,9 @@ public sealed class Session
     /// Поставить в общий порядок «общий снимок мира» с назначенным отдающим. <paramref name="requester"/> — кто просил
     /// (null — сервер сам, например при расхождении). Отдающего нет — на выделенном сервере мир отдаёт сам сервер.
     /// </summary>
-    private void OrderWorldSnapshot(Player? requester, int clientSeq, string why)
+    private void OrderWorldSnapshot(Player? requester, int clientSeq, string why, ISet<int>? among = null)
     {
-        int sender = ChooseWorldSender(requester != null && !requester.HasWorld ? requester : null);
+        int sender = ChooseWorldSender(requester != null && !requester.HasWorld ? requester : null, among);
         if (sender == ServerPlayerId && requester == null)
         {
             _log($"общий снимок ({why}) не заказан: мир некому отдать");

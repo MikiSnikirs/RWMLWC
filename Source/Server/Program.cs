@@ -36,6 +36,7 @@ internal static class Program
         string? publicHost = settings.GetString("public_host");
         double autosaveMinutes = settings.GetDouble("autosave_minutes", 5, 0, 24 * 60);
         int maxPlayers = settings.GetInt("max_players", 8, 1, 64);
+        int maxLead = settings.GetInt("max_lead_ticks", 180, 0, 100000);
         bool echo = false;
         int startTick = 0;
         uint? seed = null;
@@ -93,6 +94,7 @@ internal static class Program
             Store = store,
             Dedicated = true,
             MaxPlayers = maxPlayers,
+            MaxLeadTicks = maxLead,
             AutosaveInterval = autosaveMinutes > 0 ? TimeSpan.FromMinutes(autosaveMinutes) : null,
         };
         Console.WriteLine($"SESSION startTick={options.StartTick} seed={options.SessionSeed}");
@@ -122,7 +124,11 @@ internal static class Program
         "autosave_minutes = 5\r\n" +
         "\r\n" +
         "# Сколько игроков одновременно.\r\n" +
-        "max_players = 8\r\n";
+        "max_players = 8\r\n" +
+        "\r\n" +
+        "# На сколько тиков часы сервера могут опережать самого медленного игрока (0 — без ограничения).\r\n" +
+        "# Меньше — быстрее исполняются приказы и входят новички; больше — медленный компьютер реже тормозит остальных.\r\n" +
+        "max_lead_ticks = 180\r\n";
 
     private static void PrintConnectionCodes(int port, string thumbprint, string? publicHost)
     {

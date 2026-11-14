@@ -48,7 +48,10 @@ public static class HostedSession
         "direct_port = 0\r\n" +
         "\r\n" +
         "# Сколько игроков одновременно.\r\n" +
-        "max_players = 8\r\n";
+        "max_players = 8\r\n" +
+        "\r\n" +
+        "# На сколько тиков часы сессии могут опережать самого медленного игрока (0 — без ограничения).\r\n" +
+        "max_lead_ticks = 180\r\n";
 
     private static string LocalAddress()
     {
@@ -99,6 +102,7 @@ public static class HostedSession
             SessionSeed = seed ?? (uint)System.Security.Cryptography.RandomNumberGenerator.GetInt32(int.MaxValue),
             Store = new SaveStore(DataDir),
             MaxPlayers = maxPlayers,
+            MaxLeadTicks = settings.GetInt("max_lead_ticks", 180, 0, 100000),
         };
         _host = new SessionHost(new Session(options, Write));
         _cts = new CancellationTokenSource();
