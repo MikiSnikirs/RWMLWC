@@ -1,0 +1,27 @@
+2026-11-14 22:58:09 autoload: loading save 'offline'
+2026-11-14 22:58:15 lockstep: connecting to 127.0.0.1:56560 as 'hostA'
+2026-11-14 22:58:15 hostsession: open at tick 14998, steam=True, hold 1800 s
+2026-11-14 22:58:16 lockstep: connected to quic:127.0.0.1:56560, Hello sent
+2026-11-14 22:58:17 lockstep: Welcome, playerId=1, serverTick=14998, seed=7
+2026-11-14 22:58:17 presence: player 1 online
+2026-11-14 23:11:05 lockstep: hold is over, requesting speed 3
+2026-11-14 23:11:05 presence: player 2 online
+2026-11-14 23:11:05 lockstep: snapshot for player 2 at tick 14998: raw=15827620 bytes, packed=2604241 bytes (16.5%), save=644 ms, pack=18 ms, 14 chunks sent; reloading it here too
+2026-11-14 23:11:09 lockstep: snapshot loaded, tick 14998, serverTick=14998, perMapSim=True
+2026-11-14 23:11:15 run started: #0, tick=14998, scenario=none, ticks=8000, trace=False, quit=True, file=hash-20261114-231115.txt
+2026-11-14 23:11:16 lockstep: notice 3: карта 0 тик 15000: игрок 1 ≠ игрок 2
+2026-11-14 23:11:16 lockstep: desync reported, the server orders a common snapshot
+2026-11-14 23:11:17 lockstep: snapshot for player 0 at tick 15041: raw=15758443 bytes, packed=2574377 bytes (16.3%), save=352 ms, pack=15 ms, 13 chunks sent; reloading it here too
+2026-11-14 23:11:19 lockstep: snapshot loaded, tick 15041, serverTick=15045, perMapSim=True
+2026-11-14 23:11:19 resumed after snapshot reload at tick 15041, perMapSim=True
+2026-11-14 23:13:36 summary: map0 drafted=0 forbidden=56 plants=[]
+2026-11-14 23:13:36 summary: map0 jobs=[231:GotoWander@(125, 0, 137),234:GotoWander@(127, 0, 132),239:GotoWander@(128, 0, 132)]
+2026-11-14 23:13:36 camera: this client moved its camera 54 times during the run
+2026-11-14 23:13:36 summary: map0 settings=29B89D30A34E3B1A
+2026-11-14 23:13:36 summary: absence= offline=[]
+2026-11-14 23:13:36 summary: squads= rejected=0 drafted=[]
+2026-11-14 23:13:36 summary: map0 designations=0 blueprints=0 zones=0; commands sent=0 executed=0 failed=0
+2026-11-14 23:13:36 run finished: file=hash-20261114-231115.txt
+2026-11-14 23:13:36 queue: finished
+2026-11-14 23:13:36 lockstep: disconnect: прогон завершён
+2026-11-14 23:13:36 quitting game
