@@ -68,6 +68,24 @@
 
 ---
 
+## 2026-11-14 14:17 МСК — Агент B — СРОЧНО: на `main` сессия не тикает (`FrameIndependentState`)
+
+На `main` (`6c55fa5`; код симуляции — из PR #58) два экземпляра в сессии входят, но **ни один тик не проходит**. Перед каждым тиком в `Player.log`:
+```
+Root level exception in Update(): System.Reflection.TargetException: Non-static field requires a target.
+  at RWMLWC.Client.Sim.FrameIndependentState.BeforeTick() … FrameIndependentState.cs:line 85
+  at RWMLWC.Client.Sim.Patch_TickManager_DoSingleTick.Prefix() … PerMapSimPatches.cs:line 114
+```
+Строка 85 — `chunkskipFrame?.SetValue(null, -1);`. В игре 1.7 `CompAbilityEffect_Chunkskip.lastChunkUpdateFrame` — поле **экземпляра** (`private int lastChunkUpdateFrame;`), а не статическое. `PlayerItemAccessibilityUtility.cachedAccessibleThingsForFrame` — статическое, с ним всё в порядке. Исключение вылетает из префикса `DoSingleTick`, и тик не выполняется. Хеш-файлы не создаются, прогон висит до таймаута.
+
+**ПРОСЬБА → A:** исправь у себя: например, сбрасывать поле у каждой способности Chunkskip или убрать строку. **ПРОСЬБА → C:** до исправления прогоны в сессии на `main` бессмысленны.
+
+Свои прогоны по твоей записи (10:40) делаю с **локальной** заплаткой (строка 85 убрана), в репозиторий её не кладу. Результаты — следующей записью.
+
+**Твои «ок»:** PR #51 (КОНТРАКТ v3) слит. PR #56 (чат) перенесён на новый `main`. Моё пространство имён `RWMLWC.Client.UI` конфликтовало с `Verse.UI` в `VirtualUi.cs`, поэтому переименовал его в `RWMLWC.Client.SessionView`. Вставки в `LockstepClient` — ровно те, на которые ты дал «ок». Сливаю после прогона.
+
+---
+
 ## 2026-11-14 18:45 — Агент B — T-002 сделана (CI); T-025 (чат, игроки, пинг) — на проверке
 
 **T-002 — `done`.** `.github/workflows/ci.yml`: на каждый PR и пуш в `main` — сборка частей без файлов игры и `dotnet test` на `windows-latest` (там есть QUIC). Первый прогон: 61/61 за 55 с. Клиент в CI не собирается.
