@@ -272,6 +272,21 @@ public static class TestAutomation
         }
         activeConfig = cfg;
         sessionSteps.Clear();
+        if (cfg.scenario == "access")
+        {
+            // T-033: c2 (issuer=0) занимает карту и выдаёт права; c1 (issuer=1) пробует действовать.
+            if (cfg.issuer)
+            {
+                sessionSteps.Enqueue((startTick + 500, "access: designate without rights", () => AccessTry("designate, no rights", ScenarioDesignate)));
+                sessionSteps.Enqueue((startTick + 900, "access: designate with Build", () => AccessTry("designate, Build", ScenarioDesignate)));
+                sessionSteps.Enqueue((startTick + 1000, "access: draft with Build", () => AccessTry("draft, Build", GizmoDraft)));
+            }
+            else
+            {
+                sessionSteps.Enqueue((startTick + 300, "access: claim", AccessClaim));
+                sessionSteps.Enqueue((startTick + 700, "access: grant Build", AccessGrantBuild));
+            }
+        }
         if (cfg.issuer && cfg.scenario == "tabs")
         {
             sessionSteps.Enqueue((startTick + 300, "tabs: work priority", TabsWorkPriority));
@@ -366,6 +381,7 @@ public static class TestAutomation
                     ScenarioSecondMap(true);
                     break;
                 case "ui":
+                case "access":
                 case "tabs":
                 case "desync":
                 case "designate":
@@ -644,6 +660,32 @@ public static class TestAutomation
             hash.Add(pawn.playerSettings != null ? (int)pawn.playerSettings.medCare : -1);
         }
         return hash.Value.ToString("X16");
+    }
+
+    // --- сценарий access (T-033): владелец карты и права ---
+
+    private static void AccessClaim()
+    {
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        RWMLWC.Client.Maps.MapAccess.Claim(map);
+        Note($"access: player {LockstepClient.PlayerId} claims map {map.uniqueID}");
+    }
+
+    private static void AccessGrantBuild()
+    {
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        int other = LockstepClient.PlayerId == 1 ? 2 : 1;
+        RWMLWC.Client.Maps.MapAccess.Grant(map.uniqueID, other, RWMLWC.Shared.Protocol.PermissionLevel.Build);
+        Note($"access: owner of map {map.uniqueID} is {RWMLWC.Client.Maps.MapAccess.OwnerOf(map.uniqueID)}; granting Build to player {other}");
+    }
+
+    private static void AccessTry(string what, Action act)
+    {
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        int sentBefore = LockstepClient.CommandsSent;
+        Note($"access: try '{what}': my level on map {map.uniqueID} is {RWMLWC.Client.Maps.MapAccess.MyLevel(map.uniqueID)}, owner {RWMLWC.Client.Maps.MapAccess.OwnerOf(map.uniqueID)}");
+        act();
+        Note($"access: try '{what}': commands sent={LockstepClient.CommandsSent - sentBefore}");
     }
 
     // --- сценарий desync (T-034): искусственное расхождение ---
