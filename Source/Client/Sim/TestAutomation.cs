@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using RimWorld;
 using RimWorld.Planet;
+using RWMLWC.Client.Input;
 using Verse;
 
 namespace RWMLWC.Client.Sim;
@@ -47,6 +49,7 @@ public static class TestAutomation
         public string thumbprint = "";
         public string playerName = "player";
         public int holdSec;
+        public bool issuer;
         public bool quit;
     }
 
@@ -54,6 +57,10 @@ public static class TestAutomation
     private static string? pendingScenario;
     private static bool quitWhenDone;
     private static bool automationActive;
+    private static int designateAtTick = -1;
+
+    /// <summary>Через столько тиков после начала прогона сценарий designate отдаёт свои приказы.</summary>
+    private const int DesignateAfterTicks = 300;
     private static byte[]? snapshotToApply;
     private static bool snapshotDone;
     private static bool reloadPending;
@@ -166,6 +173,9 @@ public static class TestAutomation
                 case "thumbprint":
                     cfg.thumbprint = value;
                     break;
+                case "issuer":
+                    cfg.issuer = value == "1";
+                    break;
                 case "holdsec":
                     if (int.TryParse(value, out int holdSec) && holdSec >= 0)
                     {
@@ -240,6 +250,7 @@ public static class TestAutomation
             Find.TickManager.CurTimeSpeed = TimeSpeed.Superfast;
         }
         activeConfig = cfg;
+        designateAtTick = cfg.scenario == "designate" && cfg.issuer ? startTick + DesignateAfterTicks : -1;
         snapshotDone = false;
         snapshotToApply = null;
         Note($"run started: #{cfg.queueIndex}, tick={startTick}, scenario={cfg.scenario}, ticks={cfg.ticks}, trace={cfg.trace}, quit={cfg.quit}, file={Path.GetFileName(hashFile)}");
@@ -282,6 +293,8 @@ public static class TestAutomation
                 case "twomaps-freeze":
                     ScenarioSecondMap(true);
                     break;
+                case "designate":
+                    break; // срабатывает позже, из кадра (SessionFrame): приказы идут как ввод игрока
                 case "snap-save":
                 case "snap-reload":
                     break; // срабатывают позже, на тике snapat (BeforeTickDuringRun)
@@ -297,8 +310,82 @@ public static class TestAutomation
         }
     }
 
+    /// <summary>Раз в кадр в сессии, между тиками: сценарии, которые действуют как игрок.</summary>
+    public static void SessionFrame()
+    {
+        if (designateAtTick < 0 || Current.Game == null || Find.TickManager.TicksGame < designateAtTick)
+        {
+            return;
+        }
+        designateAtTick = -1;
+        try
+        {
+            ScenarioDesignate();
+        }
+        catch (Exception ex)
+        {
+            Note("scenario 'designate' FAILED: " + ex);
+            Log.Error("[RWMLWC] сценарий designate упал: " + ex);
+        }
+    }
+
+    // Те же вызовы, что делает интерфейс: в сессии они перехватываются и уходят командами (T-020).
+    private static void ScenarioDesignate()
+    {
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        IntVec3 center = map.Center;
+
+        Designator_PlantsCut cut = new Designator_PlantsCut();
+        List<IntVec3> cutCells = CellRect.CenteredOn(center, 15).ClipInsideMap(map).Cells.ToList();
+        cut.DesignateMultiCell(cutCells);
+
+        Designator_Build wall = new Designator_Build(ThingDefOf.Wall);
+        wall.SetStuffDef(ThingDefOf.WoodLog);
+        List<IntVec3> wallCells = new List<IntVec3>();
+        for (int i = -5; i < 5; i++)
+        {
+            IntVec3 cell = center + new IntVec3(i, 0, 20);
+            if (cell.InBounds(map))
+            {
+                wallCells.Add(cell);
+            }
+        }
+        wall.DesignateMultiCell(wallCells);
+        if (wallCells.Count > 0)
+        {
+            wall.DesignateSingleCell(wallCells[0] + new IntVec3(0, 0, 2));
+        }
+
+        Designator_ZoneAddStockpile_Resources stockpile = new Designator_ZoneAddStockpile_Resources();
+        List<IntVec3> zoneCells = CellRect.CenteredOn(center + new IntVec3(25, 0, 0), 3).ClipInsideMap(map).Cells
+            .Where(c => stockpile.CanDesignateCell(c).Accepted).ToList();
+        stockpile.DesignateMultiCell(zoneCells);
+
+        Designator_Hunt hunt = new Designator_Hunt();
+        Pawn? prey = map.mapPawns.AllPawnsSpawned.Where(p => hunt.CanDesignateThing(p).Accepted).OrderBy(p => p.thingIDNumber).FirstOrDefault();
+        if (prey != null)
+        {
+            hunt.DesignateThing(prey);
+        }
+
+        Note($"designate: tick={Find.TickManager.TicksGame}, cut={cutCells.Count} cells, wall={wallCells.Count}+1, zone={zoneCells.Count}, hunt={(prey != null ? prey.LabelShort : "none")}; captured={DesignatorCommands.Captured}, sent={LockstepClient.CommandsSent}");
+    }
+
+    private static void NoteMapSummary()
+    {
+        if (Current.Game == null)
+        {
+            return;
+        }
+        foreach (Map map in Find.Maps)
+        {
+            Note($"summary: map{map.uniqueID} designations={map.designationManager.AllDesignations.Count} blueprints={map.listerThings.ThingsInGroup(ThingRequestGroup.Blueprint).Count} zones={map.zoneManager.AllZones.Count}; commands sent={LockstepClient.CommandsSent} executed={CommandBus.Executed} failed={CommandBus.Failed}");
+        }
+    }
+
     public static void OnRunFinished(string? hashFile)
     {
+        NoteMapSummary();
         Note("run finished: file=" + Path.GetFileName(hashFile));
         Config? cfg = activeConfig;
         activeConfig = null;
