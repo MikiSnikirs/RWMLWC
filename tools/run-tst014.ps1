@@ -31,6 +31,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'TestWindow.ps1')
 function Step($t) { Write-Host "`n== $t" -ForegroundColor Cyan }
 function Fail($t) { Write-Host "FAILED: $t" -ForegroundColor Red; exit 1 }
 
@@ -122,6 +123,7 @@ for ($c = 1; $c -le $Clients; $c++) {
         $vol.InnerText = '0'
         $px.Save($pf)
     }
+    Set-TestWindow $pf ($c - 1)   # RWMLWC_TEST_MONITOR: windows on another monitor (tools/TestWindow.ps1)
     Copy-Item -LiteralPath $saveFile (Join-Path $dir 'Saves\tst014.rws')
     $armTicks = $Ticks
     $armScenario = $Scenario

@@ -23,6 +23,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'TestWindow.ps1')
 function Step($t) { Write-Host "`n== $t" -ForegroundColor Cyan }
 function Fail($t) { Write-Host "FAILED: $t" -ForegroundColor Red; exit 1 }
 
@@ -67,6 +68,7 @@ if (Test-Path -LiteralPath $pf) {
     $vol.InnerText = '0'
     $px.Save($pf)
 }
+Set-TestWindow $pf (0)   # RWMLWC_TEST_MONITOR: windows on another monitor (tools/TestWindow.ps1)
 Copy-Item -LiteralPath $saveFile (Join-Path $dir 'Saves\offline.rws')
 
 $arm = @('armed=1', 'save=offline', "scenarios=$($Queue -join ',')", "ticks=$Ticks", "trace=$(if ($Trace) { 1 } else { 0 })",
