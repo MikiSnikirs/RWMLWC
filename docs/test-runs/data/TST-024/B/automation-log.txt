@@ -1,0 +1,26 @@
+2026-11-14 18:13:51 autoload: loading save 'tst'
+2026-11-14 18:13:59 run started: #0, tick=14998, scenario=none, ticks=3000, trace=False, quit=True, file=hash-20261114-181359.txt
+2026-11-14 18:14:50 summary: map0 drafted=0 forbidden=56 plants=[]
+2026-11-14 18:14:50 summary: map0 jobs=[231:GotoWander@(138, 0, 120),234:GotoWander@(140, 0, 112),239:Wait_Wander@(139, 0, 106)]
+2026-11-14 18:14:50 summary: map0 settings=29B89D30A34E3B1A
+2026-11-14 18:14:50 summary: map0 designations=0 blueprints=0 zones=0; commands sent=0 executed=0 failed=0
+2026-11-14 18:14:50 run finished: file=hash-20261114-181359.txt
+2026-11-14 18:14:50 queue: restarting game for run #1 (ui)
+2026-11-14 18:15:04 autoload: loading save 'tst'
+2026-11-14 18:15:13 run started: #1, tick=14998, scenario=ui, ticks=3000, trace=False, quit=True, file=hash-20261114-181513.txt
+2026-11-14 18:15:17 ui: selected Ross
+2026-11-14 18:15:22 ui: opened tab Architect
+2026-11-14 18:15:27 ui: opened tab Work
+2026-11-14 18:15:32 ui: opened tab Research
+2026-11-14 18:15:37 ui: opened tab Quests
+2026-11-14 18:15:42 ui: opened tab Factions
+2026-11-14 18:15:47 ui: info card Ross
+2026-11-14 18:19:56 ui: selected item серебро
+2026-11-14 18:20:01 ui: closed
+2026-11-14 18:20:07 summary: map0 drafted=0 forbidden=56 plants=[]
+2026-11-14 18:20:07 summary: map0 jobs=[231:GotoWander@(138, 0, 120),234:GotoWander@(140, 0, 112),239:Wait_Wander@(139, 0, 106)]
+2026-11-14 18:20:07 summary: map0 settings=29B89D30A34E3B1A
+2026-11-14 18:20:07 summary: map0 designations=0 blueprints=0 zones=0; commands sent=0 executed=0 failed=0
+2026-11-14 18:20:07 run finished: file=hash-20261114-181513.txt
+2026-11-14 18:20:07 queue: finished
+2026-11-14 18:20:07 quitting game
