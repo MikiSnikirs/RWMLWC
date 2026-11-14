@@ -38,6 +38,26 @@ public class TransportTests
     }
 
     [Fact]
+    public async Task RelayForwardsBothWaysAndClosesTogether()
+    {
+        // friend ↔ (bridgeFriendSide | relay | bridgeServerSide) ↔ server
+        var (friend, bridgeFriendSide) = InMemoryConnection.CreatePair("friend", "bridge-f");
+        var (bridgeServerSide, server) = InMemoryConnection.CreatePair("bridge-s", "server");
+        Task relay = ConnectionRelay.RunAsync(bridgeFriendSide, bridgeServerSide);
+
+        for (int i = 1; i <= 50; i++) friend.Send(new CommandMessage { ClientSeq = i });
+        for (int i = 1; i <= 50; i++)
+            Assert.Equal(i, ((CommandMessage)await server.ReceiveAsync().AsTask().WaitAsync(Wait)).ClientSeq);
+        server.Send(new TickMessage { TickUpTo = 9 });
+        Assert.Equal(9, ((TickMessage)await friend.ReceiveAsync().AsTask().WaitAsync(Wait)).TickUpTo);
+
+        friend.Close("друг вышел");
+        await relay.WaitAsync(Wait);
+        await server.Closed.WaitAsync(Wait);
+        Assert.Contains("друг вышел", server.CloseReason);
+    }
+
+    [Fact]
     public async Task QuicExchangesAllMessagesInOrderPerStream()
     {
         if (!QuicTransport.IsSupported) { _out.WriteLine("QUIC не поддерживается — тест пропущен"); return; }
