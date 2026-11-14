@@ -54,31 +54,7 @@ internal static class Program
 
         using var stop = new CancellationTokenSource();
         Console.CancelKeyPress += (_, e) => { e.Cancel = true; stop.Cancel(); };
-        try
-        {
-            while (true)
-            {
-                IConnection connection = await server.AcceptAsync(stop.Token, reason => Console.WriteLine("REJECTED " + reason));
-                Console.WriteLine("CONNECTED " + connection.Remote);
-                _ = EchoAsync(connection, stop.Token);
-            }
-        }
-        catch (OperationCanceledException)
-        {
-        }
+        await EchoService.RunAsync(server, stop.Token, Console.WriteLine);
         return 0;
-    }
-
-    private static async Task EchoAsync(IConnection connection, CancellationToken ct)
-    {
-        try
-        {
-            while (true)
-                connection.Send(await connection.ReceiveAsync(ct));
-        }
-        catch (Exception e) when (e is ConnectionClosedException or OperationCanceledException)
-        {
-        }
-        Console.WriteLine("DISCONNECTED " + connection.Remote + ": " + connection.CloseReason);
     }
 }
