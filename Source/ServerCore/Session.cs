@@ -453,6 +453,9 @@ public sealed class Session
         {
             _log($"РАСХОЖДЕНИЕ карта {h.MapId} тик {h.Tick}: игрок {first.playerId} {first.hash.Total:X16}, игрок {player.Id} {h.Total:X16}");
             Desync?.Invoke(first.hash, first.playerId, h, player.Id);
+            // Хеш тика не позже уже заказанного общего снимка: этот снимок его и вылечит, второй не нужен.
+            // (Клиенты присылают хеши с отставанием — без этой проверки за время одной перезагрузки заказывалось несколько.)
+            if (h.Tick <= _lastWorldSnapshotTick) return;
             if (!_desyncNoticeTick.TryGetValue(h.MapId, out int last) || h.Tick - last >= ProtocolLimits.DesyncNoticeIntervalTicks || h.Tick < last)
             {
                 _desyncNoticeTick[h.MapId] = h.Tick;
@@ -695,6 +698,7 @@ public sealed class Session
             return;
         }
         long seq = _nextSeq++;
+        _lastWorldSnapshotTick = TickUpTo;
         Broadcast(new CommandOrderedMessage
         {
             Seq = seq,
@@ -712,6 +716,9 @@ public sealed class Session
     // Номера снимков автосохранения: их куски не пересылаются игрокам. Держим последние несколько.
     private readonly HashSet<int> _saveSnapshotIds = new();
     private readonly Queue<int> _saveSnapshotOrder = new();
+
+    // Тик последнего заказанного общего снимка: расхождения до него уже лечатся.
+    private int _lastWorldSnapshotTick = int.MinValue;
 
     private double _lastAutosaveMs;
     private int _lastAutosaveTick = -1;
