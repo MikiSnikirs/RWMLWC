@@ -1,0 +1,28 @@
+2026-11-14 18:39:48 autoload: loading save 'tst014'
+2026-11-14 18:39:54 lockstep: connecting to 127.0.0.1:61879 as 'c1'
+2026-11-14 18:39:56 lockstep: connected to quic:127.0.0.1:61879, Hello sent
+2026-11-14 18:39:56 lockstep: Welcome, playerId=1, serverTick=14998, seed=7
+2026-11-14 18:40:56 lockstep: hold is over, requesting speed 3
+2026-11-14 18:40:56 run started: #0, tick=14998, scenario=squads, ticks=3000, trace=False, quit=True, file=hash-c1-20261114-184056.txt
+2026-11-14 18:41:00 squads: now 
+2026-11-14 18:41:00 squads: members sent, me=1 other=2
+2026-11-14 18:41:00 squads: now 
+2026-11-14 18:41:00 squads: now 
+2026-11-14 18:41:00 squads: now 
+2026-11-14 18:41:00 squads: now 
+2026-11-14 18:41:00 squads: requesting a common snapshot
+2026-11-14 18:41:00 squads: created 1 'Альфа' by player 1
+2026-11-14 18:41:00 squads: created 2 'Бета' by player 1
+2026-11-14 18:41:01 lockstep: snapshot for player 1 at tick 16367: raw=15755645 bytes, packed=2597993 bytes (16.5%), save=763 ms, pack=21 ms, 13 chunks sent; reloading it here too
+2026-11-14 18:41:05 lockstep: snapshot loaded, tick 16367, serverTick=16373, perMapSim=True
+2026-11-14 18:41:05 resumed after snapshot reload at tick 16367, perMapSim=True
+2026-11-14 18:42:05 lockstep: hold is over, requesting speed 3
+2026-11-14 18:42:09 summary: map0 drafted=0 forbidden=56 plants=[]
+2026-11-14 18:42:09 summary: map0 jobs=[231:Wait_Wander@(137, 0, 127),234:GotoWander@(128, 0, 126),239:GotoWander@(129, 0, 131)]
+2026-11-14 18:42:09 summary: map0 settings=29B89D30A34E3B1A
+2026-11-14 18:42:09 summary: squads=1:Альфа[1|]; 2:Бета[2|231,234]
+2026-11-14 18:42:09 summary: map0 designations=0 blueprints=0 zones=0; commands sent=8 executed=7 failed=0
+2026-11-14 18:42:09 run finished: file=hash-c1-20261114-184056.txt
+2026-11-14 18:42:09 queue: finished
+2026-11-14 18:42:09 lockstep: disconnect: прогон завершён
+2026-11-14 18:42:09 quitting game

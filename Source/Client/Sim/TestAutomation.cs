@@ -364,6 +364,30 @@ public static class TestAutomation
         {
             sessionSteps.Enqueue((startTick + 300, "designate", ScenarioDesignate));
         }
+        if (cfg.issuer && cfg.scenario == "squads")
+        {
+            // TST-060, ч. 1: c1 создаёт два отряда, назначает участников и пешек, переводит пешку,
+            // затем просит общий снимок: после загрузки отряды должны остаться теми же у обоих.
+            sessionSteps.Enqueue((startTick + 300, "squads: create", () => SquadsStep(map => { RWMLWC.Client.Maps.Squads.Create(map, "Альфа"); RWMLWC.Client.Maps.Squads.Create(map, "Бета"); })));
+            sessionSteps.Enqueue((startTick + 400, "squads: members", () => SquadsStep(map =>
+            {
+                int me = LockstepClient.PlayerId;
+                int other = RWMLWC.Client.SessionView.SessionUi.Players.Select(p => p.PlayerId).Where(id => id != me).DefaultIfEmpty(0).Min();
+                RWMLWC.Client.Maps.Squads.SetMember(map, 1, me, true);
+                RWMLWC.Client.Maps.Squads.SetMember(map, 2, other, true);
+                Note($"squads: members sent, me={me} other={other}");
+            })));
+            sessionSteps.Enqueue((startTick + 500, "squads: assign", () => SquadsStep(map =>
+            {
+                List<Pawn> colonists = map.mapPawns.FreeColonistsSpawned.OrderBy(p => p.thingIDNumber).ToList();
+                RWMLWC.Client.Maps.Squads.AssignPawns(map, 1, colonists.Take(1));
+                RWMLWC.Client.Maps.Squads.AssignPawns(map, 2, colonists.Skip(1).Take(1));
+            })));
+            sessionSteps.Enqueue((startTick + 700, "squads: move first pawn to squad 2", () => SquadsStep(map =>
+                RWMLWC.Client.Maps.Squads.AssignPawns(map, 2, map.mapPawns.FreeColonistsSpawned.OrderBy(p => p.thingIDNumber).Take(1)))));
+            sessionSteps.Enqueue((startTick + 900, "squads: digest before reload", () => SquadsStep(map => { })));
+            sessionSteps.Enqueue((startTick + 1000, "squads: common snapshot", () => { Note("squads: requesting a common snapshot"); LockstepClient.RequestCommonSnapshot(); }));
+        }
         if (cfg.issuer && cfg.scenario == "gizmo")
         {
             sessionSteps.Enqueue((startTick + 300, "gizmo: draft", GizmoDraft));
@@ -423,6 +447,7 @@ public static class TestAutomation
                 case "designate":
                 case "gizmo":
                 case "rightclick":
+                case "squads":
                     break; // срабатывают позже, из кадра (SessionFrame): приказы идут как ввод игрока
                 case "snap-save":
                 case "snap-reload":
@@ -847,6 +872,13 @@ public static class TestAutomation
         Find.Selector.Select(obj, false, false);
     }
 
+    private static void SquadsStep(Action<Map> act)
+    {
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        act(map);
+        Note("squads: now " + (RWMLWC.Client.Maps.Squads.Component?.Digest() ?? "no component"));
+    }
+
     private static void GizmoDraft()
     {
         Map map = Find.CurrentMap ?? Find.Maps[0];
@@ -1028,6 +1060,7 @@ public static class TestAutomation
                 Note($"camera: this client moved its camera {cameraJumps} times during the run");
             }
             Note($"summary: map{map.uniqueID} settings={SettingsDigest(map)}");
+            Note("summary: squads=" + (RWMLWC.Client.Maps.Squads.Component?.Digest() ?? "-"));
             Note($"summary: map{map.uniqueID} designations={map.designationManager.AllDesignations.Count} blueprints={map.listerThings.ThingsInGroup(ThingRequestGroup.Blueprint).Count} zones={map.zoneManager.AllZones.Count}; commands sent={LockstepClient.CommandsSent} executed={CommandBus.Executed} failed={CommandBus.Failed}");
         }
     }
