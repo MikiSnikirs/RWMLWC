@@ -82,8 +82,8 @@ public sealed class HelloMessage : Message
     public ulong ModListHash;
     /// <summary>Мир локальной копии сейва у игрока (<c>WorldInfo.persistentRandomValue</c>); 0 — копии нет (T-044, v2).</summary>
     public ulong SaveWorldId;
-    /// <summary>Номер ревизии локальной копии, выданный сервером при сохранении (T-044, v2); 0 — нет.</summary>
-    public ulong SaveRevision;
+    /// <summary>Игровой тик, на котором снята локальная копия сейва (T-044, v2); 0 — нет. Больше тик того же мира — новее копия.</summary>
+    public int SaveTick;
 
     public override void Write(PacketWriter w)
     {
@@ -93,7 +93,7 @@ public sealed class HelloMessage : Message
         w.WriteString(PlayerName);
         w.WriteUInt64(ModListHash);
         w.WriteUInt64(SaveWorldId);
-        w.WriteUInt64(SaveRevision);
+        w.WriteInt32(SaveTick);
     }
 
     internal static HelloMessage Read(ref PacketReader r) => new()
@@ -104,7 +104,7 @@ public sealed class HelloMessage : Message
         PlayerName = r.ReadString(),
         ModListHash = r.ReadUInt64(),
         SaveWorldId = r.ReadUInt64(),
-        SaveRevision = r.ReadUInt64(),
+        SaveTick = r.ReadInt32(),
     };
 }
 
@@ -121,8 +121,8 @@ public sealed class WelcomeMessage : Message
     public uint SessionSeed;
     /// <summary>Мир, который хранит сервер; 0 — сервер ещё не получал сейв (T-044, v2).</summary>
     public ulong SaveWorldId;
-    /// <summary>Последняя ревизия сейва на сервере; 0 — нет (T-044, v2).</summary>
-    public ulong SaveRevision;
+    /// <summary>Тик последней копии сейва на сервере; 0 — нет (T-044, v2).</summary>
+    public int SaveTick;
 
     public override void Write(PacketWriter w)
     {
@@ -130,7 +130,7 @@ public sealed class WelcomeMessage : Message
         w.WriteInt32(ServerTick);
         w.WriteUInt32(SessionSeed);
         w.WriteUInt64(SaveWorldId);
-        w.WriteUInt64(SaveRevision);
+        w.WriteInt32(SaveTick);
     }
 
     internal static WelcomeMessage Read(ref PacketReader r) => new()
@@ -139,7 +139,7 @@ public sealed class WelcomeMessage : Message
         ServerTick = r.ReadInt32(),
         SessionSeed = r.ReadUInt32(),
         SaveWorldId = r.ReadUInt64(),
-        SaveRevision = r.ReadUInt64(),
+        SaveTick = r.ReadInt32(),
     };
 }
 
