@@ -297,6 +297,8 @@ public static class TestAutomation
             sessionSteps.Enqueue((startTick + 800, "tabs: add bill", TabsAddBill));
             sessionSteps.Enqueue((startTick + 900, "tabs: suspend bill", TabsSuspendBill));
             sessionSteps.Enqueue((startTick + 1000, "tabs: medical care", TabsMedCare));
+            sessionSteps.Enqueue((startTick + 1100, "tabs: storage filter", TabsStorageFilter));
+            sessionSteps.Enqueue((startTick + 1200, "tabs: storage priority", TabsStoragePriority));
         }
         if (cfg.desync && cfg.scenario == "desync")
         {
@@ -624,9 +626,50 @@ public static class TestAutomation
         Note($"tabs: medical care of {pawn.LabelShort}: {before} -> {after}, sent={LockstepClient.CommandsSent - sentBefore}");
     }
 
+    private static Zone_Stockpile? FirstStockpile()
+    {
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        return map.zoneManager.AllZones.OfType<Zone_Stockpile>().OrderBy(z => z.ID).FirstOrDefault();
+    }
+
+    private static void TabsStorageFilter()
+    {
+        Zone_Stockpile? zone = FirstStockpile();
+        if (zone == null)
+        {
+            Note("tabs: storage filter: no stockpile in this save");
+            return;
+        }
+        bool before = zone.settings.filter.Allows(ThingDefOf.WoodLog);
+        int sentBefore = LockstepClient.CommandsSent;
+        zone.settings.filter.SetAllow(ThingDefOf.WoodLog, !before);
+        Note($"tabs: storage filter of zone {zone.ID}: wood {before} -> {!before}, sent={LockstepClient.CommandsSent - sentBefore}, value now={zone.settings.filter.Allows(ThingDefOf.WoodLog)}");
+    }
+
+    private static void TabsStoragePriority()
+    {
+        Zone_Stockpile? zone = FirstStockpile();
+        if (zone == null)
+        {
+            Note("tabs: storage priority: no stockpile in this save");
+            return;
+        }
+        StoragePriority before = zone.settings.Priority;
+        StoragePriority after = before == StoragePriority.Critical ? StoragePriority.Low : StoragePriority.Critical;
+        int sentBefore = LockstepClient.CommandsSent;
+        zone.settings.Priority = after;
+        Note($"tabs: storage priority of zone {zone.ID}: {before} -> {after}, sent={LockstepClient.CommandsSent - sentBefore}");
+    }
+
     private static string SettingsDigest(Map map)
     {
         Fnv64 hash = Fnv64.Create();
+        foreach (Zone_Stockpile zone in map.zoneManager.AllZones.OfType<Zone_Stockpile>().OrderBy(z => z.ID))
+        {
+            hash.Add(zone.ID);
+            hash.Add((int)zone.settings.Priority);
+            hash.Add(zone.settings.filter.Allows(ThingDefOf.WoodLog));
+        }
         ResearchProjectDef? project = Find.ResearchManager.GetProject();
         hash.Add(project != null ? (int)project.shortHash : -1);
         foreach (Building_WorkTable table in map.listerBuildings.AllBuildingsColonistOfClass<Building_WorkTable>().OrderBy(t => t.thingIDNumber))

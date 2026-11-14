@@ -39,6 +39,15 @@ public static class ValueCodec
     private const byte KBillStack = 22;
     private const byte KNewBill = 23;
     private const byte KResearchManager = 24;
+    private const byte KFilter = 25;
+    private const byte KStoreSettings = 26;
+    private const byte KDefList = 27;
+
+    // Чей это фильтр: зоны-склада, вещи с настройками хранения, счёта, политики.
+    private const byte OwnerZone = 1;
+    private const byte OwnerThing = 2;
+    private const byte OwnerBill = 3;
+    private const byte OwnerPolicy = 4;
 
     private static readonly AccessTools.FieldRef<Bill, int> billLoadId = AccessTools.FieldRefAccess<Bill, int>("loadID");
 
@@ -255,6 +264,26 @@ public static class ValueCodec
             }
             case KResearchManager:
                 return Find.ResearchManager;
+            case KFilter:
+                return ReadFilter(ref r, map);
+            case KStoreSettings:
+                return ReadStoreOwner(ref r, map)?.GetStoreSettings();
+            case KDefList:
+            {
+                int count = r.ReadCount(100_000, 8);
+                List<Def> list = new List<Def>(count);
+                for (int i = 0; i < count; i++)
+                {
+                    Type? type = FindType(r.ReadString());
+                    string defName = r.ReadString();
+                    Def? def = type == null ? null : GenDefDatabase.GetDef(type, defName, false);
+                    if (def != null)
+                    {
+                        list.Add(def);
+                    }
+                }
+                return list;
+            }
             case KPawnAnywhere:
                 return FindPawnAnywhere(r.ReadInt32());
             case KPolicy:
@@ -304,6 +333,35 @@ public static class ValueCodec
             case ResearchManager:
                 w.WriteByte(KResearchManager);
                 return true;
+            case ThingFilter filter:
+                return TryWriteFilter(w, filter);
+            case StorageSettings settings:
+            {
+                PacketWriter probe = new PacketWriter(16);
+                if (!TryWriteStoreOwner(probe, settings.owner))
+                {
+                    return false;
+                }
+                w.WriteByte(KStoreSettings);
+                TryWriteStoreOwner(w, settings.owner);
+                return true;
+            }
+            case System.Collections.IEnumerable defs when !(value is string) && IsDefSequence(defs):
+            {
+                List<Def> list = new List<Def>();
+                foreach (object item in defs)
+                {
+                    list.Add((Def)item);
+                }
+                w.WriteByte(KDefList);
+                w.WriteInt32(list.Count);
+                foreach (Def def in list)
+                {
+                    w.WriteString(def.GetType().FullName ?? "");
+                    w.WriteString(def.defName ?? "");
+                }
+                return true;
+            }
             case BillStack stack:
                 if (!(stack.billGiver is Thing stackOwner))
                 {
@@ -400,6 +458,190 @@ public static class ValueCodec
             }
         }
         return null;
+    }
+
+    // ---------- фильтры вещей и настройки хранения ----------
+
+    private static bool IsDefSequence(System.Collections.IEnumerable sequence)
+    {
+        foreach (Type implemented in sequence.GetType().GetInterfaces())
+        {
+            if (implemented.IsGenericType && implemented.GetGenericTypeDefinition() == typeof(IEnumerable<>)
+                && typeof(Def).IsAssignableFrom(implemented.GetGenericArguments()[0]))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static bool TryWriteStoreOwner(PacketWriter w, IStoreSettingsParent? owner)
+    {
+        if (owner is Zone zone)
+        {
+            w.WriteByte(OwnerZone);
+            w.WriteInt32(zone.ID);
+            return true;
+        }
+        if (owner is Thing thing)
+        {
+            w.WriteByte(OwnerThing);
+            w.WriteInt32(thing.thingIDNumber);
+            return true;
+        }
+        return false;
+    }
+
+    private static IStoreSettingsParent? ReadStoreOwner(ref PacketReader r, Map map)
+    {
+        byte kind = r.ReadByte();
+        int id = r.ReadInt32();
+        if (kind == OwnerZone)
+        {
+            return FindZone(map, id) as IStoreSettingsParent;
+        }
+        return FindThing(map, id) as IStoreSettingsParent;
+    }
+
+    /// <summary>
+    /// Фильтр вещей сам не знает, чей он. Ищем владельца: настройки хранения зон и вещей карты,
+    /// счета верстаков, политики. Если фильтр — «родительский» (то, что владельцу вообще разрешено),
+    /// передаётся владелец и признак. Фильтр без владельца (временный объект интерфейса) не передаётся.
+    /// </summary>
+    private static bool TryWriteFilter(PacketWriter w, ThingFilter filter)
+    {
+        foreach (Map map in Find.Maps)
+        {
+            foreach (Zone zone in map.zoneManager.AllZones)
+            {
+                if (zone is IStoreSettingsParent parent && MatchStore(w, parent, filter))
+                {
+                    return true;
+                }
+            }
+            foreach (Thing thing in map.listerThings.AllThings)
+            {
+                if (thing is IStoreSettingsParent parent && MatchStore(w, parent, filter))
+                {
+                    return true;
+                }
+                if (thing is IBillGiver giver && giver.BillStack != null)
+                {
+                    foreach (Bill bill in giver.BillStack.Bills)
+                    {
+                        bool own = ReferenceEquals(bill.ingredientFilter, filter);
+                        if (own || ReferenceEquals(bill.recipe?.fixedIngredientFilter, filter))
+                        {
+                            w.WriteByte(KFilter);
+                            w.WriteByte(OwnerBill);
+                            w.WriteBool(!own);
+                            w.WriteInt32(thing.thingIDNumber);
+                            w.WriteInt32(billLoadId(bill));
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        Game game = Current.Game;
+        IEnumerable<Policy>[] databases =
+        {
+            game.outfitDatabase.AllOutfits, game.drugPolicyDatabase.AllPolicies,
+            game.foodRestrictionDatabase.AllFoodRestrictions, game.readingPolicyDatabase.AllReadingPolicies,
+        };
+        foreach (IEnumerable<Policy> database in databases)
+        {
+            foreach (Policy policy in database)
+            {
+                foreach (FieldInfo field in policy.GetType().GetFields(InstanceFields))
+                {
+                    if (field.FieldType == typeof(ThingFilter) && ReferenceEquals(field.GetValue(policy), filter))
+                    {
+                        w.WriteByte(KFilter);
+                        w.WriteByte(OwnerPolicy);
+                        w.WriteBool(false);
+                        w.WriteString(policy.GetType().FullName ?? "");
+                        w.WriteInt32(policy.id);
+                        w.WriteString(field.Name);
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    private static bool MatchStore(PacketWriter w, IStoreSettingsParent parent, ThingFilter filter)
+    {
+        bool own = ReferenceEquals(parent.GetStoreSettings()?.filter, filter);
+        if (!own && !ReferenceEquals(parent.GetParentStoreSettings()?.filter, filter))
+        {
+            return false;
+        }
+        w.WriteByte(KFilter);
+        w.WriteByte(parent is Zone ? OwnerZone : OwnerThing);
+        w.WriteBool(!own);
+        w.WriteInt32(parent is Zone zone ? zone.ID : ((Thing)parent).thingIDNumber);
+        return true;
+    }
+
+    private static ThingFilter? ReadFilter(ref PacketReader r, Map map)
+    {
+        byte kind = r.ReadByte();
+        bool parentFilter = r.ReadBool();
+        switch (kind)
+        {
+            case OwnerZone:
+            case OwnerThing:
+            {
+                int id = r.ReadInt32();
+                IStoreSettingsParent? owner = null;
+                foreach (Map candidate in Find.Maps)
+                {
+                    owner = (kind == OwnerZone ? (object?)FindZone(candidate, id) : FindThing(candidate, id)) as IStoreSettingsParent;
+                    if (owner != null)
+                    {
+                        break;
+                    }
+                }
+                if (owner == null)
+                {
+                    return null;
+                }
+                return parentFilter ? owner.GetParentStoreSettings()?.filter : owner.GetStoreSettings()?.filter;
+            }
+            case OwnerBill:
+            {
+                int ownerId = r.ReadInt32();
+                int loadId = r.ReadInt32();
+                foreach (Map candidate in Find.Maps)
+                {
+                    BillStack? stack = (FindThing(candidate, ownerId) as IBillGiver)?.BillStack;
+                    if (stack == null)
+                    {
+                        continue;
+                    }
+                    foreach (Bill bill in stack.Bills)
+                    {
+                        if (billLoadId(bill) == loadId)
+                        {
+                            return parentFilter ? bill.recipe?.fixedIngredientFilter : bill.ingredientFilter;
+                        }
+                    }
+                }
+                return null;
+            }
+            case OwnerPolicy:
+            {
+                string typeName = r.ReadString();
+                int id = r.ReadInt32();
+                string fieldName = r.ReadString();
+                Policy? policy = FindPolicy(typeName, id);
+                return policy?.GetType().GetField(fieldName, InstanceFields)?.GetValue(policy) as ThingFilter;
+            }
+            default:
+                throw new ProtocolException("ValueCodec: неизвестный владелец фильтра " + kind);
+        }
     }
 
     private static BillStack? FindBillStack(Map map, int ownerThingId)
