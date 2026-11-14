@@ -33,6 +33,9 @@ public static class CommandKinds
 
     /// <summary>Запись поля объекта, которое окно меняет напрямую, без метода (счета, медицина) (T-023).</summary>
     public const int FieldSet = 8;
+
+    /// <summary>Изменение отрядов: создать, переименовать, удалить, участники, перевод пешек (T-060).</summary>
+    public const int SquadEdit = 9;
 }
 
 /// <summary>
@@ -174,6 +177,9 @@ public static class CommandBus
                     break;
                 case CommandKinds.FieldSet:
                     FieldWatch.Execute(map, ref reader);
+                    break;
+                case CommandKinds.SquadEdit:
+                    RWMLWC.Client.Maps.Squads.Execute(map, ref reader);
                     break;
                 default:
                     Failed++;

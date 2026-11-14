@@ -511,6 +511,15 @@ public static class LockstepClient
         {
             Messages.Message("RWMLWC: игра разошлась между игроками — перезагружаем общий снимок", MessageTypeDefOf.CautionInput, false);
         }
+        RequestCommonSnapshot();
+    }
+
+    /// <summary>
+    /// Попросить общий снимок: в общем порядке все клиенты с миром остановятся, отдающий снимет мир,
+    /// и все загрузят его (то же, что при входе игрока и при лечении расхождения).
+    /// </summary>
+    public static void RequestCommonSnapshot()
+    {
         connection?.Send(new CommandMessage
         {
             ClientSeq = nextClientSeq++,

@@ -131,6 +131,10 @@ for ($c = 1; $c -le $Clients; $c++) {
         if ($c -eq 1) { $armTicks = $HostTicks; $extra = @('snapsender=1') }
         else { $saveLine = 'save='; $extra = @("connectdelay=$ConnectDelaySec") }
     }
+    if ($Scenario -eq 'squads') {
+        # TST-060: c1 edits squads and asks for a common snapshot, so c1 must be able to serve it.
+        if ($c -eq 1) { $extra = @('snapsender=1') }
+    }
     if ($Scenario -eq 'desync') {
         # TST-034: c2 corrupts its own state; c1 holds the snapshot and starts the common reload.
         if ($c -eq 1) { $extra = @('snapsender=1') } else { $extra = @('desync=1') }
