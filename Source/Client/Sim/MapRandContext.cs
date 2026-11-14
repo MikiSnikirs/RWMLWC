@@ -21,6 +21,12 @@ public static class MapRandContext
     private static Map? current;
     private static ulong globalState;
 
+    // Третье состояние — «показ»: всё, что выполняется между тиками (интерфейс, отрисовка, звук).
+    // Пока идёт тик, в Rand лежит состояние симуляции (глобальное или карты);
+    // между тиками — состояние показа, и оно на симуляцию не влияет.
+    private static bool inTick;
+    private static ulong presentationState = 0x0000000050524553UL;
+
     static MapRandContext()
     {
         // Rand.StateCompressed — приватное свойство: seed | (iterations << 32).
@@ -39,12 +45,64 @@ public static class MapRandContext
     public static ulong CurrentRawState => getState();
 
     /// <summary>Глобальное состояние Rand, какой бы контекст ни был активен.</summary>
-    public static ulong GlobalState => current == null ? getState() : globalState;
+    public static ulong GlobalState => inTick && current == null ? getState() : globalState;
+
+    /// <summary>Сейчас выполняется тик игры (между BeginTick и EndTick).</summary>
+    public static bool InTick => inTick;
+
+    /// <summary>Раздельная симуляция включается: текущее состояние Rand становится глобальным состоянием симуляции.</summary>
+    public static void OnEnabled()
+    {
+        globalState = getState();
+        current = null;
+        inTick = false;
+    }
+
+    /// <summary>Раздельная симуляция выключается: вернуть в Rand глобальное состояние симуляции.</summary>
+    public static void OnDisabled()
+    {
+        if (inTick)
+        {
+            Enter(null);
+        }
+        else
+        {
+            setState(globalState);
+        }
+        current = null;
+        inTick = false;
+    }
+
+    /// <summary>Начало тика: убрать состояние показа, загрузить глобальное состояние симуляции.</summary>
+    public static void BeginTick()
+    {
+        if (inTick)
+        {
+            return;
+        }
+        presentationState = getState();
+        setState(globalState);
+        current = null;
+        inTick = true;
+    }
+
+    /// <summary>Конец тика: сохранить состояние симуляции, вернуть состояние показа.</summary>
+    public static void EndTick()
+    {
+        if (!inTick)
+        {
+            return;
+        }
+        Enter(null);
+        globalState = getState();
+        setState(presentationState);
+        inTick = false;
+    }
 
     /// <summary>Задать глобальное состояние Rand (синхронизация при входе в сессию, тестовые прогоны).</summary>
     public static void SetGlobalState(ulong state)
     {
-        if (current == null)
+        if (inTick && current == null)
         {
             setState(state);
         }
@@ -57,9 +115,9 @@ public static class MapRandContext
     /// <summary>Сделать активным состояние указанной карты (null — глобальное).</summary>
     public static void Enter(Map? map)
     {
-        if (ReferenceEquals(map, current))
+        if (!inTick || ReferenceEquals(map, current))
         {
-            return;
+            return; // вне тика в Rand лежит состояние показа, контексты симуляции не трогаем
         }
 
         // Сохранить уходящий контекст.
@@ -109,7 +167,10 @@ public static class MapRandContext
     {
         if (ReferenceEquals(map, current))
         {
-            setState(globalState);
+            if (inTick)
+            {
+                setState(globalState);
+            }
             current = null;
         }
     }

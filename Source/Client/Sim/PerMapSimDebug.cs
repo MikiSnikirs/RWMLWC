@@ -14,12 +14,7 @@ internal static class PerMapSimDebug
     [DebugAction("RWMLWC", "Per-map sim: on/off", allowedGameStates = AllowedGameStates.Playing)]
     private static void Toggle()
     {
-        if (PerMapSim.Enabled)
-        {
-            // Вернуть Rand в глобальный контекст, пока патчи ещё активны.
-            MapRandContext.ExitToGlobal();
-        }
-        PerMapSim.Enabled = !PerMapSim.Enabled;
+        PerMapSim.SetEnabled(!PerMapSim.Enabled);
         Say("Per-map sim: " + (PerMapSim.Enabled ? "ON" : "OFF"));
     }
 
