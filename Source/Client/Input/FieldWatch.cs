@@ -110,9 +110,14 @@ public static class FieldWatch
     }
 
     // Сравнить с запомненным; изменения вернуть назад и отправить командами.
+    // Все изменения одного объекта уходят вместе или не уходят вовсе: поля бывают связаны
+    // (способ хранения в счёте и склад для него).
     private static void SendChanges(object target, object?[] before)
     {
         List<(byte depth, FieldInfo field)> fields = FieldsOf(target.GetType());
+        List<PacketWriter>? commands = null;
+        Map? map = null;
+        string? failed = null;
         for (int i = 0; i < fields.Count && i < before.Length; i++)
         {
             (byte depth, FieldInfo field) = fields[i];
@@ -122,20 +127,46 @@ public static class FieldWatch
                 continue;
             }
             field.SetValue(target, before[i]); // игру меняет только команда
-            Map? map = MethodCommands.MapFor(target);
+            if (failed != null)
+            {
+                continue;
+            }
+            map ??= MethodCommands.MapFor(target);
             if (map == null)
             {
+                failed = field.Name;
                 continue;
             }
             PacketWriter w = CommandBus.Begin(map);
-            if (!ValueCodec.TryWriteAny(w, target))
+            try
             {
-                Messages.Message("RWMLWC: эта настройка пока не работает в сетевой игре (" + target.GetType().Name + "." + field.Name + ")", MessageTypeDefOf.RejectInput, false);
+                if (!ValueCodec.TryWriteAny(w, target))
+                {
+                    failed = field.Name;
+                    continue;
+                }
+                w.WriteByte(depth);
+                w.WriteString(field.Name);
+                ValueCodec.Write(w, now);
+            }
+            catch (NotSupportedException)
+            {
+                failed = field.Name; // значение, которое не умеем передавать (например, группа складов)
                 continue;
             }
-            w.WriteByte(depth);
-            w.WriteString(field.Name);
-            ValueCodec.Write(w, now);
+            (commands ??= new List<PacketWriter>()).Add(w);
+        }
+        if (failed != null)
+        {
+            Messages.Message("RWMLWC: эта настройка пока не работает в сетевой игре (" + target.GetType().Name + "." + failed + ")", MessageTypeDefOf.RejectInput, false);
+            return;
+        }
+        if (commands == null || map == null)
+        {
+            return;
+        }
+        foreach (PacketWriter w in commands)
+        {
             CommandBus.Send(map, CommandKinds.FieldSet, PermissionLevel.Full, w);
             Captured++;
         }

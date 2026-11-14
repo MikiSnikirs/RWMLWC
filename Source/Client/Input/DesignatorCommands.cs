@@ -59,8 +59,9 @@ public static class DesignatorCommands
             return true;
         }
         Type type = designator.GetType();
-        if (!CanRebuild(type))
+        if (!CanRebuild(type) || designator is Designator_Plan_Copy || designator is Designator_Plan_CopySelectionPaste)
         {
+            // Копирование и вставка планов держат скопированную форму в полях, которые не передаются.
             Messages.Message("RWMLWC: этот инструмент пока не работает в сетевой игре (" + type.Name + ")", MessageTypeDefOf.RejectInput, false);
             return false;
         }

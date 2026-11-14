@@ -42,6 +42,7 @@ public static class ValueCodec
     private const byte KFilter = 25;
     private const byte KStoreSettings = 26;
     private const byte KDefList = 27;
+    private const byte KSlotGroup = 28;
 
     // Чей это фильтр: зоны-склада, вещи с настройками хранения, счёта, политики.
     private const byte OwnerZone = 1;
@@ -62,7 +63,7 @@ public static class ValueCodec
             || type == typeof(ColorInt) || type == typeof(IntRange) || type == typeof(FloatRange) || type == typeof(QualityRange)
             || typeof(Def).IsAssignableFrom(type) || typeof(Thing).IsAssignableFrom(type)
             || typeof(Zone).IsAssignableFrom(type) || typeof(Area).IsAssignableFrom(type)
-            || typeof(Precept).IsAssignableFrom(type);
+            || typeof(Precept).IsAssignableFrom(type) || typeof(ISlotGroup).IsAssignableFrom(type);
     }
 
     public static void Write(PacketWriter w, object? value)
@@ -142,6 +143,12 @@ public static class ValueCodec
             case Precept precept:
                 w.WriteByte(KPrecept);
                 w.WriteInt32(precept.Id);
+                break;
+            case SlotGroup slotGroup when slotGroup.parent is Zone || slotGroup.parent is Thing:
+                // Место хранения (склад-зона или стеллаж) — по его владельцу.
+                w.WriteByte(KSlotGroup);
+                w.WriteBool(slotGroup.parent is Zone);
+                w.WriteInt32(slotGroup.parent is Zone slotZone ? slotZone.ID : ((Thing)slotGroup.parent).thingIDNumber);
                 break;
             case Enum e:
                 w.WriteByte(KEnum);
@@ -264,6 +271,13 @@ public static class ValueCodec
             }
             case KResearchManager:
                 return Find.ResearchManager;
+            case KSlotGroup:
+            {
+                bool isZone = r.ReadBool();
+                int id = r.ReadInt32();
+                object? owner = isZone ? FindZone(map, id) : FindThing(map, id);
+                return (owner as ISlotGroupParent)?.GetSlotGroup();
+            }
             case KFilter:
                 return ReadFilter(ref r, map);
             case KStoreSettings:
