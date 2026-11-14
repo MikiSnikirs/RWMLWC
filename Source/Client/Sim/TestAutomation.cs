@@ -264,6 +264,13 @@ public static class TestAutomation
         }
         activeConfig = cfg;
         sessionSteps.Clear();
+        if (cfg.issuer && cfg.scenario == "tabs")
+        {
+            sessionSteps.Enqueue((startTick + 300, "tabs: work priority", TabsWorkPriority));
+            sessionSteps.Enqueue((startTick + 400, "tabs: schedule", TabsSchedule));
+            sessionSteps.Enqueue((startTick + 500, "tabs: outfit policy", TabsOutfit));
+            sessionSteps.Enqueue((startTick + 600, "tabs: allowed area", TabsArea));
+        }
         if (cfg.desync && cfg.scenario == "desync")
         {
             // T-034: этот клиент нарочно портит своё состояние.
@@ -346,6 +353,7 @@ public static class TestAutomation
                     ScenarioSecondMap(true);
                     break;
                 case "ui":
+                case "tabs":
                 case "desync":
                 case "designate":
                 case "gizmo":
@@ -440,6 +448,110 @@ public static class TestAutomation
         Find.MainTabsRoot.EscapeCurrentTab(false);
         Find.Selector.ClearSelection();
         Note("ui: closed");
+    }
+
+    // --- сценарий tabs (T-023): те же вызовы, что делают вкладки «Работа», «Расписание», «Назначения» ---
+
+    private static Pawn? FirstColonist()
+    {
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        return map.mapPawns.FreeColonistsSpawned.OrderBy(p => p.thingIDNumber).FirstOrDefault();
+    }
+
+    private static void TabsWorkPriority()
+    {
+        Pawn? pawn = FirstColonist();
+        if (pawn == null || pawn.workSettings == null || !pawn.workSettings.EverWork)
+        {
+            Note("tabs: work: no colonist");
+            return;
+        }
+        WorkTypeDef? work = DefDatabase<WorkTypeDef>.AllDefsListForReading.OrderBy(w => w.defName).FirstOrDefault(w => !pawn.WorkTypeIsDisabled(w));
+        if (work == null)
+        {
+            Note("tabs: work: no work type");
+            return;
+        }
+        int before = pawn.workSettings.GetPriority(work);
+        int after = before == 0 ? 3 : 0;
+        int sentBefore = LockstepClient.CommandsSent;
+        pawn.workSettings.SetPriority(work, after);
+        Note($"tabs: work {work.defName} of {pawn.LabelShort}: {before} -> {after}, sent={LockstepClient.CommandsSent - sentBefore}, value now={pawn.workSettings.GetPriority(work)}");
+    }
+
+    private static void TabsSchedule()
+    {
+        Pawn? pawn = FirstColonist();
+        if (pawn == null || pawn.timetable == null)
+        {
+            Note("tabs: schedule: no colonist");
+            return;
+        }
+        TimeAssignmentDef before = pawn.timetable.GetAssignment(5);
+        TimeAssignmentDef after = before == TimeAssignmentDefOf.Work ? TimeAssignmentDefOf.Joy : TimeAssignmentDefOf.Work;
+        int sentBefore = LockstepClient.CommandsSent;
+        pawn.timetable.SetAssignment(5, after);
+        Note($"tabs: schedule hour 5 of {pawn.LabelShort}: {before.defName} -> {after.defName}, sent={LockstepClient.CommandsSent - sentBefore}");
+    }
+
+    private static void TabsOutfit()
+    {
+        Pawn? pawn = FirstColonist();
+        if (pawn == null || pawn.outfits == null)
+        {
+            Note("tabs: outfit: no colonist");
+            return;
+        }
+        ApparelPolicy? other = Current.Game.outfitDatabase.AllOutfits.OrderBy(o => o.id).FirstOrDefault(o => o != pawn.outfits.CurrentApparelPolicy);
+        if (other == null)
+        {
+            Note("tabs: outfit: only one policy");
+            return;
+        }
+        int sentBefore = LockstepClient.CommandsSent;
+        pawn.outfits.CurrentApparelPolicy = other;
+        Note($"tabs: outfit of {pawn.LabelShort} -> policy {other.id}, sent={LockstepClient.CommandsSent - sentBefore}");
+    }
+
+    private static void TabsArea()
+    {
+        Pawn? pawn = FirstColonist();
+        if (pawn == null || pawn.playerSettings == null)
+        {
+            Note("tabs: area: no colonist");
+            return;
+        }
+        Area? area = pawn.Map.areaManager.AllAreas.Where(a => a is Area_Allowed).OrderBy(a => a.ID).FirstOrDefault();
+        Area? target = pawn.playerSettings.AreaRestrictionInPawnCurrentMap == area ? null : area;
+        int sentBefore = LockstepClient.CommandsSent;
+        pawn.playerSettings.AreaRestrictionInPawnCurrentMap = target;
+        Note($"tabs: allowed area of {pawn.LabelShort} -> {(target != null ? target.ID.ToString() : "none")}, sent={LockstepClient.CommandsSent - sentBefore}");
+    }
+
+    private static string SettingsDigest(Map map)
+    {
+        Fnv64 hash = Fnv64.Create();
+        foreach (Pawn pawn in map.mapPawns.FreeColonistsSpawned.OrderBy(p => p.thingIDNumber))
+        {
+            hash.Add(pawn.thingIDNumber);
+            if (pawn.workSettings != null && pawn.workSettings.EverWork)
+            {
+                foreach (WorkTypeDef work in DefDatabase<WorkTypeDef>.AllDefsListForReading.OrderBy(w => w.defName))
+                {
+                    hash.Add(pawn.workSettings.GetPriority(work));
+                }
+            }
+            if (pawn.timetable != null)
+            {
+                for (int hour = 0; hour < 24; hour++)
+                {
+                    hash.Add((int)pawn.timetable.GetAssignment(hour).shortHash);
+                }
+            }
+            hash.Add(pawn.outfits?.CurrentApparelPolicy?.id ?? -1);
+            hash.Add(pawn.playerSettings?.AreaRestrictionInPawnCurrentMap?.ID ?? -1);
+        }
+        return hash.Value.ToString("X16");
     }
 
     // --- сценарий desync (T-034): искусственное расхождение ---
@@ -647,6 +759,7 @@ public static class TestAutomation
             string jobs = string.Join(",", map.mapPawns.FreeColonistsSpawned.OrderBy(p => p.thingIDNumber)
                 .Select(p => p.thingIDNumber + ":" + (p.CurJobDef != null ? p.CurJobDef.defName : "-") + "@" + p.Position));
             Note($"summary: map{map.uniqueID} jobs=[{jobs}]");
+            Note($"summary: map{map.uniqueID} settings={SettingsDigest(map)}");
             Note($"summary: map{map.uniqueID} designations={map.designationManager.AllDesignations.Count} blueprints={map.listerThings.ThingsInGroup(ThingRequestGroup.Blueprint).Count} zones={map.zoneManager.AllZones.Count}; commands sent={LockstepClient.CommandsSent} executed={CommandBus.Executed} failed={CommandBus.Failed}");
         }
     }

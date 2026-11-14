@@ -27,6 +27,9 @@ public static class CommandKinds
 
     /// <summary>Приказ призванной пешке идти в клетку (перемещение группы с расстановкой) (T-022).</summary>
     public const int PawnGoto = 6;
+
+    /// <summary>Вызов метода игры, которым окно или вкладка меняет настройку (приоритеты работ, расписание, политики) (T-023).</summary>
+    public const int MethodCall = 7;
 }
 
 /// <summary>
@@ -157,6 +160,9 @@ public static class CommandBus
                     break;
                 case CommandKinds.PawnGoto:
                     MapClickCommands.ExecuteGoto(map, ref reader);
+                    break;
+                case CommandKinds.MethodCall:
+                    MethodCommands.Execute(map, ref reader);
                     break;
                 default:
                     Failed++;
