@@ -35,7 +35,8 @@ public sealed class PlayerPresenceComponent : GameComponent
         TestAutomation.Note($"presence: player {playerId} {(isOnline ? "online" : "offline")}");
     }
 
-    public string Digest() => string.Join(",", online.OrderBy(p => p.Key).Select(p => $"{p.Key}:{(p.Value ? "on" : "off")}"));
+    /// <summary>Сводка: кто не в сети (в сети — значение по умолчанию; «в сети» до входа клиента он мог не получить).</summary>
+    public string Digest() => string.Join(",", online.Where(p => !p.Value).OrderBy(p => p.Key).Select(p => p.Key));
 }
 
 public static class PlayerPresence
