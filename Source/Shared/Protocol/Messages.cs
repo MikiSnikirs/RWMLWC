@@ -1,0 +1,328 @@
+using System;
+using System.Collections.Generic;
+
+namespace RWMLWC.Shared.Protocol;
+
+/// <summary>
+/// Тип сообщения — первые 2 байта кадра. Номера не переиспользуются:
+/// удалённый тип оставляет дыру, новый получает следующий номер.
+/// </summary>
+public enum MessageType : ushort
+{
+    Hello = 1,
+    Welcome = 2,
+    Reject = 3,
+    Command = 4,
+    CommandOrdered = 5,
+    Tick = 6,
+    SpeedRequest = 7,
+    SnapshotChunk = 8,
+    MapHash = 9,
+}
+
+/// <summary>Причина отказа сервера в подключении.</summary>
+public enum RejectReason : byte
+{
+    Other = 0,
+    ProtocolMismatch = 1,
+    ModMismatch = 2,
+    GameVersionMismatch = 3,
+    ModListMismatch = 4,
+    ServerFull = 5,
+    NameTaken = 6,
+}
+
+/// <summary>Константы полей.</summary>
+public static class ProtocolIds
+{
+    /// <summary><c>MapId</c> для команд и данных уровня мира, а не карты.</summary>
+    public const int WorldMapId = -1;
+}
+
+public abstract class Message
+{
+    public abstract MessageType Type { get; }
+    public abstract void Write(PacketWriter w);
+}
+
+/// <summary>Клиент → сервер, первое сообщение после подключения.</summary>
+public sealed class HelloMessage : Message
+{
+    public override MessageType Type => MessageType.Hello;
+
+    /// <summary>Версия протокола клиента; сервер сверяет её с <see cref="ProtocolInfo.ProtocolVersion"/>.</summary>
+    public int ProtocolVersion = ProtocolInfo.ProtocolVersion;
+    public string ModId = ProtocolInfo.ModId;
+    /// <summary>Версия игры, например «1.7.5005».</summary>
+    public string GameVersion = "";
+    public string PlayerName = "";
+    /// <summary>Хеш списка модов и их версий. Как он считается — решает клиент; сервер только сравнивает.</summary>
+    public ulong ModListHash;
+
+    public override void Write(PacketWriter w)
+    {
+        w.WriteInt32(ProtocolVersion);
+        w.WriteString(ModId);
+        w.WriteString(GameVersion);
+        w.WriteString(PlayerName);
+        w.WriteUInt64(ModListHash);
+    }
+
+    internal static HelloMessage Read(ref PacketReader r) => new()
+    {
+        ProtocolVersion = r.ReadInt32(),
+        ModId = r.ReadString(),
+        GameVersion = r.ReadString(),
+        PlayerName = r.ReadString(),
+        ModListHash = r.ReadUInt64(),
+    };
+}
+
+/// <summary>Сервер → клиент: подключение принято.</summary>
+public sealed class WelcomeMessage : Message
+{
+    public override MessageType Type => MessageType.Welcome;
+
+    /// <summary>Номер игрока в сессии, выдаёт сервер.</summary>
+    public int PlayerId;
+    /// <summary>Тик общих часов на момент входа.</summary>
+    public int ServerTick;
+
+    public override void Write(PacketWriter w)
+    {
+        w.WriteInt32(PlayerId);
+        w.WriteInt32(ServerTick);
+    }
+
+    internal static WelcomeMessage Read(ref PacketReader r) => new()
+    {
+        PlayerId = r.ReadInt32(),
+        ServerTick = r.ReadInt32(),
+    };
+}
+
+/// <summary>Сервер → клиент: подключение отклонено, после сообщения сервер закрывает соединение.</summary>
+public sealed class RejectMessage : Message
+{
+    public override MessageType Type => MessageType.Reject;
+
+    public RejectReason Reason;
+    /// <summary>Текст для игрока.</summary>
+    public string Detail = "";
+
+    public override void Write(PacketWriter w)
+    {
+        w.WriteByte((byte)Reason);
+        w.WriteString(Detail);
+    }
+
+    internal static RejectMessage Read(ref PacketReader r) => new()
+    {
+        Reason = (RejectReason)r.ReadByte(),
+        Detail = r.ReadString(),
+    };
+}
+
+/// <summary>
+/// Клиент → сервер: команда игрока. Сервер не разбирает <see cref="Payload"/>,
+/// он назначает порядок и тик исполнения и рассылает <see cref="CommandOrderedMessage"/>.
+/// </summary>
+public sealed class CommandMessage : Message
+{
+    public override MessageType Type => MessageType.Command;
+
+    /// <summary>Номер команды у этого клиента, растёт с 1. Нужен, чтобы клиент узнал свою команду в рассылке.</summary>
+    public int ClientSeq;
+    /// <summary>Карта (<c>Map.uniqueID</c>) или <see cref="ProtocolIds.WorldMapId"/>.</summary>
+    public int MapId;
+    /// <summary>Вид команды. Реестр видов ведёт клиент (зона A, T-020–T-023).</summary>
+    public int Kind;
+    public byte[] Payload = Array.Empty<byte>();
+
+    public override void Write(PacketWriter w)
+    {
+        w.WriteInt32(ClientSeq);
+        w.WriteInt32(MapId);
+        w.WriteInt32(Kind);
+        w.WriteBytes(Payload);
+    }
+
+    internal static CommandMessage Read(ref PacketReader r) => new()
+    {
+        ClientSeq = r.ReadInt32(),
+        MapId = r.ReadInt32(),
+        Kind = r.ReadInt32(),
+        Payload = r.ReadBytes(),
+    };
+}
+
+/// <summary>
+/// Сервер → все клиенты: команда в общем порядке. Клиенты исполняют команды тика
+/// <see cref="Tick"/> по возрастанию <see cref="Seq"/>.
+/// </summary>
+public sealed class CommandOrderedMessage : Message
+{
+    public override MessageType Type => MessageType.CommandOrdered;
+
+    /// <summary>Глобальный номер команды в сессии, без пропусков.</summary>
+    public long Seq;
+    /// <summary>Тик, на котором команду исполняют все клиенты.</summary>
+    public int Tick;
+    public int PlayerId;
+    public int ClientSeq;
+    public int MapId;
+    public int Kind;
+    public byte[] Payload = Array.Empty<byte>();
+
+    public override void Write(PacketWriter w)
+    {
+        w.WriteInt64(Seq);
+        w.WriteInt32(Tick);
+        w.WriteInt32(PlayerId);
+        w.WriteInt32(ClientSeq);
+        w.WriteInt32(MapId);
+        w.WriteInt32(Kind);
+        w.WriteBytes(Payload);
+    }
+
+    internal static CommandOrderedMessage Read(ref PacketReader r) => new()
+    {
+        Seq = r.ReadInt64(),
+        Tick = r.ReadInt32(),
+        PlayerId = r.ReadInt32(),
+        ClientSeq = r.ReadInt32(),
+        MapId = r.ReadInt32(),
+        Kind = r.ReadInt32(),
+        Payload = r.ReadBytes(),
+    };
+}
+
+/// <summary>
+/// Сервер → все клиенты: разрешение тикать. Клиент может исполнить тики до <see cref="TickUpTo"/> включительно;
+/// все команды для этих тиков уже разосланы раньше этого сообщения.
+/// </summary>
+public sealed class TickMessage : Message
+{
+    public override MessageType Type => MessageType.Tick;
+
+    public int TickUpTo;
+    /// <summary>Общая скорость: 0 — пауза, 1..4 — как <c>TimeSpeed</c> игры.</summary>
+    public byte Speed;
+
+    public override void Write(PacketWriter w)
+    {
+        w.WriteInt32(TickUpTo);
+        w.WriteByte(Speed);
+    }
+
+    internal static TickMessage Read(ref PacketReader r) => new()
+    {
+        TickUpTo = r.ReadInt32(),
+        Speed = r.ReadByte(),
+    };
+}
+
+/// <summary>Клиент → сервер: скорость, которую выбрал игрок. Сервер применяет правило меньшей скорости.</summary>
+public sealed class SpeedRequestMessage : Message
+{
+    public override MessageType Type => MessageType.SpeedRequest;
+
+    /// <summary>0 — пауза, 1..4 — как <c>TimeSpeed</c> игры.</summary>
+    public byte Speed;
+
+    public override void Write(PacketWriter w) => w.WriteByte(Speed);
+
+    internal static SpeedRequestMessage Read(ref PacketReader r) => new() { Speed = r.ReadByte() };
+}
+
+/// <summary>
+/// Кусок снимка карты (в обе стороны: владелец → сервер → гость). Снимок режется на куски
+/// по <see cref="ProtocolLimits.SnapshotChunkBytes"/>; формат и сжатие данных — T-030 (зона A).
+/// </summary>
+public sealed class SnapshotChunkMessage : Message
+{
+    public override MessageType Type => MessageType.SnapshotChunk;
+
+    /// <summary>Номер снимка у отправителя; куски одного снимка имеют один номер.</summary>
+    public int SnapshotId;
+    public int MapId;
+    /// <summary>Тик, на котором снят снимок.</summary>
+    public int Tick;
+    public int ChunkIndex;
+    public int ChunkCount;
+    public byte[] Data = Array.Empty<byte>();
+
+    public override void Write(PacketWriter w)
+    {
+        w.WriteInt32(SnapshotId);
+        w.WriteInt32(MapId);
+        w.WriteInt32(Tick);
+        w.WriteInt32(ChunkIndex);
+        w.WriteInt32(ChunkCount);
+        w.WriteBytes(Data);
+    }
+
+    internal static SnapshotChunkMessage Read(ref PacketReader r)
+    {
+        var m = new SnapshotChunkMessage
+        {
+            SnapshotId = r.ReadInt32(),
+            MapId = r.ReadInt32(),
+            Tick = r.ReadInt32(),
+            ChunkIndex = r.ReadInt32(),
+            ChunkCount = r.ReadInt32(),
+            Data = r.ReadBytes(),
+        };
+        if (m.ChunkCount < 1 || m.ChunkIndex < 0 || m.ChunkIndex >= m.ChunkCount)
+            throw new ProtocolException($"Неверный номер куска снимка: {m.ChunkIndex} из {m.ChunkCount}");
+        return m;
+    }
+}
+
+/// <summary>Одна часть хеша карты (подсистема), например «things», «pawns», «rand».</summary>
+public readonly record struct HashPart(string Name, ulong Value);
+
+/// <summary>
+/// Клиент → сервер: хеш состояния карты на тике. Сервер сравнивает хеши игроков по (MapId, Tick).
+/// Части передаются по имени, чтобы новые подсистемы хеша (зона A, <c>MapStateHasher</c>) не меняли протокол.
+/// </summary>
+public sealed class MapHashMessage : Message
+{
+    public override MessageType Type => MessageType.MapHash;
+
+    public int MapId;
+    public int Tick;
+    public ulong Total;
+    public List<HashPart> Parts = new();
+
+    public override void Write(PacketWriter w)
+    {
+        if (Parts.Count > ProtocolLimits.MaxHashParts)
+            throw new ProtocolException($"Частей хеша больше {ProtocolLimits.MaxHashParts}");
+        w.WriteInt32(MapId);
+        w.WriteInt32(Tick);
+        w.WriteUInt64(Total);
+        w.WriteInt32(Parts.Count);
+        foreach (HashPart p in Parts)
+        {
+            w.WriteString(p.Name);
+            w.WriteUInt64(p.Value);
+        }
+    }
+
+    internal static MapHashMessage Read(ref PacketReader r)
+    {
+        var m = new MapHashMessage
+        {
+            MapId = r.ReadInt32(),
+            Tick = r.ReadInt32(),
+            Total = r.ReadUInt64(),
+        };
+        // Минимум на часть: 4 байта длины строки + 8 байт значения.
+        int count = r.ReadCount(ProtocolLimits.MaxHashParts, 12);
+        m.Parts = new List<HashPart>(count);
+        for (int i = 0; i < count; i++)
+            m.Parts.Add(new HashPart(r.ReadString(), r.ReadUInt64()));
+        return m;
+    }
+}

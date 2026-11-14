@@ -7,8 +7,8 @@ namespace RWMLWC.Shared;
 /// </summary>
 public static class ProtocolInfo
 {
-    /// <summary>Версия протокола. 0 — протокола ещё нет (до задачи T-011).</summary>
-    public const int ProtocolVersion = 0;
+    /// <summary>Версия протокола. 1 — протокол v0 (T-011): рукопожатие, команды, тик, снимок, хеш.</summary>
+    public const int ProtocolVersion = 1;
 
     /// <summary>Идентификатор мода: packageId в About.xml и id экземпляра Harmony.</summary>
     public const string ModId = "MikiSnikirs.RWMLWC";
