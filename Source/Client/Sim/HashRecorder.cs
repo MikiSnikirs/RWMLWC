@@ -27,6 +27,11 @@ public sealed class HashRecorder : GameComponent
     private string? filePath;
     private readonly StringBuilder buffer = new StringBuilder();
 
+    // Диагностика поворотов в первых тиках прогона (по одной карте — первой).
+    private string? rotLogPath;
+    private readonly StringBuilder rotBuffer = new StringBuilder();
+    private readonly Dictionary<int, int> lastRot = new Dictionary<int, int>();
+
     // Прогон должен начаться строго до первого тика после загрузки, иначе два запуска
     // стартуют с разных тиков и их нельзя сравнивать. Поэтому старт не ручной:
     // при загрузке сейва проверяется файл-метка, а сам старт делает префикс DoSingleTick.
@@ -113,6 +118,9 @@ public sealed class HashRecorder : GameComponent
         string stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
         filePath = Path.Combine(dir, "hash-" + stamp + ".txt");
         DumpThingsAtStart(dir, stamp);
+        rotLogPath = Path.Combine(dir, "rotlog-" + stamp + ".txt");
+        rotBuffer.Clear();
+        lastRot.Clear();
         RandTracer.Start(Path.Combine(dir, "randtrace-" + stamp + ".txt"), startTick, DenseTicks);
         buffer.Clear();
         buffer.AppendLine($"# RWMLWC determinism run; startTick={startTick}; duration={durationTicks}; interval={Interval}; sessionSeed={PerMapSim.SessionSeed}");
@@ -181,6 +189,10 @@ public sealed class HashRecorder : GameComponent
             MapStateHash hash = MapStateHasher.Compute(map);
             buffer.AppendLine($"{tick};map{map.uniqueID};{hash}");
         }
+        if (tick - startTick <= DenseTicks && maps.Count > 0)
+        {
+            MapStateHasher.LogRotationChanges(maps[0], tick, lastRot, rotBuffer);
+        }
         // Сбрасываем на диск по ходу, чтобы файл уцелел при вылете.
         if (buffer.Length > 8192)
         {
@@ -190,6 +202,18 @@ public sealed class HashRecorder : GameComponent
 
     private void Flush()
     {
+        if (rotLogPath != null && rotBuffer.Length > 0)
+        {
+            try
+            {
+                File.AppendAllText(rotLogPath, rotBuffer.ToString());
+            }
+            catch (Exception ex)
+            {
+                Log.Error("[RWMLWC] не удалось записать журнал поворотов: " + ex);
+            }
+            rotBuffer.Clear();
+        }
         if (filePath == null || buffer.Length == 0)
         {
             return;

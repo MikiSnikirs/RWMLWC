@@ -165,7 +165,39 @@ public static class MapStateHasher
     // У типов с randomizeRotationOnSpawn (обломки камня и шлака) игра заново выбирает случайный поворот
     // при каждом появлении вещи, включая загрузку сейва, причём из Rand, засеянного системными часами.
     // Поворот таких вещей не является состоянием симуляции и в хеш не входит.
-    private static int StableRotation(Thing t) => t.def.randomizeRotationOnSpawn ? 0 : t.Rotation.AsInt;
+    internal static int StableRotation(Thing t) => t.def.randomizeRotationOnSpawn ? 0 : t.Rotation.AsInt;
+
+    /// <summary>
+    /// Диагностика: дописывает строки о вещах, у которых поворот изменился с прошлого вызова.
+    /// Формат: тик;номер;тип;было;стало. Первый вызов только запоминает повороты.
+    /// </summary>
+    public static void LogRotationChanges(Map map, int tick, Dictionary<int, int> lastRot, System.Text.StringBuilder sb)
+    {
+        bool first = lastRot.Count == 0;
+        tmpThings.Clear();
+        tmpThings.AddRange(map.listerThings.AllThings);
+        tmpThings.Sort(CompareThings);
+        for (int i = 0; i < tmpThings.Count; i++)
+        {
+            Thing t = tmpThings[i];
+            int rot = StableRotation(t);
+            if (lastRot.TryGetValue(t.thingIDNumber, out int old))
+            {
+                if (old != rot)
+                {
+                    sb.Append(tick).Append(';').Append(t.thingIDNumber).Append(';').Append(t.def.defName)
+                      .Append(';').Append(old).Append(';').Append(rot).Append('\n');
+                }
+            }
+            else if (!first)
+            {
+                sb.Append(tick).Append(';').Append(t.thingIDNumber).Append(';').Append(t.def.defName)
+                  .Append(";new;").Append(rot).Append('\n');
+            }
+            lastRot[t.thingIDNumber] = rot;
+        }
+        tmpThings.Clear();
+    }
 
     private static int CompareThings(Thing a, Thing b) => a.thingIDNumber.CompareTo(b.thingIDNumber);
 

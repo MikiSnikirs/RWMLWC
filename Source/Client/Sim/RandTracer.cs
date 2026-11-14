@@ -28,7 +28,21 @@ public static class RandTracer
     private static readonly StringBuilder buffer = new StringBuilder();
 
     /// <summary>Идёт запись. Проверяется в патчах Rand на каждый вызов, поэтому простое поле.</summary>
-    public static bool Active => active;
+    public static bool Active => active && suppress == 0;
+
+    // Больше нуля, пока выполняется изолированный визуальный код (см. VisualRandIsolation):
+    // его вызовы Rand не влияют на симуляцию и в трассировку не идут.
+    private static int suppress;
+
+    public static void PushSuppress() => suppress++;
+
+    public static void PopSuppress()
+    {
+        if (suppress > 0)
+        {
+            suppress--;
+        }
+    }
 
     public static void Start(string path, int fromTick, int ticks)
     {
@@ -48,12 +62,14 @@ public static class RandTracer
             return;
         }
         active = false;
+        suppress = 0;
         Flush();
     }
 
     /// <summary>Вызывается в начале каждого тика игры.</summary>
     public static void BeginTick()
     {
+        suppress = 0;
         if (!active)
         {
             return;
