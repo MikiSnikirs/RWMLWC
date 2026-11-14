@@ -37,6 +37,12 @@ internal static class Program
         double autosaveMinutes = settings.GetDouble("autosave_minutes", 5, 0, 24 * 60);
         int maxPlayers = settings.GetInt("max_players", 8, 1, 64);
         int maxLead = settings.GetInt("max_lead_ticks", 180, 0, 100000);
+        int keepCopies = settings.GetInt("keep_copies", SaveStore.DefaultKeepCopies, 1, 1000);
+        double backupHours = settings.GetDouble("backup_hours", 24, 0, 24 * 365);
+        int keepBackups = settings.GetInt("keep_backups", 7, 1, 1000);
+        var whitelist = new HashSet<string>(
+            (settings.GetString("whitelist") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
+            StringComparer.OrdinalIgnoreCase);
         bool echo = false;
         int startTick = 0;
         uint? seed = null;
@@ -76,7 +82,11 @@ internal static class Program
             return 0;
         }
 
-        var store = new SaveStore(dataDir);
+        var store = new SaveStore(dataDir, keepCopies)
+        {
+            BackupInterval = backupHours > 0 ? TimeSpan.FromHours(backupHours) : null,
+            KeepBackups = keepBackups,
+        };
         SaveCopy? latest = store.Latest;
         if (latest != null)
         {
@@ -95,10 +105,11 @@ internal static class Program
             Dedicated = true,
             MaxPlayers = maxPlayers,
             MaxLeadTicks = maxLead,
+            AllowedNames = whitelist.Count > 0 ? whitelist : null,
             AutosaveInterval = autosaveMinutes > 0 ? TimeSpan.FromMinutes(autosaveMinutes) : null,
         };
         Console.WriteLine($"SESSION startTick={options.StartTick} seed={options.SessionSeed}");
-        Console.WriteLine($"игроков до {options.MaxPlayers}, автосохранение {(options.AutosaveInterval is { } a ? $"каждые {a.TotalMinutes:0.##} мин" : "выключено")}");
+        Console.WriteLine($"игроков до {options.MaxPlayers}, автосохранение {(options.AutosaveInterval is { } a ? $"каждые {a.TotalMinutes:0.##} мин" : "выключено")}"); Console.WriteLine($"копий мира: {keepCopies}, резервные копии: {(backupHours > 0 ? $"раз в {backupHours:0.##} ч, хранить {keepBackups}" : "выключены")}, белый список: {(whitelist.Count > 0 ? string.Join(", ", whitelist) : "нет (пускать всех)")}");
         PrintConnectionCodes(server.LocalEndPoint.Port, ServerCertificate.Thumbprint(cert), publicHost);
         var host = new SessionHost(new Session(options, Console.WriteLine));
         _ = Task.Run(() => ConsoleLoop(host, store, stop));
@@ -128,7 +139,18 @@ internal static class Program
         "\r\n" +
         "# На сколько тиков часы сервера могут опережать самого медленного игрока (0 — без ограничения).\r\n" +
         "# Меньше — быстрее исполняются приказы и входят новички; больше — медленный компьютер реже тормозит остальных.\r\n" +
-        "max_lead_ticks = 180\r\n";
+        "max_lead_ticks = 180\r\n" +
+        "\r\n" +
+        "# Сколько последних копий мира хранить в saves/.\r\n" +
+        "keep_copies = 5\r\n" +
+        "\r\n" +
+        "# Резервная копия мира в backups/ раз в столько часов (0 — не делать) и сколько их хранить.\r\n" +
+        "backup_hours = 24\r\n" +
+        "keep_backups = 7\r\n" +
+        "\r\n" +
+        "# Белый список: имена игроков через запятую (регистр не важен). Пусто — пускать всех.\r\n" +
+        "# Имя игрок задаёт сам, так что это защита от случайных людей, а не пароль.\r\n" +
+        "whitelist =\r\n";
 
     private static void PrintConnectionCodes(int port, string thumbprint, string? publicHost)
     {

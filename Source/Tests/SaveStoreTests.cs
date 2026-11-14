@@ -123,7 +123,7 @@ public sealed class SaveStoreTests : IDisposable
         var store = new SaveStore(_dir);
         for (int t = 1; t <= 8; t++) store.Store(World, t * 1000, new byte[] { (byte)t });
         Assert.Equal(new[] { 4000, 5000, 6000, 7000, 8000 }, store.List().Select(c => c.Tick));
-        Assert.Equal(SaveStore.KeepCopies * 2, Directory.GetFiles(Path.Combine(_dir, "saves")).Length);
+        Assert.Equal(SaveStore.DefaultKeepCopies * 2, Directory.GetFiles(Path.Combine(_dir, "saves")).Length);
     }
 
     [Fact]
