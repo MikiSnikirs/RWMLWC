@@ -61,6 +61,10 @@ if (Test-Path -LiteralPath $pf) {
     $node = $px.PrefsData.SelectSingleNode('runInBackground')
     if (-not $node) { $node = $px.CreateElement('runInBackground'); [void]$px.PrefsData.AppendChild($node) }
     $node.InnerText = 'True'
+    # Test instances are silent (the person may be playing something else meanwhile).
+    $vol = $px.PrefsData.SelectSingleNode('volumeMaster')
+    if (-not $vol) { $vol = $px.CreateElement('volumeMaster'); [void]$px.PrefsData.AppendChild($vol) }
+    $vol.InnerText = '0'
     $px.Save($pf)
 }
 Copy-Item -LiteralPath $saveFile (Join-Path $dir 'Saves\offline.rws')
