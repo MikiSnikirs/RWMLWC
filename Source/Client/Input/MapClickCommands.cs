@@ -86,7 +86,7 @@ public static class MapClickCommands
     /// <summary>Отправить правый щелчок в точке карты (также для тестовых сценариев).</summary>
     public static void Send(Map map, Vector3 clickPos)
     {
-        PacketWriter w = CommandBus.Begin(map);
+        PacketWriter w = CommandBus.Begin(map, clickPos);
         WriteFloat(w, clickPos.x);
         WriteFloat(w, clickPos.y);
         WriteFloat(w, clickPos.z);
