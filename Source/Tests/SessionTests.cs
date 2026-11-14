@@ -419,8 +419,39 @@ public class SessionTests
         Step(s, ProtocolLimits.PlayersRefreshMs, a);        // пинг изменился (-1 → 0) — новый состав
         PlayerInfo me = a.Received.OfType<PlayersMessage>().Last().Players.Single();
         Assert.True(me.PingMs >= 0);
+    }
+
+    /// <summary>Соединение с постоянным пингом: в памяти пинг меряется по часам и может прыгать 0 ↔ 1 мс.</summary>
+    private sealed class FixedPing : IConnection
+    {
+        private readonly IConnection _inner;
+        public FixedPing(IConnection inner) => _inner = inner;
+        public string Remote => _inner.Remote;
+        public bool IsOpen => _inner.IsOpen;
+        public string? CloseReason => _inner.CloseReason;
+        public System.Threading.Tasks.Task Closed => _inner.Closed;
+        public void Send(Message message) => _inner.Send(message);
+        public bool TryReceive(out Message message) => _inner.TryReceive(out message);
+        public System.Threading.Tasks.ValueTask<Message> ReceiveAsync(System.Threading.CancellationToken ct = default) => _inner.ReceiveAsync(ct);
+        public void Close(string reason) => _inner.Close(reason);
+        public void SendPing() { }
+        public int RoundTripMs => 25;
+        public System.Threading.Tasks.ValueTask DisposeAsync() => _inner.DisposeAsync();
+    }
+
+    [Fact]
+    public void PlayersAreNotResentWhilePingsStayTheSame()
+    {
+        var (s, _) = NewSession();
+        var (client, server) = InMemoryConnection.CreatePair("A", "server");
+        s.Accept(new FixedPing(server));
+        client.Send(new HelloMessage { PlayerName = "A", GameVersion = "1.7.5005", ModListHash = 7 });
+        var a = new TestClient(client);
+        Step(s, ProtocolLimits.PlayersRefreshMs, a);        // пинг стал известен (25) — новый состав
+        Assert.Equal(25, a.Received.OfType<PlayersMessage>().Last().Players.Single().PingMs);
         int count = a.Received.OfType<PlayersMessage>().Count();
         Step(s, ProtocolLimits.PlayersRefreshMs, a);        // пинг тот же — не рассылается
+        Step(s, ProtocolLimits.PlayersRefreshMs, a);
         Assert.Equal(count, a.Received.OfType<PlayersMessage>().Count());
     }
 
