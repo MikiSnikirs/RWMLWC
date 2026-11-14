@@ -416,6 +416,7 @@ public static class TestAutomation
             sessionSteps.Enqueue((startTick + 700, "squads: move first pawn to squad 2", () => SquadsStep(map =>
                 RWMLWC.Client.Maps.Squads.AssignPawns(map, 2, map.mapPawns.FreeColonistsSpawned.OrderBy(p => p.thingIDNumber).Take(1)))));
             sessionSteps.Enqueue((startTick + 900, "squads: digest before reload", () => SquadsStep(map => { })));
+            sessionSteps.Enqueue((startTick + 950, "absence: autopilot for map", () => SquadsStep(map => RWMLWC.Client.Maps.AbsenceModes.Set(map, RWMLWC.Client.Maps.AbsenceMode.Autopilot))));
             sessionSteps.Enqueue((startTick + 1000, "squads: common snapshot", () => { Note("squads: requesting a common snapshot"); LockstepClient.RequestCommonSnapshot(); }));
             // TST-060, ч. 2 (T-061): после снимка у c1 — отряд «Альфа» без пешек, пешки первого и второго
             // колонистов в «Бете» (участник c2), третий колонист общий.
@@ -1258,6 +1259,7 @@ public static class TestAutomation
                 Note($"camera: this client moved its camera {cameraJumps} times during the run");
             }
             Note($"summary: map{map.uniqueID} settings={SettingsDigest(map)}");
+            Note("summary: absence=" + (RWMLWC.Client.Maps.AbsenceModes.Component?.Digest() ?? "-"));
             Note("summary: squads=" + (RWMLWC.Client.Maps.Squads.Component?.Digest() ?? "-") + " rejected=" + RWMLWC.Client.Maps.SquadRules.Rejected
                 + " drafted=[" + string.Join(",", map.mapPawns.FreeColonistsSpawned.Where(p => p.Drafted).Select(p => p.thingIDNumber).OrderBy(i => i)) + "]");
             Note($"summary: map{map.uniqueID} designations={map.designationManager.AllDesignations.Count} blueprints={map.listerThings.ThingsInGroup(ThingRequestGroup.Blueprint).Count} zones={map.zoneManager.AllZones.Count}; commands sent={LockstepClient.CommandsSent} executed={CommandBus.Executed} failed={CommandBus.Failed}");
