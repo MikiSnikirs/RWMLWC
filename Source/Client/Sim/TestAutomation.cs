@@ -59,6 +59,10 @@ public static class TestAutomation
         public bool quit;
         /// <summary>Потолок тиков за кадр в сессии (0 — без потолка): ключ tpf.</summary>
         public int ticksPerFrame;
+        /// <summary>Ключ hostsession=1: после загрузки сейва открыть сессию в этой игре (приём друзей через Steam) и войти в неё.</summary>
+        public bool hostSession;
+        /// <summary>Ключ steamhost=auto: из главного меню войти через Steam к другу, который сейчас держит сессию RWMLWC.</summary>
+        public bool steamAuto;
     }
 
     private static Config? activeConfig;
@@ -244,6 +248,12 @@ public static class TestAutomation
                     break;
                 case "quit":
                     cfg.quit = value == "1";
+                    break;
+                case "hostsession":
+                    cfg.hostSession = value == "1";
+                    break;
+                case "steamhost":
+                    cfg.steamAuto = value == "auto";
                     break;
                 case "tpf":
                     if (int.TryParse(value, out int tpf) && tpf >= 0)
@@ -505,6 +515,20 @@ public static class TestAutomation
         {
             // Автоматический прогон: снимать паузу с самого начала (в сессии это просьба серверу).
             automationActive = true;
+        }
+        if (cfg.hostSession && LockstepClient.CurrentState == LockstepClient.State.Off)
+        {
+            // Совместный тест двух машин: сессия в игре хоста, друг входит через Steam. SteamID и ник Steam в журнал
+            // автопрогона не пишем (он попадает в публичный репозиторий): имя игрока — из метки.
+            RWMLWC.Client.Net.HostedSession.Start(Find.TickManager.TicksGame, seed: 7);
+            RWMLWC.Client.Net.SteamInvite.AdvertiseHost();
+            LockstepClient.HoldSeconds = cfg.holdSec;
+            LockstepClient.HoldUntilPlayers = 2; // ждём друга (не дольше holdsec), затем оба начинают с одного тика
+            LockstepClient.ForceSnapshotSender = true;
+            LockstepClient.ConnectPassword = RWMLWC.Client.Net.HostedSession.Password;
+            LockstepClient.Connect("127.0.0.1", RWMLWC.Client.Net.HostedSession.Port, RWMLWC.Client.Net.HostedSession.Thumbprint, cfg.playerName);
+            Note($"hostsession: open at tick {Find.TickManager.TicksGame}, steam={RWMLWC.Client.Net.SteamNet.Available}, hold {cfg.holdSec} s");
+            return;
         }
         if (cfg.serverHost != null && LockstepClient.CurrentState == LockstepClient.State.Off)
         {
@@ -1372,6 +1396,42 @@ public static class TestAutomation
     // --- вход без мира (T-045): подключение из главного меню ---
 
     private static Config? entryConnect;
+
+    // Как «Присоединиться» в списке друзей Steam: хост объявляет rich presence connect = "+rwmlwc_join <SteamID>"
+    // (SteamInvite.AdvertiseHost). SteamID берётся оттуда и никуда не записывается.
+    private static async System.Threading.Tasks.Task<RWMLWC.Net.IConnection> ConnectToHostingFriend()
+    {
+        await RWMLWC.Client.Net.SteamNet.WaitForRelayAsync(TimeSpan.FromSeconds(30)).ConfigureAwait(false);
+        for (int attempt = 1; ; attempt++)
+        {
+            ulong host = 0;
+            int count = Steamworks.SteamFriends.GetFriendCount(Steamworks.EFriendFlags.k_EFriendFlagImmediate);
+            for (int i = 0; i < count && host == 0; i++)
+            {
+                Steamworks.CSteamID friend = Steamworks.SteamFriends.GetFriendByIndex(i, Steamworks.EFriendFlags.k_EFriendFlagImmediate);
+                string connect = Steamworks.SteamFriends.GetFriendRichPresence(friend, "connect") ?? "";
+                if (connect.StartsWith("+rwmlwc_join ", StringComparison.Ordinal) && ulong.TryParse(connect.Substring(13).Trim(), out ulong id))
+                {
+                    host = id;
+                }
+            }
+            if (host != 0)
+            {
+                try
+                {
+                    return await RWMLWC.Client.Net.SteamNet.ConnectAsync(host, TimeSpan.FromSeconds(30)).ConfigureAwait(false);
+                }
+                catch (Exception) when (attempt < 10)
+                {
+                }
+            }
+            else if (attempt >= 360) // до 30 минут: хост может открыть сессию позже
+            {
+                throw new InvalidOperationException("no Steam friend hosts an RWMLWC session");
+            }
+            await System.Threading.Tasks.Task.Delay(5000).ConfigureAwait(false);
+        }
+    }
     private static readonly System.Diagnostics.Stopwatch entryClock = new System.Diagnostics.Stopwatch();
 
     /// <summary>В метке задан сервер, но не задан сейв: подключиться из главного меню через connectdelay секунд.</summary>
@@ -1386,7 +1446,7 @@ public static class TestAutomation
     public static void EntryFrame()
     {
         Config? cfg = entryConnect;
-        if (cfg == null || cfg.serverHost == null || entryClock.ElapsedMilliseconds < cfg.connectDelaySec * 1000L)
+        if (cfg == null || (cfg.serverHost == null && !cfg.steamAuto) || entryClock.ElapsedMilliseconds < cfg.connectDelaySec * 1000L)
         {
             return;
         }
@@ -1395,7 +1455,13 @@ public static class TestAutomation
         {
             automationActive = true;
         }
-        LockstepClient.Connect(cfg.serverHost, cfg.serverPort, cfg.thumbprint, cfg.playerName);
+        if (cfg.steamAuto)
+        {
+            Note("entry: joining a Steam friend who hosts an RWMLWC session");
+            LockstepClient.Connect(ConnectToHostingFriend(), "steam friend", cfg.playerName);
+            return;
+        }
+        LockstepClient.Connect(cfg.serverHost!, cfg.serverPort, cfg.thumbprint, cfg.playerName);
     }
 
     public static void KeepRunning()
@@ -1520,7 +1586,7 @@ public static class TestAutomationBoot
         try
         {
             TestAutomation.Config cfg = TestAutomation.Read();
-            if (cfg.armed && cfg.save == null && cfg.serverHost != null)
+            if (cfg.armed && cfg.save == null && (cfg.serverHost != null || cfg.steamAuto))
             {
                 TestAutomation.ScheduleEntryConnect(cfg);
                 return;
