@@ -184,6 +184,10 @@ public static class FieldWatch
         {
             return;
         }
+        if (!RWMLWC.Client.Maps.SquadRules.LocalMay(RWMLWC.Client.Maps.SquadRules.PawnOf(target)))
+        {
+            return; // отряды (T-061): изменения уже откачены выше, команду не шлём
+        }
         foreach (PacketWriter w in commands)
         {
             CommandBus.Send(map, CommandKinds.FieldSet, PermissionLevel.Full, w);
@@ -276,6 +280,11 @@ public static class FieldWatch
         {
             TestAutomation.Note("field: " + name + ": object is gone, dropped");
             return;
+        }
+        if (RWMLWC.Client.Maps.SquadRules.RejectAtExecution(
+                RWMLWC.Client.Maps.SquadRules.Forbidden(RWMLWC.Client.Maps.SquadRules.PawnOf(target), CommandBus.CurrentPlayerId), CommandBus.CurrentSeq))
+        {
+            return; // отряды (T-061): настройка чужой пешки
         }
         Type? declaring = target.GetType();
         for (int i = 0; i < depth && declaring != null; i++)
