@@ -39,6 +39,12 @@ public static class CommandKinds
 
     /// <summary>Режим отсутствия карты: стазис, автопилот, управляющий (T-072).</summary>
     public const int AbsenceMode = 10;
+
+    /// <summary>Сформировать караван из окна (T-073): пешки, вещи с количествами, точки сбора и выхода, клетки мира.</summary>
+    public const int CaravanForm = 11;
+
+    /// <summary>Действие на карте мира (T-073): основать поселение, маршрут каравана.</summary>
+    public const int WorldAction = 12;
 }
 
 /// <summary>
@@ -133,6 +139,11 @@ public static class CommandBus
                 break;
             }
         }
+        // Команды карты мира (T-073): своей карты нет; обстановка автора разбирается на первой карте (выделение там пустое).
+        if (map == null && command.MapId == ProtocolIds.WorldMapId && command.Kind == CommandKinds.WorldAction && maps.Count > 0)
+        {
+            map = maps[0];
+        }
         if (map == null)
         {
             Failed++;
@@ -216,6 +227,12 @@ public static class CommandBus
                     break;
                 case CommandKinds.AbsenceMode:
                     RWMLWC.Client.Maps.AbsenceModes.Execute(map, ref reader);
+                    break;
+                case CommandKinds.CaravanForm:
+                    WorldCommands.ExecuteCaravanForm(map, ref reader);
+                    break;
+                case CommandKinds.WorldAction:
+                    WorldCommands.ExecuteWorldAction(ref reader);
                     break;
                 default:
                     Failed++;
