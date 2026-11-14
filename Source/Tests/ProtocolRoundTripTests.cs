@@ -42,6 +42,8 @@ public class ProtocolRoundTripTests
         yield return new object[] { new ChatMessage { PlayerId = 2, Text = "привет, ставлю паузу" } };
         yield return new object[] { new ChooseColorMessage { Color = 0x3CB44B } };
         yield return new object[] { new PlayerStateMessage { Idle = true } };
+        yield return new object[] { new GrantPermissionMessage { MapId = 3, PlayerId = 2, Level = PermissionLevel.Full, UntilReturn = true } };
+        yield return new object[] { new PermissionsMessage { Maps = { new MapPermissions { MapId = 3, OwnerPlayerId = 1, Grants = { new PermissionGrant(2, PermissionLevel.Full, true), new PermissionGrant(4, PermissionLevel.Build) } } } } };
         yield return new object[] { new AlarmMessage { MapId = 5, PlayerId = 2, Seconds = 45, Text = "Рейд пиратов" } };
         yield return new object[] { new HelloMessage { PlayerName = "p", Password = "секрет" } };
         yield return new object[] { new CursorMessage { PlayerId = 3, MapId = 0, X = 123.25f, Z = -0.5f } };

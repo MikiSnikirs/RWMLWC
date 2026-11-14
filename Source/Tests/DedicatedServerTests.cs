@@ -84,7 +84,7 @@ public sealed class DedicatedServerTests : IDisposable
         s.Pump();
         c.Drain();
 
-        CommandOrderedMessage request = c.Got.OfType<CommandOrderedMessage>().Single();
+        CommandOrderedMessage request = c.Got.OfType<CommandOrderedMessage>().Single(o => o.Kind == ProtocolIds.RequestWorldSnapshotKind);
         var chunks = c.Got.OfType<SnapshotChunkMessage>().ToList();
         Assert.True(chunks.Count > 1);
         Assert.All(chunks, ch =>
