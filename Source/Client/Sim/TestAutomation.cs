@@ -21,6 +21,7 @@ namespace RWMLWC.Client.Sim;
 ///   trace=0|1          — писать ли трассировку Rand (большой файл);
 ///   densefrom=0, denseto=300 — окно (в тиках от старта), где хеш пишется каждый тик и идёт трассировка;
 ///   perprocess=1       — между прогонами очереди перезапускать игру, а не перезагружать сейв;
+///   snapat=2000        — тик от старта, на котором сценарии snap-save и snap-reload снимают снимок игры;
 ///   quit=1             — после прогона закрыть игру.
 /// Файл без строк ключ=значение означает прежнее поведение: автостарт при загрузке, без сценария.
 /// </summary>
@@ -38,6 +39,7 @@ public static class TestAutomation
         public int denseFrom;
         public int denseTo = HashRecorder.DenseTicks;
         public bool perProcess;
+        public int snapAt = 2000;
         public bool quit;
     }
 
@@ -45,6 +47,8 @@ public static class TestAutomation
     private static string? pendingScenario;
     private static bool quitWhenDone;
     private static bool automationActive;
+    private static byte[]? snapshotToApply;
+    private static bool snapshotDone;
     private static bool reloadPending;
     private static string? reloadSave;
 
@@ -142,6 +146,12 @@ public static class TestAutomation
                         cfg.denseTo = to;
                     }
                     break;
+                case "snapat":
+                    if (int.TryParse(value, out int snap) && snap > 0)
+                    {
+                        cfg.snapAt = snap;
+                    }
+                    break;
                 case "perprocess":
                     cfg.perProcess = value == "1";
                     break;
@@ -193,6 +203,8 @@ public static class TestAutomation
             Find.TickManager.CurTimeSpeed = TimeSpeed.Superfast;
         }
         activeConfig = cfg;
+        snapshotDone = false;
+        snapshotToApply = null;
         Note($"run started: #{cfg.queueIndex}, tick={startTick}, scenario={cfg.scenario}, ticks={cfg.ticks}, trace={cfg.trace}, quit={cfg.quit}, file={Path.GetFileName(hashFile)}");
     }
 
@@ -218,6 +230,9 @@ public static class TestAutomation
                 case "twomaps-freeze":
                     ScenarioSecondMap(true);
                     break;
+                case "snap-save":
+                case "snap-reload":
+                    break; // срабатывают позже, на тике snapat (BeforeTickDuringRun)
                 default:
                     Note("unknown scenario: " + scenario);
                     break;
@@ -269,8 +284,60 @@ public static class TestAutomation
     }
 
     /// <summary>Вызывается раз в кадр во время автоматического прогона: снять автопаузу (например, от письма о рейде).</summary>
+    /// <summary>
+    /// Вызывается перед каждым тиком идущего прогона, вне тика (Rand симуляции убран).
+    /// Сценарии снимка: snap-save — снять снимок и идти дальше; snap-reload — снять снимок и
+    /// загрузить его же. Оба прогона должны совпасть с обычным прогоном без снимка.
+    /// </summary>
+    public static void BeforeTickDuringRun(HashRecorder recorder, int elapsedTicks)
+    {
+        Config? cfg = activeConfig;
+        if (cfg == null || snapshotDone || elapsedTicks != cfg.snapAt)
+        {
+            return;
+        }
+        bool reload = cfg.scenario == "snap-reload";
+        if (!reload && cfg.scenario != "snap-save")
+        {
+            return;
+        }
+        snapshotDone = true;
+        try
+        {
+            byte[] data = Maps.GameSnapshot.Take(out Maps.GameSnapshot.Stats stats);
+            Note($"snapshot taken at tick {Find.TickManager.TicksGame}: {stats}");
+            if (reload)
+            {
+                // Загрузка уничтожает текущую игру, поэтому не отсюда (мы внутри цикла тиков),
+                // а из ближайшего кадра. Тики, которые успеют пройти до этого, отбрасываются вместе с игрой.
+                recorder.SuspendForSnapshotReload();
+                snapshotToApply = data;
+            }
+        }
+        catch (Exception ex)
+        {
+            Note("snapshot FAILED: " + ex);
+            Log.Error("[RWMLWC] снимок не удался: " + ex);
+        }
+    }
+
     public static void KeepRunning()
     {
+        if (snapshotToApply != null)
+        {
+            byte[] data = snapshotToApply;
+            snapshotToApply = null;
+            try
+            {
+                Note("applying snapshot (" + data.Length + " bytes)");
+                Maps.GameSnapshot.Apply(data);
+            }
+            catch (Exception ex)
+            {
+                Note("snapshot apply FAILED: " + ex);
+            }
+            return;
+        }
         if (reloadPending)
         {
             reloadPending = false;
