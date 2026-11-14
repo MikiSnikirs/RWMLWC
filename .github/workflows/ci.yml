@@ -30,3 +30,27 @@ jobs:
         with:
           name: test-results
           path: TestResults
+
+  # T-069: готовый выделенный сервер для скачивания (со страницы прогона, раздел Artifacts).
+  # Self-contained: .NET ставить не нужно. Однофайловая сборка не годится: QUIC (msquic) из неё не загружается.
+  server-package:
+    needs: build-test
+    runs-on: windows-latest
+    timeout-minutes: 20
+    strategy:
+      matrix:
+        rid: [win-x64, linux-x64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Publish
+        run: dotnet publish Source/Server/RWMLWC.Server.csproj -c Release -r ${{ matrix.rid }} --self-contained true -o out/rwmlwc-server
+      - name: Add docs
+        shell: pwsh
+        run: Copy-Item docs/DEDICATED_SERVER.md out/rwmlwc-server/README-server.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rwmlwc-server-${{ matrix.rid }}
+          path: out/rwmlwc-server
