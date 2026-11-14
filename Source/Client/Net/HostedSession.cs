@@ -31,6 +31,9 @@ public static class HostedSession
     public static string Thumbprint { get; private set; } = "";
     public static Session? Session => _host?.Session;
 
+    /// <summary>Пароль сессии из host.txt (пусто — без пароля).</summary>
+    public static string Password { get; private set; } = "";
+
     /// <summary>Порт прямого подключения из host.txt; 0 — только Steam.</summary>
     public static int DirectPort { get; private set; }
 
@@ -51,7 +54,13 @@ public static class HostedSession
         "max_players = 8\r\n" +
         "\r\n" +
         "# На сколько тиков часы сессии могут опережать самого медленного игрока (0 — без ограничения).\r\n" +
-        "max_lead_ticks = 180\r\n";
+        "max_lead_ticks = 180\r\n" +
+        "\r\n" +
+        "# Пароль сессии. Пусто — без пароля (друзья через Steam и по коду вводят его в окне подключения).\r\n" +
+        "password =\r\n" +
+        "\r\n" +
+        "# Тревога: крупная угроза на карте отошедшего игрока ставит игру на паузу на столько секунд.\r\n" +
+        "alarm_seconds = 45\r\n";
 
     private static string LocalAddress()
     {
@@ -89,6 +98,7 @@ public static class HostedSession
         int directPort = settings.GetInt("direct_port", 0, 0, 65535);
         int maxPlayers = settings.GetInt("max_players", 8, 1, 64);
         DirectPort = directPort;
+        Password = settings.GetString("password") ?? "";
         IPEndPoint bind = directPort > 0 ? new IPEndPoint(IPAddress.Any, directPort) : new IPEndPoint(IPAddress.Loopback, port);
         // Синхронное ожидание допустимо: ListenAsync завершается сразу, сети не ждёт.
         _quic = QuicServer.StartAsync(bind, cert).GetAwaiter().GetResult();
@@ -102,6 +112,8 @@ public static class HostedSession
             SessionSeed = seed ?? (uint)System.Security.Cryptography.RandomNumberGenerator.GetInt32(int.MaxValue),
             Store = new SaveStore(DataDir),
             MaxPlayers = maxPlayers,
+            Password = settings.GetString("password"),
+            AlarmSeconds = settings.GetInt("alarm_seconds", 45, 5, 600),
             MaxLeadTicks = settings.GetInt("max_lead_ticks", 180, 0, 100000),
         };
         _host = new SessionHost(new Session(options, Write));
@@ -130,6 +142,7 @@ public static class HostedSession
             return;
         }
         Start(Find.TickManager.TicksGame);
+        RWMLWC.Client.Sim.LockstepClient.ConnectPassword = Password;
         RWMLWC.Client.Sim.LockstepClient.Connect("127.0.0.1", Port, Thumbprint, SteamNet.Available ? Steamworks.SteamFriends.GetPersonaName() : "host");
         string id = SteamNet.Available ? SteamNet.MySteamId.ToString() : "(Steam недоступен)";
         if (SteamNet.Available)

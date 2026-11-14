@@ -35,12 +35,15 @@ public class ProtocolRoundTripTests
         yield return new object[] { new NoticeMessage { Code = NoticeCode.NewerSaveOnClient, Text = "У игрока сейв новее" } };
         yield return new object[] { new SnapshotAppliedMessage { SnapshotId = 3, Tick = 20000 } };
         yield return new object[] { new NoticeMessage { Code = NoticeCode.Desync, Text = "карта 0 тик 15060: игрок 1 ≠ игрок 2" } };
-        yield return new object[] { new PlayersMessage { Players = { new PlayerInfo(1, "Хост", true, 48, 0xE6194B), new PlayerInfo(2, "B", false, -1, PlayerColors.None) } } };
+        yield return new object[] { new PlayersMessage { Players = { new PlayerInfo(1, "Хост", true, 48, 0xE6194B, true), new PlayerInfo(2, "B", false, -1, PlayerColors.None) } } };
         yield return new object[] { new PlayersMessage() };
         yield return new object[] { new PingMessage { Timestamp = 0x0123456789ABCDEF } };
         yield return new object[] { new PongMessage { Timestamp = ulong.MaxValue } };
         yield return new object[] { new ChatMessage { PlayerId = 2, Text = "привет, ставлю паузу" } };
         yield return new object[] { new ChooseColorMessage { Color = 0x3CB44B } };
+        yield return new object[] { new PlayerStateMessage { Idle = true } };
+        yield return new object[] { new AlarmMessage { MapId = 5, PlayerId = 2, Seconds = 45, Text = "Рейд пиратов" } };
+        yield return new object[] { new HelloMessage { PlayerName = "p", Password = "секрет" } };
         yield return new object[] { new CursorMessage { PlayerId = 3, MapId = 0, X = 123.25f, Z = -0.5f } };
         yield return new object[] { new CursorMessage { PlayerId = 1, MapId = CursorMessage.NoCursor } };
         yield return new object[] { new NoticeMessage { Code = NoticeCode.ColorTaken, Text = "Цвет занят" } };

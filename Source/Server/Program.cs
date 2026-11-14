@@ -106,6 +106,8 @@ internal static class Program
             MaxPlayers = maxPlayers,
             MaxLeadTicks = maxLead,
             AllowedNames = whitelist.Count > 0 ? whitelist : null,
+            Password = settings.GetString("password"),
+            AlarmSeconds = settings.GetInt("alarm_seconds", 45, 5, 600),
             AutosaveInterval = autosaveMinutes > 0 ? TimeSpan.FromMinutes(autosaveMinutes) : null,
         };
         Console.WriteLine($"SESSION startTick={options.StartTick} seed={options.SessionSeed}");
@@ -150,7 +152,14 @@ internal static class Program
         "\r\n" +
         "# Белый список: имена игроков через запятую (регистр не важен). Пусто — пускать всех.\r\n" +
         "# Имя игрок задаёт сам, так что это защита от случайных людей, а не пароль.\r\n" +
-        "whitelist =\r\n";
+        "whitelist =\r\n" +
+        "\r\n" +
+        "# Пароль сервера. Пусто — без пароля. Игроки вводят его в окне «Подключиться к серверу».\r\n" +
+        "password =\r\n" +
+        "\r\n" +
+        "# Тревога: если на карте отошедшего игрока крупная угроза, игра у всех встаёт на паузу на столько секунд\r\n" +
+        "# (или пока он не вернётся к компьютеру).\r\n" +
+        "alarm_seconds = 45\r\n";
 
     private static void PrintConnectionCodes(int port, string thumbprint, string? publicHost)
     {

@@ -61,6 +61,9 @@ public static class SessionUi
             case PlayersMessage players:
                 _players = players.Players.ToList();
                 break;
+            case AlarmMessage alarm:
+                RWMLWC.Client.Absence.IdleAlarm.OnAlarm(alarm);
+                break;
             case CursorMessage cursor:
                 if (cursor.MapId == CursorMessage.NoCursor) Cursors.Remove(cursor.PlayerId);
                 else Cursors[cursor.PlayerId] = new RemoteCursor(cursor.MapId, cursor.X, cursor.Z, Time.realtimeSinceStartup);
@@ -293,6 +296,7 @@ internal static class Patch_MapInterface_SessionStatus
     private static void Postfix()
     {
         ChatSelfTest.Frame();
+        RWMLWC.Client.Absence.IdleAlarm.Frame();
         RWMLWC.Client.Net.NetworkGameMenu.Frame();
         StatusLineView.OnGUI();
     }
@@ -329,6 +333,7 @@ internal static class StatusLineView
         string line = SessionUi.StatusLine();
         if (line.Length == 0) return;
         if (SessionUi.Unread > 0) line += $" · чат: {SessionUi.Unread}";
+        line += RWMLWC.Client.Absence.IdleAlarm.StatusSuffix();
         Load();
         Text.Font = GameFont.Tiny;
         Vector2 size = Text.CalcSize(line);
