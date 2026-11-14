@@ -84,6 +84,18 @@ for ($c = 1; $c -le $Clients; $c++) {
     $dir = Join-Path $work "c$c"
     New-Item -ItemType Directory -Path (Join-Path $dir 'Saves'), (Join-Path $dir 'RWMLWC') | Out-Null
     Copy-Item (Join-Path $data 'Config') (Join-Path $dir 'Config') -Recurse
+    # Test runs are vanilla + DLC + Harmony + RWMLWC regardless of the mod list of the normal game (copy only).
+    $mc = Join-Path $dir 'Config\ModsConfig.xml'
+    $xml = [xml](Get-Content -LiteralPath $mc -Raw -Encoding UTF8)
+    $active = $xml.ModsConfigData.activeMods
+    foreach ($li in @($active.li)) {
+        if ($li -notmatch '^(brrainz\.harmony|ludeon\.rimworld(\..+)?)$') {
+            $node = $active.SelectNodes('li') | Where-Object { $_.InnerText -eq $li }
+            foreach ($n in @($node)) { [void]$active.RemoveChild($n) }
+        }
+    }
+    $add = $xml.CreateElement('li'); $add.InnerText = 'mikisnikirs.rwmlwc'; [void]$active.AppendChild($add)
+    $xml.Save($mc)
     Copy-Item -LiteralPath $saveFile (Join-Path $dir 'Saves\tst014.rws')
     $arm = @(
         'armed=1', 'save=tst014', "scenarios=$Scenario", "ticks=$Ticks", 'trace=0', 'quit=1',
