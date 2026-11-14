@@ -57,10 +57,8 @@ public static class TestAutomation
     private static string? pendingScenario;
     private static bool quitWhenDone;
     private static bool automationActive;
-    private static int designateAtTick = -1;
-
-    /// <summary>Через столько тиков после начала прогона сценарий designate отдаёт свои приказы.</summary>
-    private const int DesignateAfterTicks = 300;
+    // Шаги сценария, которые действуют как игрок: (тик, действие), по возрастанию тика.
+    private static readonly Queue<(int tick, string name, Action act)> sessionSteps = new Queue<(int, string, Action)>();
     private static byte[]? snapshotToApply;
     private static bool snapshotDone;
     private static bool reloadPending;
@@ -250,7 +248,19 @@ public static class TestAutomation
             Find.TickManager.CurTimeSpeed = TimeSpeed.Superfast;
         }
         activeConfig = cfg;
-        designateAtTick = cfg.scenario == "designate" && cfg.issuer ? startTick + DesignateAfterTicks : -1;
+        sessionSteps.Clear();
+        if (cfg.issuer && cfg.scenario == "designate")
+        {
+            sessionSteps.Enqueue((startTick + 300, "designate", ScenarioDesignate));
+        }
+        if (cfg.issuer && cfg.scenario == "gizmo")
+        {
+            sessionSteps.Enqueue((startTick + 300, "gizmo: draft", GizmoDraft));
+            sessionSteps.Enqueue((startTick + 400, "gizmo: forbid", GizmoForbid));
+            sessionSteps.Enqueue((startTick + 500, "gizmo: attack", GizmoAttack));
+            sessionSteps.Enqueue((startTick + 600, "gizmo: plant menu", GizmoPlantMenu));
+            sessionSteps.Enqueue((startTick + 700, "gizmo: menu option", GizmoMenuOption));
+        }
         snapshotDone = false;
         snapshotToApply = null;
         Note($"run started: #{cfg.queueIndex}, tick={startTick}, scenario={cfg.scenario}, ticks={cfg.ticks}, trace={cfg.trace}, quit={cfg.quit}, file={Path.GetFileName(hashFile)}");
@@ -294,7 +304,8 @@ public static class TestAutomation
                     ScenarioSecondMap(true);
                     break;
                 case "designate":
-                    break; // срабатывает позже, из кадра (SessionFrame): приказы идут как ввод игрока
+                case "gizmo":
+                    break; // срабатывают позже, из кадра (SessionFrame): приказы идут как ввод игрока
                 case "snap-save":
                 case "snap-reload":
                     break; // срабатывают позже, на тике snapat (BeforeTickDuringRun)
@@ -313,20 +324,106 @@ public static class TestAutomation
     /// <summary>Раз в кадр в сессии, между тиками: сценарии, которые действуют как игрок.</summary>
     public static void SessionFrame()
     {
-        if (designateAtTick < 0 || Current.Game == null || Find.TickManager.TicksGame < designateAtTick)
+        if (sessionSteps.Count == 0 || Current.Game == null || Find.TickManager.TicksGame < sessionSteps.Peek().tick)
         {
             return;
         }
-        designateAtTick = -1;
+        (int _, string name, Action act) = sessionSteps.Dequeue();
         try
         {
-            ScenarioDesignate();
+            act();
         }
         catch (Exception ex)
         {
-            Note("scenario 'designate' FAILED: " + ex);
-            Log.Error("[RWMLWC] сценарий designate упал: " + ex);
+            Note("step '" + name + "' FAILED: " + ex);
+            Log.Error("[RWMLWC] шаг сценария " + name + " упал: " + ex);
         }
+    }
+
+    // --- сценарий gizmo (T-021): нажатия кнопок выделенных объектов, приказ атаки, меню ---
+
+    private static Pawn? gizmoPawn;
+
+    private static void SelectOnly(object obj)
+    {
+        Find.Selector.ClearSelection();
+        Find.Selector.Select(obj, false, false);
+    }
+
+    private static void GizmoDraft()
+    {
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        gizmoPawn = map.mapPawns.FreeColonistsSpawned.OrderBy(p => p.thingIDNumber).FirstOrDefault();
+        if (gizmoPawn == null)
+        {
+            Note("gizmo: draft: no colonist");
+            return;
+        }
+        SelectOnly(gizmoPawn);
+        bool sent = GizmoCommands.SendClick(map, gizmoPawn, g => g is Command_Toggle toggle && toggle.hotKey == KeyBindingDefOf.Command_ColonistDraft);
+        Note($"gizmo: draft {gizmoPawn.LabelShort} (id {gizmoPawn.thingIDNumber}): sent={sent}");
+    }
+
+    private static void GizmoForbid()
+    {
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        Thing? item = map.listerThings.ThingsInGroup(ThingRequestGroup.HaulableEver)
+            .Where(t => t.Spawned && !t.Fogged() && t.TryGetComp<CompForbiddable>() != null)
+            .OrderBy(t => t.thingIDNumber).FirstOrDefault();
+        if (item == null)
+        {
+            Note("gizmo: forbid: no item");
+            return;
+        }
+        SelectOnly(item);
+        bool sent = GizmoCommands.SendClick(map, item, g => g is Command_Toggle toggle && toggle.hotKey == KeyBindingDefOf.Command_ItemForbid);
+        Note($"gizmo: forbid {item.LabelShort} (id {item.thingIDNumber}, forbidden before={item.IsForbidden(Faction.OfPlayer)}): sent={sent}");
+    }
+
+    private static void GizmoAttack()
+    {
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        Pawn? pawn = gizmoPawn;
+        if (pawn == null || !pawn.Spawned)
+        {
+            Note("gizmo: attack: no pawn");
+            return;
+        }
+        Pawn? prey = map.mapPawns.AllPawnsSpawned
+            .Where(p => p.RaceProps.Animal && p.Faction == null && !p.Fogged())
+            .OrderBy(p => p.Position.DistanceToSquared(pawn.Position)).ThenBy(p => p.thingIDNumber).FirstOrDefault();
+        Verb? verb = pawn.TryGetAttackVerb(prey);
+        if (prey == null || verb == null)
+        {
+            Note("gizmo: attack: no target or verb");
+            return;
+        }
+        SelectOnly(pawn);
+        int before = LockstepClient.CommandsSent;
+        // Тот же вызов, что делает прицел после щелчка по цели; в сессии он перехватывается.
+        verb.OrderForceTarget(new LocalTargetInfo(prey));
+        Note($"gizmo: attack {prey.LabelShort} (id {prey.thingIDNumber}) by {pawn.LabelShort}, drafted={pawn.Drafted}: sent={LockstepClient.CommandsSent - before}");
+    }
+
+    private static void GizmoPlantMenu()
+    {
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        Zone? zone = map.zoneManager.AllZones.Where(z => z is Zone_Growing).OrderBy(z => z.ID).FirstOrDefault();
+        if (zone == null)
+        {
+            Note("gizmo: plant menu: no growing zone in this save");
+            return;
+        }
+        SelectOnly(zone);
+        bool sent = GizmoCommands.SendClick(map, zone, g => g.GetType().Name.Contains("SetPlantToGrow"));
+        Note($"gizmo: plant menu of zone {zone.ID} ({((Zone_Growing)zone).GetPlantDefToGrow()?.defName}): sent={sent}");
+    }
+
+    private static void GizmoMenuOption()
+    {
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        bool sent = VirtualUi.TestChooseFirstOption(map);
+        Note($"gizmo: first menu option: sent={sent}");
     }
 
     // Те же вызовы, что делает интерфейс: в сессии они перехватываются и уходят командами (T-020).
@@ -379,6 +476,9 @@ public static class TestAutomation
         }
         foreach (Map map in Find.Maps)
         {
+            string plants = string.Join(",", map.zoneManager.AllZones.Where(z => z is Zone_Growing).OrderBy(z => z.ID)
+                .Select(z => ((Zone_Growing)z).GetPlantDefToGrow()?.defName ?? "-"));
+            Note($"summary: map{map.uniqueID} drafted={map.mapPawns.FreeColonistsSpawned.Count(p => p.Drafted)} forbidden={map.listerThings.ThingsInGroup(ThingRequestGroup.HaulableEver).Count(t => t.IsForbidden(Faction.OfPlayer))} plants=[{plants}]");
             Note($"summary: map{map.uniqueID} designations={map.designationManager.AllDesignations.Count} blueprints={map.listerThings.ThingsInGroup(ThingRequestGroup.Blueprint).Count} zones={map.zoneManager.AllZones.Count}; commands sent={LockstepClient.CommandsSent} executed={CommandBus.Executed} failed={CommandBus.Failed}");
         }
     }
