@@ -177,6 +177,14 @@ for ($c = 1; $c -le $Clients; $c++) {
 Write-Host '--- server (tail)'
 Get-Content (Join-Path $dest 'server-out.txt') -ErrorAction SilentlyContinue | Select-Object -Last 12
 
+$failedLines = @()
+for ($c = 1; $c -le $Clients; $c++) {
+    $failedLines += @(Get-Content (Join-Path (Join-Path $dest "c$c") 'automation-log.txt') -ErrorAction SilentlyContinue | Select-String -CaseSensitive 'FAILED|LATE' | ForEach-Object { "c$c " + $_.Line })
+}
+if ($failedLines.Count -gt 0) {
+    Write-Host "`nRUN PROBLEMS:" -ForegroundColor Yellow
+    $failedLines | ForEach-Object { Write-Host $_ -ForegroundColor Yellow }
+}
 if ($timedOut) { Write-Host "`nTIMED OUT: the game did not close itself; it was stopped." -ForegroundColor Yellow }
 Write-Host "`nDONE. Results: $dest" -ForegroundColor Green
 Write-Host 'Tell the agent: gotovo.'

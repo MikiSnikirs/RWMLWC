@@ -64,6 +64,9 @@ public static class CommandBus
 
     public static int Failed { get; private set; }
 
+    /// <summary>Исполнено команд этого игрока (его собственных) — для проверки, что прогон их дождался.</summary>
+    public static int ExecutedOwn { get; private set; }
+
     /// <summary>Действие игрока надо перехватить: идёт сессия, это не исполнение команды и не тик симуляции.</summary>
     public static bool CaptureActive => LockstepClient.InSession && !Executing && !MapRandContext.InTick;
 
@@ -73,6 +76,7 @@ public static class CommandBus
         ExecutingRemote = false;
         Context = null;
         Executed = 0;
+        ExecutedOwn = 0;
         Failed = 0;
         VirtualUi.Reset();
     }
@@ -187,6 +191,10 @@ public static class CommandBus
                     break;
             }
             Executed++;
+            if (own)
+            {
+                ExecutedOwn++;
+            }
         }
         catch (Exception ex)
         {
