@@ -468,10 +468,11 @@ public class SessionTests
         var (s, _) = NewSession();
         TestClient a = Join(s, "A");
         TestClient b = Join(s, "B");
-        int red = PlayerColors.Palette[0], green = PlayerColors.Palette[1];
+        int red = 0xE53935, green = 0x43A047;
         a.Conn.Send(new ChooseColorMessage { Color = red });
         b.Conn.Send(new ChooseColorMessage { Color = red });       // занят
-        b.Conn.Send(new ChooseColorMessage { Color = 0x123456 });  // не из палитры
+        b.Conn.Send(new ChooseColorMessage { Color = PlayerColors.None });  // «нет цвета» выбрать нельзя
+        b.Conn.Send(new ChooseColorMessage { Color = 0x1000000 });          // не RGB
         b.Conn.Send(new ChooseColorMessage { Color = green });
         Step(s, 10, a, b);
         Assert.Contains(b.Received, m => m is NoticeMessage n && n.Code == NoticeCode.ColorTaken);

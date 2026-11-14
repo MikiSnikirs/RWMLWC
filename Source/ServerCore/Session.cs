@@ -174,8 +174,8 @@ public sealed class Session
         /// <summary>До какого тика игрок точно дошёл: Welcome с миром, SnapshotApplied, последний присланный хеш.</summary>
         public int LastTick { get; internal set; }
 
-        /// <summary>Цвет 0xRRGGBB из палитры (v5); -1 — не выбран. Сохраняется при переподключении, как имя.</summary>
-        public int Color { get; internal set; } = -1;
+        /// <summary>Цвет 0xRRGGBB (v5); 0 — не выбран. Сохраняется при переподключении, как имя.</summary>
+        public int Color { get; internal set; } = PlayerColors.None;
 
         /// <summary>Когда (часы сессии, мс) пересылались курсоры игрока за последнюю секунду — для ограничения частоты.</summary>
         internal Queue<double> CursorTimes { get; } = new();
@@ -874,12 +874,12 @@ public sealed class Session
         _log($"игроку {player.Id} отдан мир с сервера: тик {latest.Tick}, {data.Length} байт, {count} кусков");
     }
 
-    /// <summary>Цвет игрока (v5): только из палитры и не занятый другим игроком этой сессии (в сети или нет).</summary>
+    /// <summary>Цвет игрока (v5): любой 0xRRGGBB, не занятый другим игроком этой сессии (в сети или нет).</summary>
     private void ChooseColor(Player player, int color)
     {
         if (!PlayerColors.IsValid(color))
         {
-            _log($"игрок {player.Id}: цвет {color:X6} не из палитры — отклонён");
+            _log($"игрок {player.Id}: цвет {color:X} недопустим — отклонён");
             return;
         }
         Player? owner = _players.FirstOrDefault(p => p != player && p.Color == color);

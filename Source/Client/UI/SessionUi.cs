@@ -74,29 +74,30 @@ public static class SessionUi
     /// <summary>Последние курсоры других игроков по номеру игрока. Рисует их T-050 (агент A).</summary>
     public static readonly Dictionary<int, RemoteCursor> Cursors = new();
 
-    /// <summary>Цвет игрока 0xRRGGBB или -1, если не выбран.</summary>
+    /// <summary>Цвет игрока 0xRRGGBB или PlayerColors.None (0), если не выбран.</summary>
     public static int ColorOf(int playerId)
     {
         foreach (PlayerInfo p in _players)
             if (p.PlayerId == playerId) return p.Color;
-        return -1;
+        return PlayerColors.None;
     }
 
     public static Color ToUnityColor(int rgb) =>
-        rgb < 0 ? Color.gray : new Color(((rgb >> 16) & 0xFF) / 255f, ((rgb >> 8) & 0xFF) / 255f, (rgb & 0xFF) / 255f);
+        rgb == PlayerColors.None ? Color.gray : new Color(((rgb >> 16) & 0xFF) / 255f, ((rgb >> 8) & 0xFF) / 255f, (rgb & 0xFF) / 255f);
 
-    private static float _lastCursorSent = -1f;
+    private static float _lastCursorSent = -100f;
     private static (int map, float x, float z) _lastCursor = (int.MinValue, 0, 0);
 
     /// <summary>
-    /// Отправить свой курсор (для T-050): не чаще 10 раз в секунду и только если он сдвинулся.
+    /// Отправить свой курсор (для T-050): не чаще 10 раз в секунду; при сдвиге больше 0,1 клетки или раз в 2 с.
     /// mapId = <see cref="CursorMessage.NoCursor"/> — курсора нет (смотрю не на карту).
     /// </summary>
     public static void SendCursor(int mapId, float x, float z)
     {
         float now = Time.realtimeSinceStartup;
         if (now - _lastCursorSent < 1f / ProtocolLimits.MaxCursorsPerSecond) return;
-        if (_lastCursor.map == mapId && Mathf.Abs(_lastCursor.x - x) < 0.05f && Mathf.Abs(_lastCursor.z - z) < 0.05f) return;
+        bool moved = _lastCursor.map != mapId || Mathf.Abs(_lastCursor.x - x) > 0.1f || Mathf.Abs(_lastCursor.z - z) > 0.1f;
+        if (!moved && now - _lastCursorSent < 2f) return;
         if (LockstepClient.TrySend(new CursorMessage { MapId = mapId, X = x, Z = z }))
         {
             _lastCursorSent = now;
@@ -320,7 +321,7 @@ internal static class StatusLineView
     {
         // Первый вход в сессию: цвет ещё не выбран — предложить выбрать (T-064).
         if (!LockstepClient.InSession) _colorAsked = false;
-        else if (!_colorAsked && !TestAutomation.AutomationActive && SessionUi.Players.Any(p => p.PlayerId == LockstepClient.PlayerId) && SessionUi.ColorOf(LockstepClient.PlayerId) < 0)
+        else if (!_colorAsked && !TestAutomation.AutomationActive && SessionUi.Players.Any(p => p.PlayerId == LockstepClient.PlayerId) && SessionUi.ColorOf(LockstepClient.PlayerId) == PlayerColors.None)
         {
             _colorAsked = true;
             Find.WindowStack.Add(new Dialog_ChooseColor());
@@ -429,14 +430,14 @@ internal static class ChatSelfTest
         {
             _sent++;
             // Оба выбирают один и тот же цвет: второй получит отказ и возьмёт следующий.
-            SessionUi.ChooseColor(PlayerColors.Palette[0]);
-            Write("color: asked " + PlayerColors.Palette[0].ToString("X6"));
+            SessionUi.ChooseColor(RWMLWC.Client.Maps.Squads.Palette[0]);
+            Write("color: asked " + RWMLWC.Client.Maps.Squads.Palette[0].ToString("X6"));
         }
-        if (_sent == 3 && ms > 7000 && SessionUi.ColorOf(LockstepClient.PlayerId) < 0)
+        if (_sent == 3 && ms > 7000 && SessionUi.ColorOf(LockstepClient.PlayerId) == PlayerColors.None)
         {
             _sent++;
-            SessionUi.ChooseColor(PlayerColors.Palette[1]);
-            Write("color: first was taken, asked " + PlayerColors.Palette[1].ToString("X6"));
+            SessionUi.ChooseColor(RWMLWC.Client.Maps.Squads.Palette[1]);
+            Write("color: first was taken, asked " + RWMLWC.Client.Maps.Squads.Palette[1].ToString("X6"));
         }
         if (ms > 6000) SessionUi.SendCursor(0, 10f + (ms / 100 % 50), 20f + LockstepClient.PlayerId);
         if (ms < _nextLogMs) return;
@@ -496,9 +497,10 @@ public class Dialog_ChooseColor : Window
         const float size = 44f, gap = 8f;
         float x = inRect.x, y = inRect.y + 66f;
         int perRow = Mathf.Max(1, (int)((inRect.width + gap) / (size + gap)));
-        for (int i = 0; i < PlayerColors.Palette.Length; i++)
+        int[] palette = RWMLWC.Client.Maps.Squads.Palette; // та же палитра, что у отрядов
+        for (int i = 0; i < palette.Length; i++)
         {
-            int rgb = PlayerColors.Palette[i];
+            int rgb = palette[i];
             var r = new Rect(x + (i % perRow) * (size + gap), y + (i / perRow) * (size + gap), size, size);
             PlayerInfo? owner = SessionUi.Players.Where(p => p.Color == rgb && p.PlayerId != LockstepClient.PlayerId).Select(p => (PlayerInfo?)p).FirstOrDefault();
             Widgets.DrawBoxSolid(r, SessionUi.ToUnityColor(rgb));

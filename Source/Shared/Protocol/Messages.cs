@@ -610,9 +610,9 @@ public sealed class SnapshotAppliedMessage : Message
 /// <summary>Игрок сессии в сообщении <see cref="PlayersMessage"/>.</summary>
 /// <summary>
 /// <paramref name="PingMs"/> — время туда-обратно до сервера в мс; -1 — ещё не измерено или игрок не в сети.
-/// <paramref name="Color"/> — цвет игрока 0xRRGGBB (v5); -1 — ещё не выбран.
+/// <paramref name="Color"/> — цвет игрока 0xRRGGBB (v5); 0 — ещё не выбран.
 /// </summary>
-public readonly record struct PlayerInfo(int PlayerId, string Name, bool Online, int PingMs, int Color = -1);
+public readonly record struct PlayerInfo(int PlayerId, string Name, bool Online, int PingMs, int Color = PlayerColors.None);
 
 /// <summary>
 /// Сервер → клиентам: состав сессии (v3). Все игроки, которые когда-либо входили, по возрастанию номера:
@@ -698,29 +698,17 @@ public sealed class ChatMessage : Message
     internal static ChatMessage Read(ref PacketReader r) => new() { PlayerId = r.ReadInt32(), Text = r.ReadString() };
 }
 
-/// <summary>Палитра цветов игроков (v5): хорошо различимые цвета 0xRRGGBB. Сервер принимает только их.</summary>
+/// <summary>Цвета игроков (v5).</summary>
 public static class PlayerColors
 {
-    public static readonly int[] Palette =
-    {
-        0xE6194B, // красный
-        0x3CB44B, // зелёный
-        0x4363D8, // синий
-        0xFFE119, // жёлтый
-        0xF58231, // оранжевый
-        0x911EB4, // фиолетовый
-        0x42D4F4, // голубой
-        0xF032E6, // розовый
-        0xBFEF45, // салатовый
-        0xFABED4, // светло-розовый
-        0x469990, // бирюзовый
-        0xFFFFFF, // белый
-    };
+    /// <summary>Цвет не выбран: клиент рисует серым.</summary>
+    public const int None = 0;
 
-    public static bool IsValid(int color) => Array.IndexOf(Palette, color) >= 0;
+    /// <summary>Допустимый цвет: 0xRRGGBB, не <see cref="None"/>.</summary>
+    public static bool IsValid(int color) => color > 0 && color <= 0xFFFFFF;
 }
 
-/// <summary>Клиент → сервер (v5): выбрать свой цвет из <see cref="PlayerColors.Palette"/>. Ответ — новый <c>Players</c> или <c>Notice ColorTaken</c>.</summary>
+/// <summary>Клиент → сервер (v5): выбрать свой цвет 0xRRGGBB (палитра — у клиента). Ответ — новый <c>Players</c> или <c>Notice ColorTaken</c>.</summary>
 public sealed class ChooseColorMessage : Message
 {
     public override MessageType Type => MessageType.ChooseColor;
