@@ -13,7 +13,7 @@ public class ProtocolRoundTripTests
     public static IEnumerable<object[]> AllMessages()
     {
         yield return new object[] { new HelloMessage { GameVersion = "1.7.5005", PlayerName = "Игрок ✓", ModListHash = 0xFEDCBA9876543210 } };
-        yield return new object[] { new WelcomeMessage { PlayerId = 2, ServerTick = int.MaxValue } };
+        yield return new object[] { new WelcomeMessage { PlayerId = 2, ServerTick = int.MaxValue, SessionSeed = 0x9E3779B1 } };
         yield return new object[] { new RejectMessage { Reason = RejectReason.ModListMismatch, Detail = "Разный список модов" } };
         yield return new object[] { new CommandMessage { ClientSeq = 7, MapId = 3, Kind = 42, Payload = new byte[] { 0, 1, 2, 255 } } };
         yield return new object[] { new CommandMessage { ClientSeq = 1, MapId = ProtocolIds.WorldMapId, Kind = 0 } };
