@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Threading.Tasks;
 using HarmonyLib;
 using RimWorld;
+using RWMLWC.Client.Input;
 using RWMLWC.Net;
 using RWMLWC.Shared;
 using RWMLWC.Shared.Protocol;
@@ -20,7 +21,10 @@ namespace RWMLWC.Client.Sim;
 /// Скорость и пауза — у сервера: нажатия игрока превращаются в SpeedRequest, а действует то,
 /// что пришло в сообщении Tick (правило меньшей скорости считает сервер).
 ///
-/// Первая версия. Нет: исполнения команд игроков (T-020+), переподключения, догона (T-045),
+/// Команды игроков (T-020): SendCommand отправляет действие серверу; пришедшие в общем порядке
+/// команды (CommandOrdered) исполняются между тиками — команда с Tick = T после тика T и до тика T+1.
+///
+/// Нет: переподключения, догона (T-045),
 /// реакции на рассинхронизацию (T-034).
 /// </summary>
 public static class LockstepClient
@@ -47,7 +51,11 @@ public static class LockstepClient
     private static byte serverSpeed;
     private static int sentSpeed = -1;
     private static bool applyingServerSpeed;
-    private static int commandsIgnored;
+    private static int nextClientSeq = 1;
+    private static readonly Queue<CommandOrderedMessage> pendingCommands = new Queue<CommandOrderedMessage>();
+
+    /// <summary>Сколько команд этот клиент отправил серверу.</summary>
+    public static int CommandsSent => nextClientSeq - 1;
     private static readonly Stopwatch frameClock = new Stopwatch();
     private static readonly Stopwatch holdClock = new Stopwatch();
     private static int heldSpeed = -1;
@@ -91,7 +99,9 @@ public static class LockstepClient
         sentSpeed = -1;
         heldSpeed = -1;
         holdClock.Reset();
-        commandsIgnored = 0;
+        nextClientSeq = 1;
+        pendingCommands.Clear();
+        CommandBus.Reset();
         connecting = QuicTransport.ConnectAsync(host, port, certThumbprintSha256);
         state = State.Connecting;
         TestAutomation.Note($"lockstep: connecting to {host}:{port} as '{name}'");
@@ -147,6 +157,9 @@ public static class LockstepClient
                 GameVersion = VersionControl.CurrentVersionStringWithRev,
                 PlayerName = playerName,
                 ModListHash = ModListHash(),
+                // Версия локальной копии сейва (контракт v2): мир и тик, на котором стоит игра.
+                SaveWorldId = Current.Game != null ? unchecked((uint)Find.World.info.persistentRandomValue) : 0UL,
+                SaveTick = Current.Game != null ? tickManager.TicksGame : 0,
             });
             state = State.WaitingWelcome;
             TestAutomation.Note("lockstep: connected to " + connection.Remote + ", Hello sent");
@@ -179,6 +192,7 @@ public static class LockstepClient
 
         if (state == State.InSession)
         {
+            TestAutomation.SessionFrame();
             if (heldSpeed >= 0 && !Holding)
             {
                 int speed = heldSpeed;
@@ -236,8 +250,13 @@ public static class LockstepClient
                 }
                 break;
 
-            case CommandOrderedMessage:
-                commandsIgnored++; // исполнение команд — T-020 и дальше
+            case CommandOrderedMessage ordered:
+                pendingCommands.Enqueue(ordered);
+                break;
+
+            case CommandRejectedMessage rejected:
+                TestAutomation.Note($"lockstep: command #{rejected.ClientSeq} REJECTED on map {rejected.MapId}: need {rejected.Required}, have {rejected.Had}");
+                Messages.Message("RWMLWC: нет прав на это действие на этой карте", MessageTypeDefOf.RejectInput, false);
                 break;
 
             default:
@@ -245,8 +264,45 @@ public static class LockstepClient
         }
     }
 
+    /// <summary>Отправить команду игрока серверу. Исполнится у всех, когда вернётся в общем порядке.</summary>
+    public static int SendCommand(int mapId, int kind, PermissionLevel required, byte[] payload)
+    {
+        IConnection? conn = connection;
+        if (state != State.InSession || conn == null)
+        {
+            return -1;
+        }
+        int clientSeq = nextClientSeq++;
+        conn.Send(new CommandMessage
+        {
+            ClientSeq = clientSeq,
+            MapId = mapId,
+            Kind = kind,
+            Required = required,
+            Payload = payload,
+        });
+        return clientSeq;
+    }
+
+    // Команда с Tick = T исполняется, когда тик T завершён (TicksGame == T), до тика T+1.
+    private static void ExecuteDueCommands(TickManager tickManager)
+    {
+        while (pendingCommands.Count > 0 && pendingCommands.Peek().Tick <= tickManager.TicksGame && state == State.InSession)
+        {
+            CommandOrderedMessage command = pendingCommands.Dequeue();
+            if (command.Tick < tickManager.TicksGame)
+            {
+                // Сервер обещает прислать команду раньше разрешения на следующий тик; сюда попадать не должны.
+                TestAutomation.Note($"lockstep: command #{command.Seq} is LATE: tick {command.Tick}, game {tickManager.TicksGame}");
+            }
+            CommandBus.Execute(command);
+        }
+    }
+
     private static void RunTicks(TickManager tickManager)
     {
+        // Команды, пришедшие, пока игра стоит на этом тике (в том числе на паузе).
+        ExecuteDueCommands(tickManager);
         if (tickManager.TicksGame >= tickUpTo)
         {
             return;
@@ -261,6 +317,8 @@ public static class LockstepClient
             {
                 SendHashes(tickManager.TicksGame);
             }
+            // Порядок у всех клиентов один: тик T, хеш тика T, команды тика T.
+            ExecuteDueCommands(tickManager);
             if (state != State.InSession || frameClock.ElapsedMilliseconds > FrameBudgetMs)
             {
                 break;
