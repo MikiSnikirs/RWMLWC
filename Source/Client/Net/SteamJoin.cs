@@ -81,21 +81,30 @@ public static class SteamJoin
     internal static void ClearStatus() => SetStatus("");
 }
 
-/// <summary>Окно «Подключиться по SteamID». Сейв у игроков должен быть один и тот же (до T-045).</summary>
+/// <summary>
+/// Окно «Подключиться по SteamID». Из главного меню мир приходит от хоста снимком (T-045);
+/// из загруженной игры — у обоих должен быть тот же сейв.
+/// </summary>
 public class Dialog_SteamJoin : Window
 {
     private string _input = "";
     private bool _started;
 
-    public override Vector2 InitialSize => new Vector2(520f, 260f);
+    public override Vector2 InitialSize => new Vector2(520f, 270f);
 
-    public Dialog_SteamJoin()
+    public Dialog_SteamJoin(ulong hostSteamId = 0, bool autoStart = false)
     {
         doCloseX = true;
         closeOnClickedOutside = false;
         absorbInputAroundWindow = true;
         forcePause = false;
         SteamJoin.ClearStatus();
+        if (hostSteamId != 0) _input = hostSteamId.ToString();
+        if (autoStart && hostSteamId != 0 && SteamNet.Available && LockstepClient.CurrentState == LockstepClient.State.Off)
+        {
+            _started = true;
+            SteamJoin.Start(hostSteamId);
+        }
     }
 
     public override void DoWindowContents(Rect inRect)
@@ -105,7 +114,9 @@ public class Dialog_SteamJoin : Window
         Text.Font = GameFont.Medium;
         list.Label("Подключиться к другу через Steam");
         Text.Font = GameFont.Small;
-        list.Label("SteamID64 хоста (17 цифр) или ссылка на его профиль. У обоих должен быть загружен один и тот же сейв.");
+        list.Label(Current.ProgramState == ProgramState.Entry
+            ? "SteamID64 хоста (17 цифр) или ссылка на его профиль. Мир загрузится от хоста."
+            : "SteamID64 хоста (17 цифр) или ссылка на его профиль. Из загруженной игры у обоих должен быть один и тот же сейв; проще подключаться из главного меню.");
         _input = list.TextEntry(_input);
 
         bool valid = SteamJoin.TryParseSteamId(_input, out ulong id);
@@ -140,7 +151,7 @@ public class Dialog_SteamJoin : Window
 
 internal static class SteamJoinDebug
 {
-    [DebugAction("RWMLWC", "Join session by SteamID", allowedGameStates = AllowedGameStates.Playing)]
+    [DebugAction("RWMLWC", "Join session by SteamID", allowedGameStates = AllowedGameStates.Entry | AllowedGameStates.Playing)]
     private static void Join()
     {
         if (LockstepClient.CurrentState != LockstepClient.State.Off)
