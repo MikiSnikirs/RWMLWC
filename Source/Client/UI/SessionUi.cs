@@ -9,7 +9,7 @@ using UnityEngine;
 using Verse;
 using Message = RWMLWC.Shared.Protocol.Message;
 
-namespace RWMLWC.Client.UI;
+namespace RWMLWC.Client.SessionView;
 
 /// <summary>
 /// Чат и состояние подключения (T-025). Получает от <see cref="LockstepClient"/> сообщения, которые
@@ -223,7 +223,7 @@ internal static class Patch_MapInterface_SessionStatus
         if (SessionUi.Unread > 0) line += $" · чат: {SessionUi.Unread}";
         Text.Font = GameFont.Tiny;
         Vector2 size = Text.CalcSize(line);
-        Rect r = new Rect(Verse.UI.screenWidth - size.x - 12f, Verse.UI.screenHeight - 35f - 80f - size.y, size.x + 8f, size.y + 2f);
+        Rect r = new Rect(UI.screenWidth - size.x - 12f, UI.screenHeight - 35f - 80f - size.y, size.x + 8f, size.y + 2f);
         Widgets.DrawBoxSolid(r, new Color(0f, 0f, 0f, 0.45f));
         Text.Anchor = TextAnchor.MiddleCenter;
         Widgets.Label(r, line);
