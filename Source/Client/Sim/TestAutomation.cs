@@ -387,6 +387,21 @@ public static class TestAutomation
                 RWMLWC.Client.Maps.Squads.AssignPawns(map, 2, map.mapPawns.FreeColonistsSpawned.OrderBy(p => p.thingIDNumber).Take(1)))));
             sessionSteps.Enqueue((startTick + 900, "squads: digest before reload", () => SquadsStep(map => { })));
             sessionSteps.Enqueue((startTick + 1000, "squads: common snapshot", () => { Note("squads: requesting a common snapshot"); LockstepClient.RequestCommonSnapshot(); }));
+            // TST-060, ч. 2 (T-061): после снимка у c1 — отряд «Альфа» без пешек, пешки первого и второго
+            // колонистов в «Бете» (участник c2), третий колонист общий.
+            // Шаги ждут, пока у c1 исполнятся его же команды об отрядах (команды отстающего клиента
+            // встают в общий порядок позже, чем он их отдал).
+            stepGates["squads: draft foreign via UI"] = () =>
+            {
+                Map m = Find.CurrentMap ?? Find.Maps[0];
+                Pawn? first = m.mapPawns.FreeColonistsSpawned.OrderBy(p => p.thingIDNumber).FirstOrDefault();
+                RWMLWC.Client.Maps.Squad? squad = first == null ? null : RWMLWC.Client.Maps.Squads.Component?.SquadOf(first.thingIDNumber);
+                return squad != null && squad.id == 2 && !squad.players.Contains(LockstepClient.PlayerId);
+            };
+            sessionSteps.Enqueue((startTick + 1300, "squads: draft foreign via UI", () => SquadDraft(0, false)));
+            sessionSteps.Enqueue((startTick + 1400, "squads: draft foreign bypassing UI", () => SquadDraft(0, true)));
+            sessionSteps.Enqueue((startTick + 1600, "squads: draft common pawn", () => SquadDraft(2, false)));
+            sessionSteps.Enqueue((startTick + 1800, "squads: work of foreign bypassing UI", SquadForeignWork));
         }
         if (cfg.issuer && cfg.scenario == "gizmo")
         {
@@ -872,6 +887,54 @@ public static class TestAutomation
         Find.Selector.Select(obj, false, false);
     }
 
+    private static void SquadDraft(int colonistIndex, bool bypass)
+    {
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        Pawn? pawn = map.mapPawns.FreeColonistsSpawned.OrderBy(p => p.thingIDNumber).Skip(colonistIndex).FirstOrDefault();
+        if (pawn == null)
+        {
+            Note("squads: draft: no colonist #" + colonistIndex);
+            return;
+        }
+        SelectOnly(pawn);
+        RWMLWC.Client.Maps.SquadRules.BypassLocalCheck = bypass;
+        int before = LockstepClient.PlayerCommandsSent;
+        try
+        {
+            bool sent = GizmoCommands.SendClick(map, pawn, g => g is Command_Toggle toggle && toggle.hotKey == KeyBindingDefOf.Command_ColonistDraft);
+            Note($"squads: draft {pawn.LabelShort} (id {pawn.thingIDNumber}, bypass={bypass}): click={sent}, commands sent={LockstepClient.PlayerCommandsSent - before}");
+        }
+        finally
+        {
+            RWMLWC.Client.Maps.SquadRules.BypassLocalCheck = false;
+        }
+    }
+
+    private static void SquadForeignWork()
+    {
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        Pawn? pawn = map.mapPawns.FreeColonistsSpawned.OrderBy(p => p.thingIDNumber).Skip(1).FirstOrDefault();
+        WorkTypeDef? work = pawn == null || pawn.workSettings == null ? null
+            : DefDatabase<WorkTypeDef>.AllDefsListForReading.OrderBy(w => w.defName).FirstOrDefault(w => !pawn.WorkTypeIsDisabled(w));
+        if (pawn == null || work == null)
+        {
+            Note("squads: work: no colonist or work type");
+            return;
+        }
+        int before = pawn.workSettings!.GetPriority(work);
+        int sentBefore = LockstepClient.PlayerCommandsSent;
+        RWMLWC.Client.Maps.SquadRules.BypassLocalCheck = true;
+        try
+        {
+            pawn.workSettings.SetPriority(work, before == 0 ? 3 : 0);
+        }
+        finally
+        {
+            RWMLWC.Client.Maps.SquadRules.BypassLocalCheck = false;
+        }
+        Note($"squads: work {work.defName} of {pawn.LabelShort} (id {pawn.thingIDNumber}) {before} -> {(before == 0 ? 3 : 0)} bypassing UI, commands sent={LockstepClient.PlayerCommandsSent - sentBefore}");
+    }
+
     private static void SquadsStep(Action<Map> act)
     {
         Map map = Find.CurrentMap ?? Find.Maps[0];
@@ -1060,7 +1123,8 @@ public static class TestAutomation
                 Note($"camera: this client moved its camera {cameraJumps} times during the run");
             }
             Note($"summary: map{map.uniqueID} settings={SettingsDigest(map)}");
-            Note("summary: squads=" + (RWMLWC.Client.Maps.Squads.Component?.Digest() ?? "-"));
+            Note("summary: squads=" + (RWMLWC.Client.Maps.Squads.Component?.Digest() ?? "-") + " rejected=" + RWMLWC.Client.Maps.SquadRules.Rejected
+                + " drafted=[" + string.Join(",", map.mapPawns.FreeColonistsSpawned.Where(p => p.Drafted).Select(p => p.thingIDNumber).OrderBy(i => i)) + "]");
             Note($"summary: map{map.uniqueID} designations={map.designationManager.AllDesignations.Count} blueprints={map.listerThings.ThingsInGroup(ThingRequestGroup.Blueprint).Count} zones={map.zoneManager.AllZones.Count}; commands sent={LockstepClient.CommandsSent} executed={CommandBus.Executed} failed={CommandBus.Failed}");
         }
     }
