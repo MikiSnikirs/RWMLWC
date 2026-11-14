@@ -87,6 +87,16 @@ function Wait-GuardingFocus([double]$Seconds) {
     do { [RwmlwcQuiet]::Guard(); Start-Sleep -Milliseconds 100 } while ((Get-Date) -lt $until)
 }
 
+# A fullscreen game of the person minimizes on any focus loss, and a starting RimWorld takes focus for a moment.
+# So test instances do not start while one of these processes runs (user variable RWMLWC_TEST_BLOCKERS,
+# comma-separated process names; default: dota2). Returns the names found, empty when it is safe to start.
+function Get-GameBlockers {
+    $list = [Environment]::GetEnvironmentVariable('RWMLWC_TEST_BLOCKERS', 'User')
+    if (-not $list) { $list = $env:RWMLWC_TEST_BLOCKERS }
+    if (-not $list) { $list = 'dota2' }
+    return @($list.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ -and (Get-Process -Name $_ -ErrorAction SilentlyContinue) })
+}
+
 function Start-GameQuiet([string]$Exe, [string]$Arguments, [string]$WorkDir) {
     $id = [RwmlwcQuiet]::Start($Exe, $Arguments, $WorkDir)
     return Get-Process -Id $id
