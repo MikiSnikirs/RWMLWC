@@ -106,7 +106,7 @@ for ($c = 1; $c -le $Clients; $c++) {
     }
     $arm = @(
         'armed=1', $saveLine, "scenarios=$armScenario", "ticks=$armTicks", 'trace=0', 'quit=1',
-        "server=127.0.0.1:$port", "thumbprint=$thumb", "name=c$c", "holdsec=$armHold", "issuer=$(if ($c -eq 1) { 1 } else { 0 })"
+        "server=127.0.0.1:$port", "thumbprint=$thumb", "name=c$c", "holdsec=$armHold", "issuer=$(if ($c -eq 1) { 1 } else { 0 })", "camera=$(if ($c -eq 2) { 1 } else { 0 })"
     ) + $extra
     [IO.File]::WriteAllLines((Join-Path $dir 'RWMLWC\arm-determinism-run.txt'), $arm)
     [IO.File]::WriteAllText((Join-Path $dir 'RWMLWC\automation-progress.txt'), '0')

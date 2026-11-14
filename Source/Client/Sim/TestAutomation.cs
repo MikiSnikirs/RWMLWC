@@ -53,6 +53,7 @@ public static class TestAutomation
         public int holdSec;
         public bool issuer;
         public bool snapSender;
+        public bool cameraWander;
         public bool desync;
         public int connectDelaySec;
         public bool quit;
@@ -178,6 +179,9 @@ public static class TestAutomation
                     break;
                 case "desync":
                     cfg.desync = value == "1";
+                    break;
+                case "camera":
+                    cfg.cameraWander = value == "1";
                     break;
                 case "snapsender":
                     cfg.snapSender = value == "1";
@@ -405,9 +409,37 @@ public static class TestAutomation
         }
     }
 
+    // Камера этого клиента «гуляет»: раз в 150 тиков прыгает в случайное место карты и меняет приближение.
+    // У двух экземпляров игры на одной машине камеры иначе одинаковы, и зависимость симуляции
+    // от камеры (docs/research/sim.md, 6з) такой тест не поймал бы.
+    private static readonly System.Random cameraRandom = new System.Random();
+    private static int nextCameraJumpTick;
+    private static int cameraJumps;
+
+    private static void WanderCamera()
+    {
+        Config? cfg = activeConfig;
+        if (cfg == null || !cfg.cameraWander || Current.Game == null || Find.CurrentMap == null)
+        {
+            return;
+        }
+        int tick = Find.TickManager.TicksGame;
+        if (tick < nextCameraJumpTick)
+        {
+            return;
+        }
+        nextCameraJumpTick = tick + 150;
+        Map map = Find.CurrentMap;
+        IntVec3 cell = new IntVec3(cameraRandom.Next(5, map.Size.x - 5), 0, cameraRandom.Next(5, map.Size.z - 5));
+        float size = 11f + (float)cameraRandom.NextDouble() * 49f;
+        Find.CameraDriver.SetRootPosAndSize(cell.ToVector3Shifted(), size);
+        cameraJumps++;
+    }
+
     /// <summary>Раз в кадр в сессии, между тиками: сценарии, которые действуют как игрок.</summary>
     public static void SessionFrame()
     {
+        WanderCamera();
         if (sessionSteps.Count == 0 || Current.Game == null || Find.TickManager.TicksGame < sessionSteps.Peek().tick)
         {
             return;
@@ -936,6 +968,10 @@ public static class TestAutomation
             string jobs = string.Join(",", map.mapPawns.FreeColonistsSpawned.OrderBy(p => p.thingIDNumber)
                 .Select(p => p.thingIDNumber + ":" + (p.CurJobDef != null ? p.CurJobDef.defName : "-") + "@" + p.Position));
             Note($"summary: map{map.uniqueID} jobs=[{jobs}]");
+            if (cameraJumps > 0)
+            {
+                Note($"camera: this client moved its camera {cameraJumps} times during the run");
+            }
             Note($"summary: map{map.uniqueID} settings={SettingsDigest(map)}");
             Note($"summary: map{map.uniqueID} designations={map.designationManager.AllDesignations.Count} blueprints={map.listerThings.ThingsInGroup(ThingRequestGroup.Blueprint).Count} zones={map.zoneManager.AllZones.Count}; commands sent={LockstepClient.CommandsSent} executed={CommandBus.Executed} failed={CommandBus.Failed}");
         }
