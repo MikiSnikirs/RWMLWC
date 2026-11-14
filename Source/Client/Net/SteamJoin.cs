@@ -150,7 +150,9 @@ public class Dialog_SteamJoin : Window
             string line = st switch
             {
                 LockstepClient.State.InSession => "В сессии, игрок " + LockstepClient.PlayerId + ". Окно можно закрыть.",
-                LockstepClient.State.Off => "Подключение не состоялось. " + SteamJoin.Status + " Подробности — в логе игры (строки RWMLWC).",
+                LockstepClient.State.Off => LockstepClient.LastReject.Length > 0
+                    ? "Хост отказал: " + LockstepClient.LastReject + "."
+                    : "Подключение не состоялось. " + SteamJoin.Status + " Подробности — в логе игры (строки RWMLWC).",
                 _ => SteamJoin.Status,
             };
             list.Label(line);

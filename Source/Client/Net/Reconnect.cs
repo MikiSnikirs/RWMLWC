@@ -135,7 +135,9 @@ public class Dialog_Reconnect : Window
             list.Label(st switch
             {
                 LockstepClient.State.InSession => "Снова в сессии. Окно можно закрыть.",
-                LockstepClient.State.Off => "Не получилось. Сервер или друг недоступен — попробуйте ещё раз позже.",
+                LockstepClient.State.Off => LockstepClient.LastReject.Length > 0
+                    ? "Отказ: " + LockstepClient.LastReject + "."
+                    : "Не получилось. Сервер или друг недоступен — попробуйте ещё раз позже.",
                 _ => "Подключаюсь и догружаю мир...",
             });
             if (st == LockstepClient.State.InSession && list.ButtonText("Закрыть")) Close();

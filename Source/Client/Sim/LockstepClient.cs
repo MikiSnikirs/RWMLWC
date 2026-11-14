@@ -142,6 +142,7 @@ public static class LockstepClient
             return;
         }
         playerName = name;
+        LastReject = "";
         sentSpeed = -1;
         heldSpeed = -1;
         holdClock.Reset();
@@ -352,6 +353,7 @@ public static class LockstepClient
                 break;
 
             case RejectMessage reject:
+                LastReject = reject.Detail; // B: окна подключения показывают причину (разрешение A 22:34)
                 TestAutomation.Note($"lockstep: REJECTED: {reject.Reason} {reject.Detail}");
                 Disconnect("сервер отказал");
                 break;
@@ -774,6 +776,9 @@ public static class LockstepClient
             conn.Send(message);
         }
     }
+
+    /// <summary>Причина последнего отказа сервера (текст для игрока); пусто — отказа не было. Сбрасывается в <c>Connect</c>.</summary>
+    public static string LastReject = "";
 
     /// <summary>Пароль для следующего подключения (v6, T-068); задают окна подключения и хост сессии.</summary>
     public static string ConnectPassword = "";
