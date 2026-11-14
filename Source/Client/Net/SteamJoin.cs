@@ -90,7 +90,8 @@ public class Dialog_SteamJoin : Window
     private string _input = "";
     private bool _started;
 
-    public override Vector2 InitialSize => new Vector2(520f, 220f);
+    public override Vector2 InitialSize => new Vector2(520f, 270f);
+    private string _password = "";
 
     public Dialog_SteamJoin(ulong hostSteamId = 0, bool autoStart = false)
     {
@@ -118,6 +119,8 @@ public class Dialog_SteamJoin : Window
             ? "SteamID64 хоста (17 цифр) или ссылка на его профиль. Мир загрузится от хоста."
             : "SteamID64 хоста (17 цифр) или ссылка на его профиль. Из загруженной игры у обоих должен быть один и тот же сейв; проще подключаться из главного меню.");
         _input = list.TextEntry(_input);
+        list.Label("Пароль (если хост его задал):");
+        _password = list.TextEntry(_password);
 
         bool valid = SteamJoin.TryParseSteamId(_input, out ulong id);
         LockstepClient.State st = LockstepClient.CurrentState;
@@ -131,6 +134,7 @@ public class Dialog_SteamJoin : Window
             if (list.ButtonText("Подключиться") && valid && st == LockstepClient.State.Off)
             {
                 _started = true;
+                LockstepClient.ConnectPassword = _password;
                 SteamJoin.Start(id);
             }
         }

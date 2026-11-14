@@ -14,8 +14,9 @@ public static class ProtocolInfo
     /// 3 — состав сессии <c>Players</c> (с пингом); <c>NoticeCode.Desync</c> (T-034); <c>Ping</c>/<c>Pong</c>, <c>Chat</c> (T-025).
     /// 4 — отдающий мир в <c>Payload</c> команды 100, сохранение мира на сервер (101), лечение расхождения сервером (T-065).
     /// 5 — цвет игрока (<c>PlayerInfo.Color</c>, <c>ChooseColor</c>, <c>Notice ColorTaken</c>), курсор (<c>Cursor</c>) (T-064).
+    /// 6 — пароль в <c>Hello</c> (T-068), простой игрока (<c>PlayerState</c>, <c>PlayerInfo.Idle</c>) и тревога (<c>Alarm</c>) (T-040).
     /// </summary>
-    public const int ProtocolVersion = 5;
+    public const int ProtocolVersion = 6;
 
     /// <summary>Идентификатор мода: packageId в About.xml и id экземпляра Harmony.</summary>
     public const string ModId = "MikiSnikirs.RWMLWC";
