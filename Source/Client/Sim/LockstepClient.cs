@@ -479,8 +479,12 @@ public static class LockstepClient
             }
             if (command.Kind == ProtocolIds.PlayerPresenceKind)
             {
-                // v7 (T-032): «игрок в сети / не в сети». Состояние игры (флаг в сейве) — клиентская часть A;
-                // пока её нет, команда пропускается, чтобы не считаться неизвестной (Failed) в автопрогонах.
+                // v7 (T-032, T-072): «игрок в сети / не в сети» — состояние игры в сейве, у всех на одном тике.
+                (int playerId, bool online)? presence = RWMLWC.Shared.Protocol.PlayerPresence.Decode(command.Payload);
+                if (presence.HasValue)
+                {
+                    RWMLWC.Client.Maps.PlayerPresence.Component?.Apply(presence.Value.playerId, presence.Value.online);
+                }
                 continue;
             }
             if (command.Tick < tickManager.TicksGame)
