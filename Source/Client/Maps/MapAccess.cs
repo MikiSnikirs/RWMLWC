@@ -1,0 +1,225 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using HarmonyLib;
+using RimWorld;
+using RWMLWC.Client.Sim;
+using RWMLWC.Shared.Protocol;
+using UnityEngine;
+using Verse;
+
+namespace RWMLWC.Client.Maps;
+
+/// <summary>
+/// Владельцы карт и права игроков (T-033, клиентская часть T-031). Таблицу ведёт сервер и присылает
+/// целиком (Permissions); здесь она хранится для интерфейса и для предварительной проверки:
+/// команду без прав клиент не отправляет, а сразу говорит игроку. Решает всё равно сервер.
+///
+/// Все карты загружены у всех игроков, поэтому «перейти в поселение друга» — это просто
+/// переключить вид на его карту; управлять на ней можно в пределах выданных прав.
+/// </summary>
+public static class MapAccess
+{
+    private sealed class MapEntry
+    {
+        public int owner;
+        public Dictionary<int, PermissionLevel> grants = new Dictionary<int, PermissionLevel>();
+    }
+
+    private static readonly Dictionary<int, MapEntry> table = new Dictionary<int, MapEntry>();
+    private static readonly SortedSet<int> knownPlayers = new SortedSet<int>();
+
+    /// <summary>Таблица получена хотя бы раз (сервер с протоколом v2).</summary>
+    public static bool HasTable { get; private set; }
+
+    public static IEnumerable<int> KnownPlayers => knownPlayers;
+
+    public static void Reset()
+    {
+        table.Clear();
+        knownPlayers.Clear();
+        HasTable = false;
+    }
+
+    /// <summary>Запомнить игрока, о котором стало известно (списка игроков сервер пока не шлёт).</summary>
+    public static void NotePlayer(int playerId)
+    {
+        if (playerId > 0)
+        {
+            knownPlayers.Add(playerId);
+        }
+    }
+
+    public static void OnPermissions(PermissionsMessage message)
+    {
+        table.Clear();
+        foreach (MapPermissions map in message.Maps)
+        {
+            MapEntry entry = new MapEntry { owner = map.OwnerPlayerId };
+            NotePlayer(map.OwnerPlayerId);
+            foreach (PermissionGrant grant in map.Grants)
+            {
+                entry.grants[grant.PlayerId] = grant.Level;
+                NotePlayer(grant.PlayerId);
+            }
+            table[map.MapId] = entry;
+        }
+        HasTable = true;
+    }
+
+    /// <summary>Владелец карты; 0 — карта свободна.</summary>
+    public static int OwnerOf(int mapId)
+    {
+        return table.TryGetValue(mapId, out MapEntry? entry) ? entry.owner : 0;
+    }
+
+    /// <summary>Уровень игрока на карте по правилам сервера: мир и свободная карта открыты всем.</summary>
+    public static PermissionLevel LevelOf(int mapId, int playerId)
+    {
+        if (mapId == ProtocolIds.WorldMapId || !table.TryGetValue(mapId, out MapEntry? entry) || entry.owner <= 0)
+        {
+            return PermissionLevel.Full;
+        }
+        if (entry.owner == playerId)
+        {
+            return PermissionLevel.Full;
+        }
+        return entry.grants.TryGetValue(playerId, out PermissionLevel level) ? level : PermissionLevel.None;
+    }
+
+    public static PermissionLevel MyLevel(int mapId) => LevelOf(mapId, LockstepClient.PlayerId);
+
+    public static void Claim(Map map)
+    {
+        LockstepClient.SendRaw(new MapClaimMessage { MapId = map.uniqueID });
+    }
+
+    public static void Grant(int mapId, int playerId, PermissionLevel level)
+    {
+        LockstepClient.SendRaw(new GrantPermissionMessage { MapId = mapId, PlayerId = playerId, Level = level });
+    }
+
+    public static string LevelLabel(PermissionLevel level)
+    {
+        switch (level)
+        {
+            case PermissionLevel.None: return "нет доступа";
+            case PermissionLevel.Observer: return "наблюдатель";
+            case PermissionLevel.Build: return "стройка";
+            default: return "полный";
+        }
+    }
+}
+
+/// <summary>Окно «Карты и права»: чья карта, мой уровень, переход на карту, заявка, выдача прав.</summary>
+public sealed class Dialog_MapAccess : Window
+{
+    private Vector2 scroll;
+
+    public override Vector2 InitialSize => new Vector2(640f, 480f);
+
+    public Dialog_MapAccess()
+    {
+        doCloseX = true;
+        draggable = true;
+        closeOnClickedOutside = false;
+        absorbInputAroundWindow = false;
+        preventCameraMotion = false;
+    }
+
+    public override void DoWindowContents(Rect inRect)
+    {
+        Text.Font = GameFont.Medium;
+        Widgets.Label(new Rect(inRect.x, inRect.y, inRect.width, 34f), "Карты и права");
+        Text.Font = GameFont.Small;
+        float y = inRect.y + 40f;
+        if (!LockstepClient.InSession)
+        {
+            Widgets.Label(new Rect(inRect.x, y, inRect.width, 30f), "Сетевая игра не идёт.");
+            return;
+        }
+        Widgets.Label(new Rect(inRect.x, y, inRect.width, 24f), "Я — игрок " + LockstepClient.PlayerId + (MapAccess.HasTable ? "" : " (таблица прав от сервера ещё не получена)"));
+        y += 28f;
+
+        List<Map> maps = Find.Maps;
+        List<int> others = MapAccess.KnownPlayers.Where(p => p != LockstepClient.PlayerId).ToList();
+        float viewHeight = 0f;
+        foreach (Map map in maps)
+        {
+            viewHeight += 34f + (MapAccess.OwnerOf(map.uniqueID) == LockstepClient.PlayerId ? others.Count * 30f : 0f) + 8f;
+        }
+        Rect outRect = new Rect(inRect.x, y, inRect.width, inRect.yMax - y);
+        Rect viewRect = new Rect(0f, 0f, outRect.width - 16f, Mathf.Max(viewHeight, outRect.height));
+        Widgets.BeginScrollView(outRect, ref scroll, viewRect);
+        float cy = 0f;
+        foreach (Map map in maps)
+        {
+            int owner = MapAccess.OwnerOf(map.uniqueID);
+            bool mine = owner == LockstepClient.PlayerId;
+            string ownerText = owner <= 0 ? "свободна" : (mine ? "моя" : "игрок " + owner);
+            string name = map.Parent != null ? map.Parent.LabelCap : ("Карта " + map.uniqueID);
+            Widgets.Label(new Rect(0f, cy + 4f, 250f, 28f), name + (map == Find.CurrentMap ? "  ◄" : ""));
+            Widgets.Label(new Rect(255f, cy + 4f, 190f, 28f), ownerText + ", я: " + MapAccess.LevelLabel(MapAccess.MyLevel(map.uniqueID)));
+            if (map != Find.CurrentMap && Widgets.ButtonText(new Rect(450f, cy, 75f, 28f), "Перейти"))
+            {
+                // Переключение вида — только интерфейс этого игрока, на симуляцию не влияет.
+                Current.Game.CurrentMap = map;
+                Find.CameraDriver.JumpToCurrentMapLoc(map.Center);
+            }
+            if (owner <= 0 && Widgets.ButtonText(new Rect(530f, cy, 75f, 28f), "Занять"))
+            {
+                MapAccess.Claim(map);
+            }
+            cy += 34f;
+            if (mine)
+            {
+                foreach (int player in others)
+                {
+                    PermissionLevel level = MapAccess.LevelOf(map.uniqueID, player);
+                    Widgets.Label(new Rect(30f, cy + 4f, 220f, 26f), "игрок " + player + ": " + MapAccess.LevelLabel(level));
+                    PermissionLevel[] levels = { PermissionLevel.None, PermissionLevel.Observer, PermissionLevel.Build, PermissionLevel.Full };
+                    for (int i = 0; i < levels.Length; i++)
+                    {
+                        Rect button = new Rect(255f + i * 88f, cy, 84f, 26f);
+                        if (levels[i] == level)
+                        {
+                            Widgets.DrawHighlightSelected(button);
+                        }
+                        if (Widgets.ButtonText(button, MapAccess.LevelLabel(levels[i])) && levels[i] != level)
+                        {
+                            MapAccess.Grant(map.uniqueID, player, levels[i]);
+                        }
+                    }
+                    cy += 30f;
+                }
+            }
+            cy += 8f;
+        }
+        Widgets.EndScrollView();
+    }
+}
+
+// Кнопка в ряду переключателей справа внизу: видна только в сетевой игре.
+[HarmonyPatch(typeof(PlaySettings), nameof(PlaySettings.DoPlaySettingsGlobalControls))]
+internal static class Patch_PlaySettings_DoPlaySettingsGlobalControls
+{
+    private static void Postfix(WidgetRow row, bool worldView)
+    {
+        if (worldView || row == null || !LockstepClient.InSession)
+        {
+            return;
+        }
+        if (row.ButtonIcon(TexButton.Info, "RWMLWC: карты и права игроков"))
+        {
+            Dialog_MapAccess? open = Find.WindowStack.WindowOfType<Dialog_MapAccess>();
+            if (open != null)
+            {
+                open.Close();
+            }
+            else
+            {
+                Find.WindowStack.Add(new Dialog_MapAccess());
+            }
+        }
+    }
+}
