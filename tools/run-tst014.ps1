@@ -179,7 +179,7 @@ for ($c = 1; $c -le $Clients; $c++) {
     [IO.File]::WriteAllText((Join-Path $dir 'RWMLWC\automation-progress.txt'), '0')
     # Without taking focus from the person's own game (tools/StartQuiet.ps1).
     . (Join-Path $PSScriptRoot 'StartQuiet.ps1')
-    [RwmlwcQuiet]::Guard()   # remember the person's window before the game takes it
+    if (Test-FocusGuardOn) { [RwmlwcQuiet]::Guard() }   # remember the person's window before the game takes it
     $procs += Start-GameQuiet $exe "-savedatafolder=$dir" $game
     Write-Host "client c$c pid $($procs[-1].Id), data $dir"
 }
