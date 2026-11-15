@@ -30,6 +30,8 @@ public static class WorldCommands
     private const byte OpTestPresence = 14;     // только тестовые прогоны (ключ stasistest=1)
     private const byte OpTestKill = 15;         // только тестовые прогоны (ключ adapttest=1)
     private const byte OpTestTransfer = 16;     // только тестовые прогоны (ключ clocktest=1)
+    private const byte OpTestTrader = 18;       // только тестовые прогоны (ключ tradetest=1): караван торговцев
+    private const byte OpTestGoTrade = 19;      // только тестовые прогоны (ключ tradetest=1): колонист идёт торговать
 
     private static readonly FieldInfo FormMapField = AccessTools.Field(typeof(Dialog_FormCaravan), "map");
     private static readonly FieldInfo FormReformField = AccessTools.Field(typeof(Dialog_FormCaravan), "reform");
@@ -694,6 +696,18 @@ public static class WorldCommands
         SendWorld(w);
     }
 
+    public static void SendTestOp(byte op, int a, int b)
+    {
+        PacketWriter w = BeginWorld();
+        w.WriteByte(op);
+        w.WriteInt32(a);
+        w.WriteInt32(b);
+        SendWorld(w);
+    }
+
+    public const byte TestTraderOp = OpTestTrader;
+    public const byte TestGoTradeOp = OpTestGoTrade;
+
     private static void ExecuteColony(byte op, ref PacketReader r)
     {
         RWMLWC.Client.World.ColoniesComponent? colonies = RWMLWC.Client.World.Colonies.Component;
@@ -724,6 +738,39 @@ public static class WorldCommands
                     }
                     colonies.SetMember(player, s);
                     TestAutomation.Note($"colonies: player {player} joined settlement {id} (owner {colonies.OwnerOf(s)})");
+                    break;
+                }
+            case OpTestTrader:
+            case OpTestGoTrade:
+                {
+                    int a = r.ReadInt32();
+                    int b = r.ReadInt32();
+                    if (!RWMLWC.Client.World.CaravanSelfTest.ArmKey("tradetest=1"))
+                    {
+                        return;
+                    }
+                    Map? map = Find.Maps.FirstOrDefault(m => m.uniqueID == a);
+                    if (map == null) return;
+                    MapRandContext.Enter(map);
+                    if (op == OpTestTrader)
+                    {
+                        IncidentParms parms = StorytellerUtility.DefaultParmsNow(IncidentCategoryDefOf.Misc, map);
+                        parms.forced = true;
+                        bool ok = IncidentDefOf.TraderCaravanArrival.Worker.TryExecute(parms);
+                        TestAutomation.Note($"trade test: trader caravan on map {a}: {ok}");
+                    }
+                    else
+                    {
+                        Pawn? trader = map.mapPawns.AllPawnsSpawned.Where(p => p.trader != null && p.CanTradeNow).OrderBy(p => p.thingIDNumber).FirstOrDefault();
+                        Pawn? colonist = map.mapPawns.FreeColonistsSpawned.Where(p => !p.Downed).OrderBy(p => p.thingIDNumber).FirstOrDefault();
+                        if (trader == null || colonist == null)
+                        {
+                            TestAutomation.Note($"trade test: no trader ({trader != null}) or colonist ({colonist != null}) on map {a}");
+                            return;
+                        }
+                        colonist.jobs.TryTakeOrderedJob(Verse.JobMaker.MakeJob(JobDefOf.TradeWithPawn, trader), Verse.AI.JobTag.Misc);
+                        TestAutomation.Note($"trade test: colonist {colonist.thingIDNumber} goes to trade with {trader.thingIDNumber}, ordered by player {CommandBus.CurrentPlayerId}");
+                    }
                     break;
                 }
             case OpTestTransfer:
@@ -817,12 +864,17 @@ public static class WorldCommands
             ExecuteWorldGizmo(ref r);
             return;
         }
+        if (op == RWMLWC.Client.World.TradeCommands.OpTrade)
+        {
+            RWMLWC.Client.World.TradeCommands.Execute(ref r);
+            return;
+        }
         if (op >= SharedWindows.OpCount && op <= SharedWindows.OpSlider)
         {
             SharedWindows.Execute(op, ref r);
             return;
         }
-        if (op == OpColonyClaim || op == OpColonyJoin || op == OpColonyNew || op == OpColonyTestAbsent || op == OpTestPresence || op == OpTestKill || op == OpTestTransfer)
+        if (op == OpColonyClaim || op == OpColonyJoin || op == OpColonyNew || op == OpColonyTestAbsent || op == OpTestPresence || op == OpTestKill || op == OpTestTransfer || op == OpTestTrader || op == OpTestGoTrade)
         {
             ExecuteColony(op, ref r);
             return;
