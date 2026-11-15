@@ -564,6 +564,10 @@ public static class LockstepClient
         TickManager tickManager = Find.TickManager;
         expectedSnapshotId = SnapshotIdFor(request);
         snapshotRequestSeen = true;
+        // Надпись для тех, кто перезагрузку не вызывал (SyncCurtain): кто входит — или лечение расхождения.
+        curtainText = request.PlayerId > 0 && request.PlayerId != PlayerId
+            ? $"{RWMLWC.Client.SessionView.SessionUi.NameOf(request.PlayerId)} подключается — синхронизация мира…"
+            : "Синхронизация мира…";
         // На время перезагрузки просим паузу; после загрузки каждый вернёт скорость, что была в мире на момент снимка.
         RequestSpeed(0);
         state = State.WaitingSnapshot;
@@ -581,10 +585,10 @@ public static class LockstepClient
         byte[] packed = GameSnapshot.Take(out GameSnapshot.Stats stats);
         int count = SendWorldChunks(expectedSnapshotId, packed, tickManager.TicksGame);
         TestAutomation.Note($"lockstep: snapshot for player {request.PlayerId} at tick {tickManager.TicksGame}: {stats}, {count} chunks sent; reloading it here too");
-        // Отправитель загружает тот же снимок, что и остальные.
+        // Отправитель загружает тот же снимок, что и остальные — под застывшим кадром (SyncCurtain).
         state = State.Loading;
         gameLoadedPending = false;
-        GameSnapshot.Apply(packed);
+        RWMLWC.Client.SessionView.SyncCurtain.BeforeReload(true, curtainText, () => GameSnapshot.Apply(packed));
     }
 
     /// <summary>
@@ -660,6 +664,8 @@ public static class LockstepClient
         TryLoadExpectedSnapshot();
     }
 
+    private static string curtainText = "Синхронизация мира…";
+
     private static void TryLoadExpectedSnapshot()
     {
         if (state != State.WaitingSnapshot || expectedSnapshotId < 0
@@ -697,21 +703,27 @@ public static class LockstepClient
         TestAutomation.Note($"lockstep: snapshot {expectedSnapshotId} received, {data.Length} bytes; loading");
         state = State.Loading;
         gameLoadedPending = false;
-        try
+        // Игрок, уже бывший в игре, видит застывший кадр; входящий из меню — обычный экран загрузки.
+        bool inGame = Current.Game != null && Current.ProgramState == ProgramState.Playing;
+        RWMLWC.Client.SessionView.SyncCurtain.BeforeReload(inGame, curtainText, () =>
         {
-            GameSnapshot.Apply(packed);
-        }
-        catch (Exception ex)
-        {
-            TestAutomation.Note("lockstep: snapshot load FAILED: " + ex);
-            Disconnect("снимок не загрузился");
-        }
+            try
+            {
+                GameSnapshot.Apply(packed);
+            }
+            catch (Exception ex)
+            {
+                TestAutomation.Note("lockstep: snapshot load FAILED: " + ex);
+                Disconnect("снимок не загрузился");
+            }
+        });
     }
 
     // Первый кадр после загрузки снимка: все GameComponent.LoadedGame уже отработали.
     private static void FinishSnapshotLoad(TickManager tickManager)
     {
         gameLoadedPending = false;
+        RWMLWC.Client.SessionView.SyncCurtain.AfterReload();
         SimSession.Begin(sessionSeed);
         VirtualUi.Reset();
         state = State.InSession;

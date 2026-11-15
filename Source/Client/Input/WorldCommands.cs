@@ -28,6 +28,7 @@ public static class WorldCommands
     private const byte OpColonyNew = 8;
     private const byte OpColonyTestAbsent = 13; // только тестовые прогоны (ключ abandontest=1)
     private const byte OpTestPresence = 14;     // только тестовые прогоны (ключ stasistest=1)
+    private const byte OpTestKill = 15;         // только тестовые прогоны (ключ adapttest=1)
 
     private static readonly FieldInfo FormMapField = AccessTools.Field(typeof(Dialog_FormCaravan), "map");
     private static readonly FieldInfo FormReformField = AccessTools.Field(typeof(Dialog_FormCaravan), "reform");
@@ -673,6 +674,15 @@ public static class WorldCommands
         SendWorld(w);
     }
 
+    /// <summary>Тест адаптации по поселению: погиб колонист на карте поселения.</summary>
+    public static void SendTestKill(int mapId)
+    {
+        PacketWriter w = BeginWorld();
+        w.WriteByte(OpTestKill);
+        w.WriteInt32(mapId);
+        SendWorld(w);
+    }
+
     private static void ExecuteColony(byte op, ref PacketReader r)
     {
         RWMLWC.Client.World.ColoniesComponent? colonies = RWMLWC.Client.World.Colonies.Component;
@@ -703,6 +713,25 @@ public static class WorldCommands
                     }
                     colonies.SetMember(player, s);
                     TestAutomation.Note($"colonies: player {player} joined settlement {id} (owner {colonies.OwnerOf(s)})");
+                    break;
+                }
+            case OpTestKill:
+                {
+                    int mapId = r.ReadInt32();
+                    if (!RWMLWC.Client.World.CaravanSelfTest.ArmKey("adapttest=1"))
+                    {
+                        return;
+                    }
+                    Map? map = Find.Maps.FirstOrDefault(m => m.uniqueID == mapId);
+                    Pawn? victim = map?.mapPawns.FreeColonistsSpawned.OrderBy(p => p.thingIDNumber).FirstOrDefault();
+                    if (victim == null)
+                    {
+                        return;
+                    }
+                    MapRandContext.Enter(map);
+                    RWMLWC.Client.World.TestSafety.AllowNextKill = true; // намеренная гибель — мимо защиты nodeath
+                    victim.Kill(null);
+                    TestAutomation.Note($"adapt test: colonist {victim.thingIDNumber} of map {mapId} killed");
                     break;
                 }
             case OpTestPresence:
@@ -756,7 +785,7 @@ public static class WorldCommands
             SharedWindows.Execute(op, ref r);
             return;
         }
-        if (op == OpColonyClaim || op == OpColonyJoin || op == OpColonyNew || op == OpColonyTestAbsent || op == OpTestPresence)
+        if (op == OpColonyClaim || op == OpColonyJoin || op == OpColonyNew || op == OpColonyTestAbsent || op == OpTestPresence || op == OpTestKill)
         {
             ExecuteColony(op, ref r);
             return;

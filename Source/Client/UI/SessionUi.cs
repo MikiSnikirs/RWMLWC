@@ -370,6 +370,7 @@ internal static class Patch_MapInterface_SessionStatus
         RWMLWC.Client.World.ColonyChoice.Frame();
         RWMLWC.Client.Input.SharedWindows.Frame();
         RWMLWC.Client.Net.NetworkGameMenu.Frame();
+        StasisBanner.OnGUI();
         StatusLineView.OnGUI();
     }
 }
