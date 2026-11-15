@@ -85,6 +85,7 @@ public static class CaravanSelfTest
     }
 
     private static int _stasisStep;
+    private static bool _killSent;
     private static int _stasisTick;
 
     private static bool Enabled
@@ -121,7 +122,7 @@ public static class CaravanSelfTest
         }
         // Действует игрок 2: игрок 1 — хост, у него первая колония, а основать поселение может только игрок
         // без своей колонии (соавтор — ключ colonychoice=join).
-        bool issuer = LockstepClient.PlayerId == 2;
+        bool issuer = LockstepClient.PlayerId == 2 && !ArmKey("adapttest=1"); // adapttest — только сводки
 
         if (issuer && !_formed && tick >= _startTick + 300)
         {
@@ -196,6 +197,14 @@ public static class CaravanSelfTest
             TestAutomation.Note("caravan: abandon test — player 2 marked absent");
         }
 
+        // adapttest: хост, когда у обоих свои колонии, — гибель колониста в колонии хоста (карта 0).
+        if (ArmKey("adapttest=1") && !_killSent && LockstepClient.PlayerId == 1 && Colonies.Component?.OwnsColony(2) == true
+            && Colonies.Component.OwnedBy(1)?.Map is Map hostMap)
+        {
+            _killSent = true;
+            RWMLWC.Client.Input.WorldCommands.SendTestKill(hostMap.uniqueID);
+        }
+
         // stasistest: хост объявляет игрока 2 (у него своя колония) «не в сети», через 6000 тиков — «снова в сети».
         if (ArmKey("stasistest=1") && LockstepClient.PlayerId == 1 && Colonies.Component?.OwnsColony(2) == true)
         {
@@ -239,6 +248,15 @@ public static class CaravanSelfTest
                 prefix: new HarmonyMethod(typeof(CaravanSelfTest), nameof(OnRand)));
             harmony.Patch(AccessTools.PropertyGetter(typeof(Rand), nameof(Rand.Int)),
                 prefix: new HarmonyMethod(typeof(CaravanSelfTest), nameof(OnRand)));
+            harmony.Patch(AccessTools.Method(typeof(TickManager), nameof(TickManager.DoSingleTick)),
+                prefix: new HarmonyMethod(typeof(CaravanSelfTest), nameof(BeforeTick)),
+                postfix: new HarmonyMethod(typeof(CaravanSelfTest), nameof(AfterTick)));
+            if (ArmKey("noclockpatch=1"))
+            {
+                // Замер: без поправки локальных часов в TicksGame (сравнение нагрузки).
+                RwmlwcMod.HarmonyInstance.Unpatch(AccessTools.PropertyGetter(typeof(TickManager), nameof(TickManager.TicksGame)), HarmonyPatchType.Postfix, RwmlwcMod.HarmonyInstance.Id);
+                TestAutomation.Note("caravan: TicksGame postfix removed for the perf comparison");
+            }
             AppDomain.CurrentDomain.UnhandledException += (_, e) => TestAutomation.Note("caravan: UNHANDLED " + e.ExceptionObject);
         }
         catch (Exception e)
@@ -311,6 +329,28 @@ public static class CaravanSelfTest
         {
             TestAutomation.Note("caravan: generated map dump failed: " + e.Message);
         }
+    }
+
+    // Замер нагрузки: время одного тика игры (DoSingleTick), сумма за отрезок между сводками.
+    private static readonly System.Diagnostics.Stopwatch _tickWatch = new System.Diagnostics.Stopwatch();
+    private static long _tickTicks;
+    private static int _tickCount;
+
+    private static void BeforeTick() => _tickWatch.Restart();
+
+    private static void AfterTick()
+    {
+        _tickTicks += _tickWatch.ElapsedTicks;
+        _tickCount++;
+    }
+
+    private static string TakePerf()
+    {
+        if (_tickCount == 0) return "n/a";
+        double us = _tickTicks * 1_000_000.0 / System.Diagnostics.Stopwatch.Frequency / _tickCount;
+        _tickTicks = 0;
+        _tickCount = 0;
+        return us.ToString("F0") + " us/tick";
     }
 
     private static void AfterError(string text)
@@ -557,6 +597,6 @@ public static class CaravanSelfTest
         Caravan? c = Find.WorldObjects.Caravans.FirstOrDefault(x => x.Faction == Faction.OfPlayer);
         string colonists = string.Join("/", Find.Maps.Select(m => m.mapPawns.FreeColonistsSpawnedCount));
         string where = c == null ? "" : $", caravan at {c.Tile}{(c.pather.Moving ? " moving to " + c.pather.Destination : "")}";
-        return $"tick {Find.TickManager.TicksGame}, forming lords {forming}, caravans {caravans}, player settlements {settlements}, maps {maps}, colonists by map {colonists}{where}, colonies {Colonies.Component?.Summary()}, adapt {SettlementThreats.Component?.Summary()}, factors {SettlementThreats.Component?.Factors()}, stasis [{string.Join(",", Find.Maps.Select(m => m.uniqueID + ":" + (MapSimState.For(m)?.frozen == true ? "F" : "-") + (MapSimState.For(m)?.stasisTicks ?? 0)))}] (game: d{GenDate.DaysPassedSinceSettle}×a{Find.StoryWatcher.watcherAdaptation.AdaptDays:F2})";
+        return $"tick {Find.TickManager.TicksGame}, forming lords {forming}, caravans {caravans}, player settlements {settlements}, maps {maps}, colonists by map {colonists}{where}, colonies {Colonies.Component?.Summary()}, adapt {SettlementThreats.Component?.Summary()}, factors {SettlementThreats.Component?.Factors()}, perf {TakePerf()}, stasis [{string.Join(",", Find.Maps.Select(m => m.uniqueID + ":" + (MapSimState.For(m)?.frozen == true ? "F" : "-") + (MapSimState.For(m)?.stasisTicks ?? 0)))}] (game: d{GenDate.DaysPassedSinceSettle}×a{Find.StoryWatcher.watcherAdaptation.AdaptDays:F2})";
     }
 }

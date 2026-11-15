@@ -50,10 +50,27 @@ public static class PlayerPresence
     /// ни в одном режиме (docs/ARCHITECTURE.md, раздел 4). Карта без выбранного режима — без запрета: кто её
     /// владелец, знает только сервер, а решение должно быть одинаковым у всех.
     /// </summary>
-    public static bool BlocksThreats(Map map)
+    public static bool BlocksThreats(Map map) => OwnerAbsent(map);
+
+    /// <summary>
+    /// Колонии карты сейчас нет в игре: её владелец не в сети (владелец колонии, иначе тот, кто выбирал режим
+    /// отсутствия) и никто из её соавторов не в сети. Одно правило для запрета угроз, заморозки адаптации
+    /// и стазиса. Владелец неизвестен — колония считается в игре.
+    /// </summary>
+    public static bool OwnerAbsent(Map map)
     {
-        int owner = AbsenceModes.Component?.OwnerOf(map.uniqueID) ?? 0;
-        return owner > 0 && !IsOnline(owner);
+        RWMLWC.Client.World.ColoniesComponent? colonies = RWMLWC.Client.World.Colonies.Component;
+        RimWorld.Planet.Settlement? settlement = map.Parent as RimWorld.Planet.Settlement;
+        int owner = settlement != null ? colonies?.OwnerOf(settlement) ?? 0 : 0;
+        if (owner == 0)
+        {
+            owner = AbsenceModes.Component?.OwnerOf(map.uniqueID) ?? 0;
+        }
+        if (owner == 0 || IsOnline(owner))
+        {
+            return false;
+        }
+        return settlement == null || colonies == null || !colonies.MembersOf(settlement).Any(IsOnline);
     }
 }
 

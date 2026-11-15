@@ -18,6 +18,9 @@ public sealed class MapSimState : MapComponent
     /// </summary>
     public int stasisTicks;
 
+    /// <summary>Мировой абсолютный тик, когда карта последний раз вошла в стазис (для предупреждения о сезоне).</summary>
+    public long stasisSinceAbs;
+
     /// <summary>Собственное состояние Rand этой карты (seed в младших 32 битах, счётчик в старших).</summary>
     public ulong randState;
 
@@ -85,6 +88,7 @@ public sealed class MapSimState : MapComponent
     {
         Scribe_Values.Look(ref frozen, "rwmlwc_frozen", false);
         Scribe_Values.Look(ref stasisTicks, "rwmlwc_stasisTicks", 0);
+        Scribe_Values.Look(ref stasisSinceAbs, "rwmlwc_stasisSinceAbs", 0L);
         Scribe_Values.Look(ref randState, "rwmlwc_randState", 0UL);
         Scribe_Values.Look(ref randInitialized, "rwmlwc_randInitialized", false);
         Scribe_Values.Look(ref nextThingId, "rwmlwc_nextThingId", 0);
