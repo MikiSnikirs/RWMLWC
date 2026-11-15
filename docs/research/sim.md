@@ -333,6 +333,7 @@ ilspycmd -p -o "$env:USERPROFILE\rw-decompiled\Waylith" "$game\Waylith.dll"
 | `LayoutWorker.FillAllRooms` | наполнение комнат строений при генерации | замена вызова в IL |
 | `Building_Trap.KnowsOfTrap` | обходит ли рейдер ловушку (тик) | замена вызова в IL |
 | `Gravship.ConstantRandSeed` | зерно событий гравикорабля | то же через `Gen.HashCombineInt` |
+| `WindManager.BaseWindSpeedAt` | шум ветра: `map.GetHashCode()` — хеш объекта (у `Map` нет своего), ветер читают ветряки | номер карты вместо хеша объекта (найдено позже, T-076) |
 
 Остальные (`PathFinder`, `FastTileFinder`, `PathFinderCostTuning`, `SimplifiedPastureNutritionSimulator`, `XmlToObjectUtils`, `GenStepWithParams`, `LayerConnection`, `GenCollection.DictHashCode`, `ScenPart_PlanetLayer`, `Toils_Ingest`) — ключи кэшей, `GetHashCode` для словарей и `Log.WarningOnce`. Не проверено: обходится ли где-то `HashSet`/`Dictionary` с такими ключами в порядке, влияющем на симуляцию.
 
