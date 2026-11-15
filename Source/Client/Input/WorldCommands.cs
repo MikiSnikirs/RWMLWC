@@ -23,6 +23,9 @@ public static class WorldCommands
     private const byte OpGizmo = 3;
     private const byte OpSplit = 4;
     private const byte OpReform = 5;
+    private const byte OpColonyClaim = 6;
+    private const byte OpColonyJoin = 7;
+    private const byte OpColonyNew = 8;
 
     private static readonly FieldInfo FormMapField = AccessTools.Field(typeof(Dialog_FormCaravan), "map");
     private static readonly FieldInfo FormReformField = AccessTools.Field(typeof(Dialog_FormCaravan), "reform");
@@ -176,6 +179,7 @@ public static class WorldCommands
             return;
         }
         CaravanFormingUtility.StartFormingCaravan(pawns, downed, Faction.OfPlayer, transferables, meeting, exit, start, dest);
+        SharedWindows.CloseMatching(w => w is Dialog_FormCaravan d && ReferenceEquals(FormMapField.GetValue(d), map));
         TestAutomation.Note($"world: caravan forming started by player {CommandBus.CurrentPlayerId}, pawns {pawns.Count}+{downed.Count}, item groups {transferables.Count}");
     }
 
@@ -514,6 +518,10 @@ public static class WorldCommands
             t?.AdjustTo(Math.Min(count, t.MaxCount));
         }
         bool ok = (bool)SplitMethod.Invoke(dialog, null)!;
+        if (ok)
+        {
+            SharedWindows.CloseMatching(w => w is Dialog_SplitCaravan d && ReferenceEquals(SplitCaravanField.GetValue(d), caravan));
+        }
         TestAutomation.Note($"world: split by player {CommandBus.CurrentPlayerId}, caravan {caravan.ID}: {(ok ? "done" : "rejected")}");
     }
 
@@ -609,7 +617,85 @@ public static class WorldCommands
         }
         FormDestinationField.SetValue(dialog, dest);
         bool ok = (bool)ReformMethod.Invoke(dialog, null)!;
+        if (ok)
+        {
+            SharedWindows.CloseMatching(w => w is Dialog_FormCaravan d && ReferenceEquals(FormMapField.GetValue(d), map));
+        }
         TestAutomation.Note($"world: reform by player {CommandBus.CurrentPlayerId}, map {mapId}, pawns {pawns.Count}: {(ok ? "done" : "rejected")}");
+    }
+
+    // ---------- колонии игроков ----------
+
+    /// <summary>Поселения игрока без владельца — автору команды (первая колония — хоста).</summary>
+    public static void SendColonyClaim()
+    {
+        PacketWriter w = BeginWorld();
+        w.WriteByte(OpColonyClaim);
+        SendWorld(w);
+    }
+
+    /// <summary>Присоединиться к колонии соавтором.</summary>
+    public static void SendColonyJoin(Settlement settlement)
+    {
+        PacketWriter w = BeginWorld();
+        w.WriteByte(OpColonyJoin);
+        w.WriteInt32(settlement.ID);
+        SendWorld(w);
+    }
+
+    /// <summary>Своя колония: новая стартовая группа основывает поселение на клетке.</summary>
+    public static void SendColonyNew(PlanetTile tile)
+    {
+        PacketWriter w = BeginWorld();
+        w.WriteByte(OpColonyNew);
+        WriteTile(w, tile);
+        SendWorld(w);
+    }
+
+    private static void ExecuteColony(byte op, ref PacketReader r)
+    {
+        RWMLWC.Client.World.ColoniesComponent? colonies = RWMLWC.Client.World.Colonies.Component;
+        int player = CommandBus.CurrentPlayerId;
+        if (colonies == null)
+        {
+            return;
+        }
+        MapRandContext.Enter(null);
+        switch (op)
+        {
+            case OpColonyClaim:
+                if (colonies.AnyOwner)
+                {
+                    TestAutomation.Note($"colonies: claim by player {player} ignored — owners already set");
+                    return;
+                }
+                TestAutomation.Note($"colonies: player {player} is the host, settlements claimed: {colonies.ClaimUnowned(player)}");
+                break;
+            case OpColonyJoin:
+                {
+                    int id = r.ReadInt32();
+                    Settlement? s = Find.WorldObjects.Settlements.FirstOrDefault(x => x.ID == id && x.Faction == Faction.OfPlayer);
+                    if (s == null || colonies.OwnsColony(player))
+                    {
+                        TestAutomation.Note($"colonies: join {id} by player {player} rejected");
+                        return;
+                    }
+                    colonies.SetMember(player, s);
+                    TestAutomation.Note($"colonies: player {player} joined settlement {id} (owner {colonies.OwnerOf(s)})");
+                    break;
+                }
+            case OpColonyNew:
+                {
+                    PlanetTile tile = ReadTile(ref r);
+                    if (colonies.OwnsColony(player) || !TileFinder.IsValidTileForNewSettlement(tile))
+                    {
+                        TestAutomation.Note($"colonies: new colony at {tile} by player {player} rejected");
+                        return;
+                    }
+                    RWMLWC.Client.World.NewColony.Found(tile, player);
+                    break;
+                }
+        }
     }
 
     public static void ExecuteWorldAction(ref PacketReader r)
@@ -618,6 +704,16 @@ public static class WorldCommands
         if (op == OpGizmo)
         {
             ExecuteWorldGizmo(ref r);
+            return;
+        }
+        if (op >= SharedWindows.OpCount && op <= SharedWindows.OpSlider)
+        {
+            SharedWindows.Execute(op, ref r);
+            return;
+        }
+        if (op == OpColonyClaim || op == OpColonyJoin || op == OpColonyNew)
+        {
+            ExecuteColony(op, ref r);
             return;
         }
         if (op == OpReform)
@@ -642,6 +738,11 @@ public static class WorldCommands
                 if (RWMLWC.Client.Maps.SquadRules.RejectAtExecution(
                         RWMLWC.Client.Maps.SquadRules.ForbiddenAny(caravan.PawnsListForReading.Cast<object>(), CommandBus.CurrentPlayerId), CommandBus.CurrentSeq))
                 {
+                    return;
+                }
+                if (RWMLWC.Client.World.Colonies.Component?.OwnsColony(CommandBus.CurrentPlayerId) == true)
+                {
+                    TestAutomation.Note($"world: settle by player {CommandBus.CurrentPlayerId} rejected — already owns a colony");
                     return;
                 }
                 SettleInEmptyTileUtility.Settle(caravan);

@@ -5,6 +5,7 @@ using HarmonyLib;
 using RimWorld;
 using RimWorld.Planet;
 using RWMLWC.Client.Sim;
+using UnityEngine;
 using Verse;
 using Verse.AI.Group;
 
@@ -70,7 +71,9 @@ public static class CaravanSelfTest
             _dumpedMaps = Find.Maps.Count;
             _nextSummary = tick + 500;
         }
-        bool issuer = LockstepClient.PlayerId == 1;
+        // Действует игрок 2: игрок 1 — хост, у него первая колония, а основать поселение может только игрок
+        // без своей колонии (соавтор — ключ colonychoice=join).
+        bool issuer = LockstepClient.PlayerId == 2;
 
         if (issuer && !_formed && tick >= _startTick + 300)
         {
@@ -95,7 +98,8 @@ public static class CaravanSelfTest
             if (_step2 == 0 && there.Count == 1)
             {
                 _step2 = 1;
-                TestAutomation.Note("caravan: split — " + TrySplit(there[0]));
+                // Окно «Разделить» — кнопкой каравана (команда); игрок 1 присоединится к окну и сам нажмёт «Принять».
+                TestAutomation.Note("caravan: split window — " + TryPress(there[0], new List<Caravan> { there[0] }, "SplitCaravan"));
             }
             else if (_step2 == 1 && there.Count == 2)
             {
@@ -124,6 +128,11 @@ public static class CaravanSelfTest
                 _rerouted = true;
                 TestAutomation.Note("caravan: route with Enter — " + TryRouteEnter(third));
             }
+        }
+
+        if (!issuer)
+        {
+            JoinSharedSplit();
         }
 
         if (_dumpedMaps < Find.Maps.Count)
@@ -355,6 +364,44 @@ public static class CaravanSelfTest
         }
     }
 
+    private static int _joinStep;
+    private static int _joinFrame;
+
+    /// <summary>
+    /// Игрок 1: присоединиться к общему окну «Разделить караван», открытому игроком 2, выбрать в нём колониста
+    /// (количество уходит командой) и нажать «Принять» (тоже командой) — проверка общих окон.
+    /// </summary>
+    private static void JoinSharedSplit()
+    {
+        RWMLWC.Client.Input.SharedWindows.Entry? e = RWMLWC.Client.Input.SharedWindows.Open
+            .FirstOrDefault(x => x.window is Dialog_SplitCaravan && x.author != LockstepClient.PlayerId);
+        if (e == null)
+        {
+            return;
+        }
+        if (_joinStep == 0)
+        {
+            RWMLWC.Client.Input.SharedWindows.Join(e);
+            _joinStep = 1;
+            _joinFrame = Time.frameCount;
+            TestAutomation.Note("caravan: joined shared split window #" + e.author + "." + e.serial);
+        }
+        else if (_joinStep == 1 && Time.frameCount > _joinFrame + 30)
+        {
+            TransferableOneWay? colonist = e.Transferables?.FirstOrDefault(t => t.AnyThing is Pawn p && p.IsColonist && !p.Downed);
+            colonist?.AdjustTo(1);
+            _joinStep = 2;
+            _joinFrame = Time.frameCount;
+            TestAutomation.Note("caravan: joiner set colonist " + (colonist?.AnyThing?.thingIDNumber ?? -1) + " to 1");
+        }
+        else if (_joinStep == 2 && Time.frameCount > _joinFrame + 120)
+        {
+            bool ok = (bool)RWMLWC.Client.Input.WorldCommands.SplitMethod.Invoke(e.window, null);
+            _joinStep = 3;
+            TestAutomation.Note("caravan: joiner pressed Accept — " + (ok ? "sent" : "rejected"));
+        }
+    }
+
     /// <summary>«Разделить караван»: окно, один колонист в новый караван, «Принять» — уходит командой (T-073).</summary>
     private static string TrySplit(Caravan caravan)
     {
@@ -418,15 +465,10 @@ public static class CaravanSelfTest
         {
             var reason = new System.Text.StringBuilder();
             if (!TileFinder.IsValidTileForNewSettlement(caravan.Tile, reason)) return "кнопка выключена: " + reason;
-            string limit = "";
-            if (SettleUtility.PlayerSettlementsCountLimitReached)
-            {
-                // Как игрок в настройках игры: по умолчанию одно поселение, кнопка второго выключена.
-                limit = $" (лимит поселений {Prefs.MaxNumberOfPlayerSettlements} достигнут — кнопка была бы выключена; поднят до 5 локально)";
-                Prefs.MaxNumberOfPlayerSettlements = 5;
-            }
+            // В сессии: одна своя колония на игрока (Colonies).
+            if (SettleUtility.PlayerSettlementsCountLimitReached) return "кнопка выключена: у игрока уже есть своя колония";
             SettleInEmptyTileUtility.Settle(caravan);
-            return "вызвано на тайле " + caravan.Tile + limit;
+            return "вызвано на тайле " + caravan.Tile;
         }
         catch (Exception e)
         {
@@ -443,6 +485,6 @@ public static class CaravanSelfTest
         Caravan? c = Find.WorldObjects.Caravans.FirstOrDefault(x => x.Faction == Faction.OfPlayer);
         string colonists = string.Join("/", Find.Maps.Select(m => m.mapPawns.FreeColonistsSpawnedCount));
         string where = c == null ? "" : $", caravan at {c.Tile}{(c.pather.Moving ? " moving to " + c.pather.Destination : "")}";
-        return $"tick {Find.TickManager.TicksGame}, forming lords {forming}, caravans {caravans}, player settlements {settlements}, maps {maps}, colonists by map {colonists}{where}";
+        return $"tick {Find.TickManager.TicksGame}, forming lords {forming}, caravans {caravans}, player settlements {settlements}, maps {maps}, colonists by map {colonists}{where}, colonies {Colonies.Component?.Summary()}, adapt {SettlementThreats.Component?.Summary()}, factors {SettlementThreats.Component?.Factors()} (game: d{GenDate.DaysPassedSinceSettle}×a{Find.StoryWatcher.watcherAdaptation.AdaptDays:F2})";
     }
 }
