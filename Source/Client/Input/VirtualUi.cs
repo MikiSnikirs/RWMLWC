@@ -82,6 +82,12 @@ public static class VirtualUi
             }
             return true;
         }
+        // Общие окна (подтверждения, ползунок, окна со списком): у всех под одним номером, к ним можно присоединиться.
+        bool? shared = SharedWindows.Register(window);
+        if (shared.HasValue)
+        {
+            return shared.Value;
+        }
         if (window is FloatMenu menu)
         {
             PlayerUi ui = For(CommandBus.CurrentPlayerId);

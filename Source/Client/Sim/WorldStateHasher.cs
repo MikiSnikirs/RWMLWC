@@ -46,6 +46,16 @@ public static class WorldStateHasher
         }
         tmp.Clear();
 
+        // Колонии игроков: владельцы и соавторы.
+        RWMLWC.Client.World.ColoniesComponent? colonies = RWMLWC.Client.World.Colonies.Component;
+        if (colonies != null)
+        {
+            foreach (int v in colonies.HashValues())
+            {
+                h.Add(v);
+            }
+        }
+
         h.Add(MapRandContext.GlobalState);
         return h.Value;
     }
