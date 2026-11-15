@@ -732,8 +732,21 @@ public static class LockstepClient
         connection?.Send(new SnapshotAppliedMessage { SnapshotId = expectedSnapshotId, Tick = tickManager.TicksGame });
         TestAutomation.Note($"lockstep: snapshot loaded, tick {tickManager.TicksGame}, serverTick={tickUpTo}, perMapSim={PerMapSim.Enabled}");
         // Скорость — та, что была в мире на момент снимка; на паузе остаёмся на паузе, пока кто-то её не снимет.
+        // Но паузу, которую держало окно (принудительная пауза: «Разделить караван», торговля…), загрузка не
+        // наследует: окна старой игры больше нет, а пауза осталась бы у всех, пока кто-то не снимет её руками
+        // (найдено владельцем в прогоне tstad7). Тогда просим скорость, что была до окна.
         sentSpeed = -1;
-        RequestSpeed((int)tickManager.CurTimeSpeed);
+        int restore = (int)tickManager.CurTimeSpeed;
+        if (forcePauseActive)
+        {
+            if (restore == 0 && speedBeforeForcePause > 0)
+            {
+                restore = speedBeforeForcePause;
+            }
+            forcePauseActive = false;
+            TestAutomation.Note($"lockstep: window pause dropped after reload, speed {restore}");
+        }
+        RequestSpeed(restore);
         applyingServerSpeed = true;
         try
         {
