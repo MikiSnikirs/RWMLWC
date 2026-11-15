@@ -11,6 +11,13 @@ public sealed class MapSimState : MapComponent
     /// <summary>Карта заморожена: её вещи и подсистемы не тикают.</summary>
     public bool frozen;
 
+    /// <summary>
+    /// Сколько тиков карта провела в стазисе (T-043). Локальные часы карты = мировое время минус это число:
+    /// пока тикает эта карта, <c>TicksGame</c> возвращает локальное время (StasisClock), и таймеры, отсчитанные
+    /// до стазиса, после разморозки не срабатывают разом.
+    /// </summary>
+    public int stasisTicks;
+
     /// <summary>Собственное состояние Rand этой карты (seed в младших 32 битах, счётчик в старших).</summary>
     public ulong randState;
 
@@ -77,6 +84,7 @@ public sealed class MapSimState : MapComponent
     public override void ExposeData()
     {
         Scribe_Values.Look(ref frozen, "rwmlwc_frozen", false);
+        Scribe_Values.Look(ref stasisTicks, "rwmlwc_stasisTicks", 0);
         Scribe_Values.Look(ref randState, "rwmlwc_randState", 0UL);
         Scribe_Values.Look(ref randInitialized, "rwmlwc_randInitialized", false);
         Scribe_Values.Look(ref nextThingId, "rwmlwc_nextThingId", 0);

@@ -83,6 +83,7 @@ public static class MapRandContext
         presentationState = getState();
         setState(globalState);
         current = null;
+        StasisClock.Offset = 0;
         inTick = true;
     }
 
@@ -96,6 +97,7 @@ public static class MapRandContext
         Enter(null);
         globalState = getState();
         setState(presentationState);
+        StasisClock.Offset = 0;
         inTick = false;
     }
 
@@ -147,6 +149,7 @@ public static class MapRandContext
                 // У карты нет нашего компонента (не должно случаться): остаёмся на глобальном.
                 setState(globalState);
                 current = null;
+                StasisClock.Offset = 0;
                 return;
             }
             if (!entering.randInitialized)
@@ -158,6 +161,8 @@ public static class MapRandContext
         }
 
         current = map;
+        // Локальные часы карты (T-043): пока в контексте эта карта, TicksGame — её локальное время.
+        StasisClock.Offset = map == null ? 0 : MapSimState.For(map)?.stasisTicks ?? 0;
     }
 
     public static void ExitToGlobal() => Enter(null);
@@ -172,6 +177,7 @@ public static class MapRandContext
                 setState(globalState);
             }
             current = null;
+            StasisClock.Offset = 0;
         }
     }
 }

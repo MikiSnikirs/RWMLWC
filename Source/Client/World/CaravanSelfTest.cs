@@ -63,6 +63,30 @@ public static class CaravanSelfTest
         }
     }
 
+    private static readonly Dictionary<string, bool> _armKeys = new Dictionary<string, bool>();
+
+    /// <summary>Есть ли строка в файле-метке тестового прогона.</summary>
+    public static bool ArmKey(string line)
+    {
+        if (!_armKeys.TryGetValue(line, out bool has))
+        {
+            try
+            {
+                string arm = System.IO.Path.Combine(GenFilePaths.SaveDataFolderPath, "RWMLWC", "arm-determinism-run.txt");
+                has = System.IO.File.Exists(arm) && System.IO.File.ReadAllLines(arm).Any(l => l.Trim() == line);
+            }
+            catch (Exception)
+            {
+                has = false;
+            }
+            _armKeys[line] = has;
+        }
+        return has;
+    }
+
+    private static int _stasisStep;
+    private static int _stasisTick;
+
     private static bool Enabled
     {
         get
@@ -170,6 +194,22 @@ public static class CaravanSelfTest
             _abandonSent = true;
             RWMLWC.Client.Input.WorldCommands.SendColonyTestAbsent(2);
             TestAutomation.Note("caravan: abandon test — player 2 marked absent");
+        }
+
+        // stasistest: хост объявляет игрока 2 (у него своя колония) «не в сети», через 6000 тиков — «снова в сети».
+        if (ArmKey("stasistest=1") && LockstepClient.PlayerId == 1 && Colonies.Component?.OwnsColony(2) == true)
+        {
+            if (_stasisStep == 0)
+            {
+                _stasisStep = 1;
+                _stasisTick = tick;
+                RWMLWC.Client.Input.WorldCommands.SendTestPresence(2, false);
+            }
+            else if (_stasisStep == 1 && tick >= _stasisTick + 6000)
+            {
+                _stasisStep = 2;
+                RWMLWC.Client.Input.WorldCommands.SendTestPresence(2, true);
+            }
         }
 
         if (tick >= _nextSummary)
@@ -517,6 +557,6 @@ public static class CaravanSelfTest
         Caravan? c = Find.WorldObjects.Caravans.FirstOrDefault(x => x.Faction == Faction.OfPlayer);
         string colonists = string.Join("/", Find.Maps.Select(m => m.mapPawns.FreeColonistsSpawnedCount));
         string where = c == null ? "" : $", caravan at {c.Tile}{(c.pather.Moving ? " moving to " + c.pather.Destination : "")}";
-        return $"tick {Find.TickManager.TicksGame}, forming lords {forming}, caravans {caravans}, player settlements {settlements}, maps {maps}, colonists by map {colonists}{where}, colonies {Colonies.Component?.Summary()}, adapt {SettlementThreats.Component?.Summary()}, factors {SettlementThreats.Component?.Factors()} (game: d{GenDate.DaysPassedSinceSettle}×a{Find.StoryWatcher.watcherAdaptation.AdaptDays:F2})";
+        return $"tick {Find.TickManager.TicksGame}, forming lords {forming}, caravans {caravans}, player settlements {settlements}, maps {maps}, colonists by map {colonists}{where}, colonies {Colonies.Component?.Summary()}, adapt {SettlementThreats.Component?.Summary()}, factors {SettlementThreats.Component?.Factors()}, stasis [{string.Join(",", Find.Maps.Select(m => m.uniqueID + ":" + (MapSimState.For(m)?.frozen == true ? "F" : "-") + (MapSimState.For(m)?.stasisTicks ?? 0)))}] (game: d{GenDate.DaysPassedSinceSettle}×a{Find.StoryWatcher.watcherAdaptation.AdaptDays:F2})";
     }
 }
