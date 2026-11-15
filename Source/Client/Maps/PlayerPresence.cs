@@ -72,3 +72,25 @@ internal static class Patch_Storyteller_TryFire_AbsentOwner
         return false;
     }
 }
+
+/// <summary>
+/// То же для крупных угроз мимо рассказчика (T-072): рейды из заданий (<c>QuestPart_Incident</c>,
+/// <c>QuestPart_RandomRaid</c>), сигналов, мест и способностей идут через <c>IncidentWorker.TryExecute</c>.
+/// На карту отсутствующего владельца такая угроза не исполняется; задание получает «не вышло» (false).
+/// Решение B на время отсутствия A (docs/ARCHITECTURE.md, раздел 4: «ни в одном режиме»).
+/// </summary>
+[HarmonyPatch(typeof(IncidentWorker), nameof(IncidentWorker.TryExecute))]
+internal static class Patch_IncidentWorker_TryExecute_AbsentOwner
+{
+    private static bool Prefix(IncidentWorker __instance, IncidentParms parms, ref bool __result)
+    {
+        IncidentDef? def = __instance.def;
+        if (def == null || def.category != IncidentCategoryDefOf.ThreatBig || !(parms?.target is Map map) || !PlayerPresence.BlocksThreats(map))
+        {
+            return true;
+        }
+        TestAutomation.Note($"presence: {def.defName} (not from storyteller) on map {map.uniqueID} skipped — owner {AbsenceModes.Component?.OwnerOf(map.uniqueID)} is offline");
+        __result = false;
+        return false;
+    }
+}

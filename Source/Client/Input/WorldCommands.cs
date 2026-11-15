@@ -22,6 +22,14 @@ public static class WorldCommands
     private const byte OpRoute = 2;
     private const byte OpGizmo = 3;
     private const byte OpSplit = 4;
+    private const byte OpReform = 5;
+
+    private static readonly FieldInfo FormMapField = AccessTools.Field(typeof(Dialog_FormCaravan), "map");
+    private static readonly FieldInfo FormReformField = AccessTools.Field(typeof(Dialog_FormCaravan), "reform");
+    private static readonly FieldInfo FormDestinationField = AccessTools.Field(typeof(Dialog_FormCaravan), "destinationTile");
+    private static readonly FieldInfo FormAboutToBeRemovedField = AccessTools.Field(typeof(Dialog_FormCaravan), "mapAboutToBeRemoved");
+    private static readonly MethodInfo FormRecacheMethod = AccessTools.Method(typeof(Dialog_FormCaravan), "CalculateAndRecacheTransferables");
+    internal static readonly MethodInfo ReformMethod = AccessTools.Method(typeof(Dialog_FormCaravan), "TryReformCaravan");
 
     private static readonly FieldInfo SplitCaravanField = AccessTools.Field(typeof(Dialog_SplitCaravan), "caravan");
     private static readonly FieldInfo SplitTransferablesField = AccessTools.Field(typeof(Dialog_SplitCaravan), "transferables");
@@ -201,10 +209,9 @@ public static class WorldCommands
 
     internal static bool CaptureRoute(Caravan caravan, PlanetTile destTile, CaravanArrivalAction? arrivalAction, bool repathImmediately, bool resetPauseStatus)
     {
-        if (arrivalAction != null)
+        if (arrivalAction != null && !ArrivalSupported(arrivalAction, out string why))
         {
-            // Действия по прибытии (войти в поселение, торговать, атаковать…) — следующий шаг T-073.
-            Messages.Message("RWMLWC: в сетевой игре пока можно отправить караван только в точку, без действия по прибытии", MessageTypeDefOf.RejectInput, false);
+            Messages.Message("RWMLWC: " + why, MessageTypeDefOf.RejectInput, false);
             return false;
         }
         if (!RWMLWC.Client.Maps.SquadRules.LocalMay(caravan.PawnsListForReading.Cast<object>()))
@@ -217,8 +224,90 @@ public static class WorldCommands
         WriteTile(w, destTile);
         w.WriteBool(repathImmediately);
         w.WriteBool(resetPauseStatus);
+        WriteArrival(w, arrivalAction);
         SendWorld(w);
         return false;
+    }
+
+    // ---------- действие по прибытии ----------
+    // Все действия игры устроены одинаково: одно поле с объектом мира (поселение, место, карта) и конструктор
+    // без параметров. Передаются тип и номер объекта; у всех действие собирается заново.
+
+    // Открывают окно торговли у того, кто прибыл, — а оно в сессии ещё не умеет командами (T-036).
+    private static readonly HashSet<Type> ArrivalWithWindow = new HashSet<Type>
+    {
+        typeof(CaravanArrivalAction_Trade),
+        typeof(CaravanArrivalAction_OfferGifts),
+    };
+
+    private static FieldInfo? ArrivalTargetField(Type type)
+    {
+        FieldInfo? found = null;
+        for (Type? t = type; t != null && t != typeof(CaravanArrivalAction); t = t.BaseType)
+        {
+            foreach (FieldInfo f in t.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
+            {
+                if (!typeof(WorldObject).IsAssignableFrom(f.FieldType) || found != null)
+                {
+                    return null; // другие поля или второй объект — общим способом не передать
+                }
+                found = f;
+            }
+        }
+        return found;
+    }
+
+    internal static bool ArrivalSupported(CaravanArrivalAction action, out string why)
+    {
+        Type type = action.GetType();
+        if (ArrivalWithWindow.Contains(type))
+        {
+            why = "торговля караваном в сетевой игре пока недоступна";
+            return false;
+        }
+        if (ArrivalTargetField(type) == null || AccessTools.Constructor(type, Type.EmptyTypes) == null)
+        {
+            why = "это действие каравана по прибытии пока не работает в сетевой игре: " + type.Name;
+            return false;
+        }
+        why = "";
+        return true;
+    }
+
+    private static void WriteArrival(PacketWriter w, CaravanArrivalAction? action)
+    {
+        if (action == null)
+        {
+            w.WriteString("");
+            return;
+        }
+        Type type = action.GetType();
+        WorldObject? target = (WorldObject?)ArrivalTargetField(type)!.GetValue(action);
+        w.WriteString(type.FullName!);
+        w.WriteInt32(target?.ID ?? -1);
+    }
+
+    private static CaravanArrivalAction? ReadArrival(ref PacketReader r, out bool failed)
+    {
+        failed = false;
+        string typeName = r.ReadString();
+        if (typeName.Length == 0)
+        {
+            return null;
+        }
+        int targetId = r.ReadInt32();
+        Type? type = AccessTools.TypeByName(typeName);
+        FieldInfo? field = type == null || !typeof(CaravanArrivalAction).IsAssignableFrom(type) ? null : ArrivalTargetField(type);
+        WorldObject? target = FindWorldObject(targetId);
+        if (type == null || field == null || target == null || !field.FieldType.IsInstanceOfType(target))
+        {
+            failed = true;
+            TestAutomation.Note($"world: arrival action {typeName} for {targetId} can't be rebuilt");
+            return null;
+        }
+        CaravanArrivalAction action = (CaravanArrivalAction)Activator.CreateInstance(type, true)!;
+        field.SetValue(action, target);
+        return action;
     }
 
     /// <summary>
@@ -428,12 +517,112 @@ public static class WorldCommands
         TestAutomation.Note($"world: split by player {CommandBus.CurrentPlayerId}, caravan {caravan.ID}: {(ok ? "done" : "rejected")}");
     }
 
+    /// <summary>
+    /// «Переформировать караван» (с временной карты: лагерь, место задания): окно создаёт караван сразу, прямо
+    /// в интерфейсе, и раскладывает вещи по случайным пешкам. Вместо этого — команда (операция 5) с выбранными
+    /// пешками и вещами и целью; у всех окно собирается заново и вызывается тот же <c>TryReformCaravan</c>.
+    /// </summary>
+    internal static bool CaptureReform(Dialog_FormCaravan dialog, ref bool result)
+    {
+        Map map = (Map)FormMapField.GetValue(dialog)!;
+        List<Pawn> pawns = TransferableUtility.GetPawnsFromTransferables(dialog.transferables);
+        if (!RWMLWC.Client.Maps.SquadRules.LocalMay(pawns.Cast<object>()))
+        {
+            result = false;
+            return false;
+        }
+        PacketWriter w = BeginWorld();
+        w.WriteByte(OpReform);
+        w.WriteInt32(map.uniqueID);
+        w.WriteBool((bool)FormAboutToBeRemovedField.GetValue(dialog)!);
+        WriteTile(w, (PlanetTile)FormDestinationField.GetValue(dialog)!);
+        WriteGroups(w, dialog.transferables);
+        SendWorld(w);
+        TestAutomation.Note($"world: reform sent, map {map.uniqueID}, pawns {pawns.Count}");
+        result = true; // окно закрывается; караван появится, когда команда вернётся в общем порядке
+        return false;
+    }
+
+    private static void WriteGroups(PacketWriter w, List<TransferableOneWay> transferables)
+    {
+        List<TransferableOneWay> moving = transferables.Where(t => t.CountToTransfer > 0 && t.HasAnyThing).ToList();
+        w.WriteInt32(moving.Count);
+        foreach (TransferableOneWay t in moving)
+        {
+            w.WriteInt32(t.CountToTransfer);
+            w.WriteInt32(t.things.Count);
+            foreach (Thing thing in t.things)
+            {
+                w.WriteInt32(thing.thingIDNumber);
+            }
+        }
+    }
+
+    private static List<(int count, List<int> ids)> ReadGroups(ref PacketReader r)
+    {
+        int groups = r.ReadCount(MaxItems, 8);
+        List<(int, List<int>)> sent = new List<(int, List<int>)>(groups);
+        for (int i = 0; i < groups; i++)
+        {
+            int count = r.ReadInt32();
+            int things = r.ReadCount(MaxItems, 4);
+            List<int> ids = new List<int>(things);
+            for (int k = 0; k < things; k++)
+            {
+                ids.Add(r.ReadInt32());
+            }
+            sent.Add((count, ids));
+        }
+        return sent;
+    }
+
+    private static void ApplyGroups(List<TransferableOneWay> transferables, List<(int count, List<int> ids)> sent)
+    {
+        foreach ((int count, List<int> ids) in sent)
+        {
+            TransferableOneWay? t = transferables.FirstOrDefault(x => x.things.Any(th => ids.Contains(th.thingIDNumber)));
+            t?.AdjustTo(Math.Min(count, t.MaxCount));
+        }
+    }
+
+    private static void ExecuteReform(ref PacketReader r)
+    {
+        int mapId = r.ReadInt32();
+        bool aboutToBeRemoved = r.ReadBool();
+        PlanetTile dest = ReadTile(ref r);
+        List<(int count, List<int> ids)> sent = ReadGroups(ref r);
+        Map? map = Find.Maps.FirstOrDefault(m => m.uniqueID == mapId);
+        if (map == null)
+        {
+            TestAutomation.Note($"world: reform: map {mapId} is gone, dropped");
+            return;
+        }
+        MapRandContext.Enter(map);
+        Dialog_FormCaravan dialog = new Dialog_FormCaravan(map, reform: true, mapAboutToBeRemoved: aboutToBeRemoved);
+        FormRecacheMethod.Invoke(dialog, null);
+        ApplyGroups(dialog.transferables, sent);
+        List<Pawn> pawns = TransferableUtility.GetPawnsFromTransferables(dialog.transferables);
+        if (RWMLWC.Client.Maps.SquadRules.RejectAtExecution(
+                RWMLWC.Client.Maps.SquadRules.ForbiddenAny(pawns.Cast<object>(), CommandBus.CurrentPlayerId), CommandBus.CurrentSeq))
+        {
+            return;
+        }
+        FormDestinationField.SetValue(dialog, dest);
+        bool ok = (bool)ReformMethod.Invoke(dialog, null)!;
+        TestAutomation.Note($"world: reform by player {CommandBus.CurrentPlayerId}, map {mapId}, pawns {pawns.Count}: {(ok ? "done" : "rejected")}");
+    }
+
     public static void ExecuteWorldAction(ref PacketReader r)
     {
         byte op = r.ReadByte();
         if (op == OpGizmo)
         {
             ExecuteWorldGizmo(ref r);
+            return;
+        }
+        if (op == OpReform)
+        {
+            ExecuteReform(ref r);
             return;
         }
         if (op == OpSplit)
@@ -463,7 +652,8 @@ public static class WorldCommands
                     PlanetTile dest = ReadTile(ref r);
                     bool repath = r.ReadBool();
                     bool reset = r.ReadBool();
-                    if (caravan == null)
+                    CaravanArrivalAction? arrival = ReadArrival(ref r, out bool arrivalFailed);
+                    if (caravan == null || arrivalFailed)
                     {
                         return;
                     }
@@ -472,7 +662,11 @@ public static class WorldCommands
                     {
                         return;
                     }
-                    caravan.pather.StartPath(dest, null, repath, reset);
+                    caravan.pather.StartPath(dest, arrival, repath, reset);
+                    if (arrival != null)
+                    {
+                        TestAutomation.Note($"world: route of caravan {caravan.ID} to {dest} with {arrival.GetType().Name} by player {CommandBus.CurrentPlayerId}");
+                    }
                     break;
                 }
             default:
@@ -521,5 +715,14 @@ internal static class Patch_Dialog_SplitCaravan_TrySplitCaravan
     private static bool Prefix(Dialog_SplitCaravan __instance, ref bool __result)
     {
         return !CommandBus.CaptureActive || WorldCommands.CaptureSplit(__instance, ref __result);
+    }
+}
+
+[HarmonyPatch(typeof(Dialog_FormCaravan), "TryReformCaravan")]
+internal static class Patch_Dialog_FormCaravan_TryReformCaravan
+{
+    private static bool Prefix(Dialog_FormCaravan __instance, ref bool __result)
+    {
+        return !CommandBus.CaptureActive || WorldCommands.CaptureReform(__instance, ref __result);
     }
 }

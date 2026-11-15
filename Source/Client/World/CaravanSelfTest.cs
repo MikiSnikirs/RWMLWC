@@ -32,6 +32,8 @@ public static class CaravanSelfTest
     private static PlanetTile _destination = PlanetTile.Invalid;
     private static bool _formed2;
     private static bool _camped;
+    private static bool _formed3;
+    private static bool _rerouted;
     private static int _step2; // второй караван: 0 — идёт, 1 — разделён, 2 — объединён, 3 — лагерь
     private static PlanetTile _destination2 = PlanetTile.Invalid;
     private static int _dumpedMaps = int.MaxValue;
@@ -105,6 +107,22 @@ public static class CaravanSelfTest
                 _step2 = 3;
                 _camped = true;
                 TestAutomation.Note("caravan: camp — " + TryPress(there[0], new List<Caravan> { there[0] }, "CreateCamp"));
+            }
+        }
+
+        // Третий караван: после лагеря — из дома, затем маршрут к новому поселению с действием «Войти» (T-073).
+        if (issuer && _camped && !_formed3 && Find.Maps.Count >= 3)
+        {
+            _formed3 = true;
+            TestAutomation.Note("caravan: reform — " + TryReform());
+        }
+        if (issuer && _formed3 && !_rerouted)
+        {
+            Caravan? third = Find.WorldObjects.Caravans.FirstOrDefault(c => c.Faction == Faction.OfPlayer);
+            if (third != null)
+            {
+                _rerouted = true;
+                TestAutomation.Note("caravan: route with Enter — " + TryRouteEnter(third));
             }
         }
 
@@ -300,6 +318,43 @@ public static class CaravanSelfTest
         return PlanetTile.Invalid;
     }
 
+    /// <summary>«Переформировать караван» на карте лагеря: один колонист, «Отправить» — уходит командой (T-073).</summary>
+    private static string TryReform()
+    {
+        try
+        {
+            Map? camp = Find.Maps.FirstOrDefault(m => m.Tile == _destination2);
+            if (camp == null) return "карты лагеря нет";
+            var dialog = new Dialog_FormCaravan(camp, reform: true);
+            AccessTools.Method(typeof(Dialog_FormCaravan), "CalculateAndRecacheTransferables").Invoke(dialog, null);
+            TransferableOneWay? colonist = dialog.transferables.FirstOrDefault(t => t.AnyThing is Pawn p && p.IsColonist && !p.Downed);
+            if (colonist == null) return "нет колониста";
+            colonist.AdjustTo(1);
+            bool ok = (bool)RWMLWC.Client.Input.WorldCommands.ReformMethod.Invoke(dialog, null);
+            return $"«Отправить» — {(ok ? "принято" : "отклонено")}, карта {camp.uniqueID}, колонист {((Pawn)colonist.AnyThing).thingIDNumber}";
+        }
+        catch (Exception e)
+        {
+            return "ОШИБКА " + e;
+        }
+    }
+
+    /// <summary>Маршрут к новому поселению игрока с действием «Войти» — как выбор в меню карты мира; уходит командой.</summary>
+    private static string TryRouteEnter(Caravan caravan)
+    {
+        try
+        {
+            Settlement? home = Find.WorldObjects.Settlements.FirstOrDefault(x => x.Faction == Faction.OfPlayer && x.Tile == _destination);
+            if (home == null) return "нового поселения нет";
+            caravan.pather.StartPath(home.Tile, new CaravanArrivalAction_Enter(home), repathImmediately: true);
+            return $"отправлено: караван {caravan.ID} → поселение {home.ID} на тайле {home.Tile}";
+        }
+        catch (Exception e)
+        {
+            return "ОШИБКА " + e;
+        }
+    }
+
     /// <summary>«Разделить караван»: окно, один колонист в новый караван, «Принять» — уходит командой (T-073).</summary>
     private static string TrySplit(Caravan caravan)
     {
@@ -386,7 +441,8 @@ public static class CaravanSelfTest
         int settlements = Find.WorldObjects.Settlements.Count(s => s.Faction == Faction.OfPlayer);
         int maps = Find.Maps.Count;
         Caravan? c = Find.WorldObjects.Caravans.FirstOrDefault(x => x.Faction == Faction.OfPlayer);
+        string colonists = string.Join("/", Find.Maps.Select(m => m.mapPawns.FreeColonistsSpawnedCount));
         string where = c == null ? "" : $", caravan at {c.Tile}{(c.pather.Moving ? " moving to " + c.pather.Destination : "")}";
-        return $"tick {Find.TickManager.TicksGame}, forming lords {forming}, caravans {caravans}, player settlements {settlements}, maps {maps}{where}";
+        return $"tick {Find.TickManager.TicksGame}, forming lords {forming}, caravans {caravans}, player settlements {settlements}, maps {maps}, colonists by map {colonists}{where}";
     }
 }
