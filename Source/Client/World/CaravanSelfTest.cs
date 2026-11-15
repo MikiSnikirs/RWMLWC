@@ -633,6 +633,14 @@ public static class CaravanSelfTest
             _joinFrame = Time.frameCount;
             TestAutomation.Note("caravan: joined shared split window #" + e.author + "." + e.serial);
         }
+        else if (_joinStep == 1 && Time.frameCount > _joinFrame + 30 && ArmKey("pausetest=1"))
+        {
+            // pausetest: окно открыто у обоих (принудительная пауза) — просим общий снимок, как при лечении
+            // расхождения. После загрузки игра должна пойти дальше сама, без ручного снятия паузы.
+            _joinStep = 9;
+            RWMLWC.Client.Sim.LockstepClient.RequestCommonSnapshot();
+            TestAutomation.Note("caravan: pausetest — common snapshot requested while the shared window is open");
+        }
         else if (_joinStep == 1 && Time.frameCount > _joinFrame + 30)
         {
             TransferableOneWay? colonist = e.Transferables?.FirstOrDefault(t => t.AnyThing is Pawn p && p.IsColonist && !p.Downed);
