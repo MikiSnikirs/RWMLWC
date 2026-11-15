@@ -126,6 +126,21 @@ public static class CaravanSelfTest
         }
         // Действует игрок 2: игрок 1 — хост, у него первая колония, а основать поселение может только игрок
         // без своей колонии (соавтор — ключ colonychoice=join).
+        // viewmap=N (T-076): оба клиента всё время смотрят на карту N — проверка, зависит ли расхождение от того,
+        // какую карту рисует клиент.
+        foreach (string key in new[] { "viewmap=0", "viewmap=1" })
+        {
+            if (ArmKey(key))
+            {
+                int want = key[key.Length - 1] - '0';
+                Map? m = Find.Maps.FirstOrDefault(x => x.uniqueID == want);
+                if (m != null && Find.CurrentMap != m && !WorldRendererUtility.WorldSelected)
+                {
+                    Current.Game.CurrentMap = m;
+                }
+            }
+        }
+
         // tracepostload: после каждой загрузки снимка — трассировка Rand со стеком на 400 тиков (оба клиента
         // стартуют с одного снимка, первая отличающаяся строка — код, который ведёт себя по-разному).
         if (!ReferenceEquals(_tracedGame, Current.Game))
@@ -261,7 +276,7 @@ public static class CaravanSelfTest
         if (tick >= _nextSummary)
         {
             _nextSummary = tick + 500;
-            TestAutomation.Note("caravan summary: " + Summary());
+            TestAutomation.Note("caravan summary: " + Summary()); SimReadsProbe.Write();
         }
     }
 

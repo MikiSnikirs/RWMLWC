@@ -1,0 +1,7 @@
+1	CameraJumper.TryJumpInternal < CameraJumper.TryJumpInternal < CameraJumper.TryJump < <>c__DisplayClass1_0.<Settle>b__1 < <>c__DisplayClass3_0.<Wrap>b__0 < LongEventHandler.UpdateCurrentSynchronousEvent
+1	WeatherManager.VolumeOfAmbientSound < WeatherManager.AmbientSoundsTick < WeatherManager.WeatherManagerTick < LockstepClient.RunTicks < LockstepClient.Pump < Patch_TickManager_TickManagerUpdate.Prefix
+14580	Building_VoidMonolith.Tick < LockstepClient.RunTicks < LockstepClient.Pump < Patch_TickManager_TickManagerUpdate.Prefix < Game.UpdatePlay < UnityWorld.InvokeMessage
+2	MapInterface.Notify_SwitchedMap < Game.set_CurrentMap < CameraJumper.TryJumpInternal < CameraJumper.TryJumpInternal < CameraJumper.TryJump < <>c__DisplayClass1_0.<Settle>b__1
+28858	WindManager.WindManagerTick < LockstepClient.RunTicks < LockstepClient.Pump < Patch_TickManager_TickManagerUpdate.Prefix < Game.UpdatePlay < UnityWorld.InvokeMessage
+3	WorldRendererUtility.get_CurrentWorldRenderMode < WorldRendererUtility.get_WorldSelected < CameraJumper.TryHideWorld < CameraJumper.TryJumpInternal < CameraJumper.TryJumpInternal < CameraJumper.TryJump
+80	WeatherManager.VolumeOfAmbientSound < WeatherManager.AmbientSoundsTick < LockstepClient.RunTicks < LockstepClient.Pump < Patch_TickManager_TickManagerUpdate.Prefix < Game.UpdatePlay

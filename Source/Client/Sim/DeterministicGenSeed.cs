@@ -82,3 +82,35 @@ internal static class Patch_Gravship_ConstantRandSeed
         return false;
     }
 }
+
+/// <summary>
+/// Шум скорости ветра карты засевается от <c>map.GetHashCode()</c>, а у <c>Map</c> своего <c>GetHashCode</c> нет —
+/// это хеш объекта: свой в каждом процессе и у каждого нового объекта карты после загрузки. Скорость ветра
+/// читают ветряки (выработка энергии), то есть симуляция. Вместо хеша объекта — номер карты (найдено B, T-076).
+/// </summary>
+[HarmonyPatch(typeof(WindManager), "BaseWindSpeedAt")]
+internal static class Patch_WindManager_BaseWindSpeedAt_Seed
+{
+    private static System.Collections.Generic.IEnumerable<CodeInstruction> Transpiler(System.Collections.Generic.IEnumerable<CodeInstruction> instructions)
+    {
+        System.Reflection.MethodInfo getHash = AccessTools.Method(typeof(object), nameof(GetHashCode));
+        System.Reflection.MethodInfo stable = AccessTools.Method(typeof(Patch_WindManager_BaseWindSpeedAt_Seed), nameof(StableHash));
+        int replaced = 0;
+        foreach (CodeInstruction ci in instructions)
+        {
+            if ((ci.opcode == System.Reflection.Emit.OpCodes.Callvirt || ci.opcode == System.Reflection.Emit.OpCodes.Call) && ci.operand is System.Reflection.MethodInfo m && m == getHash)
+            {
+                ci.opcode = System.Reflection.Emit.OpCodes.Call;
+                ci.operand = stable;
+                replaced++;
+            }
+            yield return ci;
+        }
+        if (replaced == 0)
+        {
+            Log.Warning("[RWMLWC] WindManager.BaseWindSpeedAt: GetHashCode не найден — зерно ветра не исправлено");
+        }
+    }
+
+    private static int StableHash(object o) => o is Map map ? map.uniqueID : o.GetHashCode();
+}
