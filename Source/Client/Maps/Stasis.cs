@@ -178,7 +178,29 @@ namespace RWMLWC.Client.Maps
             {
                 return false;
             }
-            return PlayerPresence.OwnerAbsent(map);
+            return PlayerPresence.OwnerAbsent(map) && !GuestsPresent(map);
+        }
+
+        /// <summary>
+        /// На карте пешка из отряда игрока, который сейчас в сети (гость, его караван вошёл на карту): стазис
+        /// невозможен (docs/ARCHITECTURE.md, раздел 5) — иначе гость замер бы вместе с чужой колонией.
+        /// </summary>
+        public static bool GuestsPresent(Map map)
+        {
+            SquadsComponent? squads = Squads.Component;
+            if (squads == null)
+            {
+                return false;
+            }
+            foreach (Pawn p in map.mapPawns.FreeColonistsSpawned)
+            {
+                Squad? squad = squads.SquadOf(p.thingIDNumber);
+                if (squad != null && squad.players.Any(PlayerPresence.IsOnline))
+                {
+                    return true;
+                }
+            }
+            return false;
         }
     }
 }
@@ -223,6 +245,114 @@ namespace RWMLWC.Client.Maps
                 mapFields[type] = fields;
             }
             return fields;
+        }
+    }
+}
+
+namespace RWMLWC.Client.Maps
+{
+    /// <summary>
+    /// Пешка переходит между картами с разными часами (T-043, этап 2; «самое хрупкое место» раздела 5).
+    /// Её отметки времени («когда последний раз ела, дралась, говорила…», поля трекеров пешки с именем на
+    /// <c>Tick</c>) записаны по часам карты, где она была. При уходе с карты они переводятся в мировое время,
+    /// при входе на карту — в её время: иначе после стазиса отметки оказались бы «в будущем» на дни.
+    /// Пустые значения (отрицательные, −99999) не трогаются. Только трекеры самой пешки, без глубокого обхода.
+    /// </summary>
+    internal static class PawnClockShift
+    {
+        private static readonly Dictionary<System.Type, System.Reflection.FieldInfo[]> tickFields = new Dictionary<System.Type, System.Reflection.FieldInfo[]>();
+        private static System.Reflection.FieldInfo[]? trackerFields;
+
+        public static void Shift(Pawn pawn, int delta)
+        {
+            if (delta == 0)
+            {
+                return;
+            }
+            int shifted = 0;
+            trackerFields ??= typeof(Pawn).GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public)
+                .Where(f => !f.FieldType.IsValueType && f.FieldType.Namespace != null
+                    && (f.FieldType.Namespace.StartsWith("Verse") || f.FieldType.Namespace.StartsWith("RimWorld"))
+                    && !typeof(Thing).IsAssignableFrom(f.FieldType) && !typeof(Def).IsAssignableFrom(f.FieldType)
+                    && f.FieldType != typeof(Map) && f.FieldType != typeof(Faction))
+                .ToArray();
+            foreach (System.Reflection.FieldInfo f in trackerFields)
+            {
+                object? tracker = f.GetValue(pawn);
+                if (tracker != null)
+                {
+                    shifted += ShiftObject(tracker, delta);
+                }
+            }
+            if (pawn.needs != null)
+            {
+                foreach (Need need in pawn.needs.AllNeeds)
+                {
+                    shifted += ShiftObject(need, delta);
+                }
+            }
+            TestAutomation.Note($"stasis: pawn {pawn.thingIDNumber} clock shifted by {delta}, {shifted} fields");
+        }
+
+        private static int ShiftObject(object o, int delta)
+        {
+            System.Type type = o.GetType();
+            if (!tickFields.TryGetValue(type, out System.Reflection.FieldInfo[]? fields))
+            {
+                var list = new List<System.Reflection.FieldInfo>();
+                for (System.Type? t = type; t != null && t != typeof(object); t = t.BaseType)
+                {
+                    foreach (System.Reflection.FieldInfo fi in t.GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public
+                        | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.DeclaredOnly))
+                    {
+                        if (fi.FieldType == typeof(int) && !fi.IsInitOnly && fi.Name.EndsWith("Tick", System.StringComparison.Ordinal))
+                        {
+                            list.Add(fi);
+                        }
+                    }
+                }
+                fields = list.ToArray();
+                tickFields[type] = fields;
+            }
+            int n = 0;
+            foreach (System.Reflection.FieldInfo fi in fields)
+            {
+                int v = (int)fi.GetValue(o)!;
+                if (v > 0)
+                {
+                    fi.SetValue(o, v + delta);
+                    n++;
+                }
+            }
+            return n;
+        }
+
+        public static int OffsetOf(Map? map) => map == null ? 0 : MapSimState.For(map)?.stasisTicks ?? 0;
+    }
+
+    [HarmonyPatch(typeof(Pawn), nameof(Pawn.DeSpawn))]
+    internal static class Patch_Pawn_DeSpawn_Clock
+    {
+        // Уходит с карты: отметки — из часов карты в мировое время (+ смещение карты).
+        private static void Prefix(Pawn __instance)
+        {
+            if (LockstepClient.InSession && PerMapSim.Enabled && __instance.Spawned)
+            {
+                PawnClockShift.Shift(__instance, PawnClockShift.OffsetOf(__instance.Map));
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(Pawn), nameof(Pawn.SpawnSetup))]
+    internal static class Patch_Pawn_SpawnSetup_Clock
+    {
+        // Входит на карту: отметки — из мирового времени в часы карты (− смещение карты). При загрузке сейва — нет.
+        private static void Postfix(Pawn __instance, Map map, bool respawningAfterLoad)
+        {
+            if (!respawningAfterLoad && LockstepClient.InSession && PerMapSim.Enabled)
+            {
+                PawnClockShift.Shift(__instance, -PawnClockShift.OffsetOf(map));
+            }
         }
     }
 }

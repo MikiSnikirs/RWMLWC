@@ -29,6 +29,7 @@ public static class WorldCommands
     private const byte OpColonyTestAbsent = 13; // только тестовые прогоны (ключ abandontest=1)
     private const byte OpTestPresence = 14;     // только тестовые прогоны (ключ stasistest=1)
     private const byte OpTestKill = 15;         // только тестовые прогоны (ключ adapttest=1)
+    private const byte OpTestTransfer = 16;     // только тестовые прогоны (ключ clocktest=1)
 
     private static readonly FieldInfo FormMapField = AccessTools.Field(typeof(Dialog_FormCaravan), "map");
     private static readonly FieldInfo FormReformField = AccessTools.Field(typeof(Dialog_FormCaravan), "reform");
@@ -683,6 +684,16 @@ public static class WorldCommands
         SendWorld(w);
     }
 
+    /// <summary>Тест часов пешки: перевести колониста с карты from на карту to (как караваном, но сразу).</summary>
+    public static void SendTestTransfer(int fromMap, int toMap)
+    {
+        PacketWriter w = BeginWorld();
+        w.WriteByte(OpTestTransfer);
+        w.WriteInt32(fromMap);
+        w.WriteInt32(toMap);
+        SendWorld(w);
+    }
+
     private static void ExecuteColony(byte op, ref PacketReader r)
     {
         RWMLWC.Client.World.ColoniesComponent? colonies = RWMLWC.Client.World.Colonies.Component;
@@ -713,6 +724,32 @@ public static class WorldCommands
                     }
                     colonies.SetMember(player, s);
                     TestAutomation.Note($"colonies: player {player} joined settlement {id} (owner {colonies.OwnerOf(s)})");
+                    break;
+                }
+            case OpTestTransfer:
+                {
+                    int fromId = r.ReadInt32();
+                    int toId = r.ReadInt32();
+                    if (!RWMLWC.Client.World.CaravanSelfTest.ArmKey("clocktest=1"))
+                    {
+                        return;
+                    }
+                    Map? from = Find.Maps.FirstOrDefault(m => m.uniqueID == fromId);
+                    Map? to = Find.Maps.FirstOrDefault(m => m.uniqueID == toId);
+                    Pawn? pawn = from?.mapPawns.FreeColonistsSpawned.Where(p => p.mindState.lastIngestTick > 0).OrderBy(p => p.thingIDNumber).FirstOrDefault();
+                    if (pawn == null || to == null)
+                    {
+                        TestAutomation.Note($"clock test: nobody to move {fromId} -> {toId}");
+                        return;
+                    }
+                    MapRandContext.Enter(from);
+                    int agoBefore = Find.TickManager.TicksGame - pawn.mindState.lastIngestTick;
+                    pawn.DeSpawn();
+                    MapRandContext.Enter(to);
+                    IntVec3 cell = CellFinder.RandomClosewalkCellNear(to.Center, to, 20);
+                    GenSpawn.Spawn(pawn, cell, to);
+                    int agoAfter = Find.TickManager.TicksGame - pawn.mindState.lastIngestTick;
+                    TestAutomation.Note($"clock test: pawn {pawn.thingIDNumber} {fromId}->{toId}: ate {agoBefore} ticks ago before, {agoAfter} after");
                     break;
                 }
             case OpTestKill:
@@ -785,7 +822,7 @@ public static class WorldCommands
             SharedWindows.Execute(op, ref r);
             return;
         }
-        if (op == OpColonyClaim || op == OpColonyJoin || op == OpColonyNew || op == OpColonyTestAbsent || op == OpTestPresence || op == OpTestKill)
+        if (op == OpColonyClaim || op == OpColonyJoin || op == OpColonyNew || op == OpColonyTestAbsent || op == OpTestPresence || op == OpTestKill || op == OpTestTransfer)
         {
             ExecuteColony(op, ref r);
             return;
