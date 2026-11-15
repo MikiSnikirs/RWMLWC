@@ -729,6 +729,7 @@ public static class WorldCommands
                         return;
                     }
                     MapRandContext.Enter(map);
+                    RWMLWC.Client.World.TestSafety.AllowNextKill = true; // намеренная гибель — мимо защиты nodeath
                     victim.Kill(null);
                     TestAutomation.Note($"adapt test: colonist {victim.thingIDNumber} of map {mapId} killed");
                     break;

@@ -86,6 +86,9 @@ public static class CaravanSelfTest
 
     private static int _stasisStep;
     private static bool _killSent;
+    private static int _bannerStep;
+    private static Map? _bannerBack;
+    private static float _bannerTime;
     private static int _stasisTick;
 
     private static bool Enabled
@@ -203,6 +206,21 @@ public static class CaravanSelfTest
         {
             _killSent = true;
             RWMLWC.Client.Input.WorldCommands.SendTestKill(hostMap.uniqueID);
+        }
+
+        // Проверка надписи стазиса: один раз показать замершую карту (только интерфейс), через 3 с вернуться.
+        if (ArmKey("adapttest=1") && _bannerStep == 0 && Find.Maps.FirstOrDefault(m => PerMapSim.IsFrozen(m)) is Map frozenMap && Find.CurrentMap != frozenMap)
+        {
+            _bannerStep = 1;
+            _bannerBack = Find.CurrentMap;
+            _bannerTime = Time.realtimeSinceStartup;
+            Current.Game.CurrentMap = frozenMap;
+            TestAutomation.Note("caravan: viewing frozen map " + frozenMap.uniqueID);
+        }
+        else if (_bannerStep == 1 && Time.realtimeSinceStartup > _bannerTime + 3f)
+        {
+            _bannerStep = 2;
+            if (_bannerBack != null && Find.Maps.Contains(_bannerBack)) Current.Game.CurrentMap = _bannerBack;
         }
 
         // stasistest: хост объявляет игрока 2 (у него своя колония) «не в сети», через 6000 тиков — «снова в сети».
