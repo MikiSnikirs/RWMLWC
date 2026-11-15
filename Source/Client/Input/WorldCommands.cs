@@ -27,6 +27,7 @@ public static class WorldCommands
     private const byte OpColonyJoin = 7;
     private const byte OpColonyNew = 8;
     private const byte OpColonyTestAbsent = 13; // только тестовые прогоны (ключ abandontest=1)
+    private const byte OpTestPresence = 14;     // только тестовые прогоны (ключ stasistest=1)
 
     private static readonly FieldInfo FormMapField = AccessTools.Field(typeof(Dialog_FormCaravan), "map");
     private static readonly FieldInfo FormReformField = AccessTools.Field(typeof(Dialog_FormCaravan), "reform");
@@ -662,6 +663,16 @@ public static class WorldCommands
         SendWorld(w);
     }
 
+    /// <summary>Тест стазиса: игрок «не в сети» / «снова в сети» в состоянии игры.</summary>
+    public static void SendTestPresence(int player, bool online)
+    {
+        PacketWriter w = BeginWorld();
+        w.WriteByte(OpTestPresence);
+        w.WriteInt32(player);
+        w.WriteBool(online);
+        SendWorld(w);
+    }
+
     private static void ExecuteColony(byte op, ref PacketReader r)
     {
         RWMLWC.Client.World.ColoniesComponent? colonies = RWMLWC.Client.World.Colonies.Component;
@@ -692,6 +703,18 @@ public static class WorldCommands
                     }
                     colonies.SetMember(player, s);
                     TestAutomation.Note($"colonies: player {player} joined settlement {id} (owner {colonies.OwnerOf(s)})");
+                    break;
+                }
+            case OpTestPresence:
+                {
+                    int target = r.ReadInt32();
+                    bool online = r.ReadBool();
+                    if (!RWMLWC.Client.World.CaravanSelfTest.ArmKey("stasistest=1"))
+                    {
+                        return;
+                    }
+                    RWMLWC.Client.Maps.PlayerPresence.Component?.Apply(target, online);
+                    TestAutomation.Note($"stasis test: player {target} {(online ? "online" : "offline")}");
                     break;
                 }
             case OpColonyTestAbsent:
@@ -733,7 +756,7 @@ public static class WorldCommands
             SharedWindows.Execute(op, ref r);
             return;
         }
-        if (op == OpColonyClaim || op == OpColonyJoin || op == OpColonyNew || op == OpColonyTestAbsent)
+        if (op == OpColonyClaim || op == OpColonyJoin || op == OpColonyNew || op == OpColonyTestAbsent || op == OpTestPresence)
         {
             ExecuteColony(op, ref r);
             return;

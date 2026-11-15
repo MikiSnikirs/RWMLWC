@@ -82,6 +82,9 @@ public sealed class ColoniesComponent : GameComponent
 
     public void SetMember(int playerId, Settlement settlement) => members[playerId] = settlement.ID;
 
+    /// <summary>Соавторы колонии.</summary>
+    public IEnumerable<int> MembersOf(Settlement settlement) => members.Where(kv => kv.Value == settlement.ID).Select(kv => kv.Key).OrderBy(p => p);
+
     /// <summary>Все поселения игрока без владельца — игроку (первая колония — хоста).</summary>
     public int ClaimUnowned(int playerId)
     {
