@@ -86,6 +86,8 @@ public static class CaravanSelfTest
 
     private static int _stasisStep;
     private static bool _killSent;
+    private static int _tradeStep;
+    private static int _tradeTick;
     private static int _clockStep;
     private static int _clockTick;
     private static Game? _tracedGame;
@@ -277,6 +279,45 @@ public static class CaravanSelfTest
                     _clockStep = 2;
                     RWMLWC.Client.Input.WorldCommands.SendTestTransfer(other.uniqueID, thawed.uniqueID);
                 }
+            }
+        }
+
+        // tradetest: игрок 2 — караван торговцев на карту хоста (карта 0), колонист идёт торговать, в окне — купить одну вещь.
+        if (ArmKey("tradetest=1") && LockstepClient.PlayerId == 2)
+        {
+            if (_tradeStep == 0 && tick >= _startTick + 200)
+            {
+                _tradeStep = 1;
+                _tradeTick = tick;
+                RWMLWC.Client.Input.WorldCommands.SendTestOp(RWMLWC.Client.Input.WorldCommands.TestTraderOp, 0, 0);
+            }
+            else if (_tradeStep == 1 && tick >= _tradeTick + 2500)
+            {
+                _tradeStep = 2;
+                RWMLWC.Client.Input.WorldCommands.SendTestOp(RWMLWC.Client.Input.WorldCommands.TestGoTradeOp, 0, 0);
+            }
+            else if (_tradeStep == 2 && TradeSession.Active && Find.WindowStack.IsOpen<Dialog_Trade>())
+            {
+                _tradeStep = 3;
+                // Продать торговцу одну вещь колонии (серебро не нужно): направление — то, при котором действие «игрок продаёт».
+                Tradeable? buy = null;
+                foreach (Tradeable t in TradeSession.deal.AllTradeables.Where(t => !t.IsCurrency && t.CountHeldBy(Transactor.Colony) > 0 && t.TraderWillTrade)
+                    .OrderBy(t => t.AnyThing.thingIDNumber))
+                {
+                    foreach (int d in new[] { 1, -1 })
+                    {
+                        if (t.CanAdjustBy(d).Accepted)
+                        {
+                            t.AdjustBy(d);
+                            if (t.ActionToDo == TradeAction.PlayerSells) { buy = t; break; }
+                            t.AdjustBy(-d);
+                        }
+                    }
+                    if (buy != null) break;
+                }
+                bool ok = TradeSession.deal.TryExecute(out bool traded);
+                Find.WindowStack.TryRemove(typeof(Dialog_Trade));
+                var all = TradeSession.deal.AllTradeables; TestAutomation.Note($"caravan: trade lines {all.Count}, colony>0 {all.Count(t => t.CountHeldBy(Transactor.Colony) > 0)}, trader>0 {all.Count(t => t.CountHeldBy(Transactor.Trader) > 0)}, willTrade {all.Count(t => t.TraderWillTrade)}, currency {all.Count(t => t.IsCurrency)}"); TestAutomation.Note($"caravan: trade window — sold {buy?.ThingDef?.defName ?? "nothing"} x1 (count {buy?.CountToTransfer}), accept {ok}/{traded}");
             }
         }
 

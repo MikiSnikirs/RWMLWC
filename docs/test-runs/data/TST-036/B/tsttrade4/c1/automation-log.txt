@@ -1,0 +1,41 @@
+2026-11-16 00:38:52 autoload: loading save 'tst014'
+2026-11-16 00:39:02 lockstep: connecting to 127.0.0.1:58185 as 'c1'
+2026-11-16 00:39:03 lockstep: connected to quic:127.0.0.1:58185, Hello sent
+2026-11-16 00:39:04 lockstep: Welcome, playerId=1, serverTick=14998, seed=7
+2026-11-16 00:39:04 presence: player 1 online
+2026-11-16 00:39:04 presence: player 2 online
+2026-11-16 00:40:04 run started: #0, tick=14998, scenario=none, ticks=9000, trace=False, quit=True, file=hash-c1-20261116-004004.txt
+2026-11-16 00:40:06 colonies: claim sent (lowest online player)
+2026-11-16 00:40:09 colonies: player 1 is the host, settlements claimed: 1
+2026-11-16 00:40:11 colonies: player 2 joined settlement 251 (owner 1)
+2026-11-16 00:40:11 trade test: trader caravan on map 0: True
+2026-11-16 00:40:11 caravan summary: tick 15515, forming lords 0, caravans 0, player settlements 1, maps 1, colonists by map 3, colonies owners=[251:1] members=[2@251], adapt 0:0.00/0, factors 0:d0×0.70×a0.80, perf 12091 us/tick, stasis [0:-0] (game: d0×a0.00)
+2026-11-16 00:40:13 caravan summary: tick 16016, forming lords 0, caravans 0, player settlements 1, maps 1, colonists by map 3, colonies owners=[251:1] members=[2@251], adapt 0:0.00/0, factors 0:d0×0.70×a0.80, perf 767 us/tick, stasis [0:-0] (game: d0×a0.00)
+2026-11-16 00:40:14 caravan summary: tick 16520, forming lords 0, caravans 0, player settlements 1, maps 1, colonists by map 3, colonies owners=[251:1] members=[2@251], adapt 0:0.00/0, factors 0:d0×0.70×a0.80, perf 711 us/tick, stasis [0:-0] (game: d0×a0.00)
+2026-11-16 00:40:16 caravan summary: tick 17023, forming lords 0, caravans 0, player settlements 1, maps 1, colonists by map 3, colonies owners=[251:1] members=[2@251], adapt 0:0.00/0, factors 0:d0×0.70×a0.80, perf 715 us/tick, stasis [0:-0] (game: d0×a0.00)
+2026-11-16 00:40:17 caravan summary: tick 17532, forming lords 0, caravans 0, player settlements 1, maps 1, colonists by map 3, colonies owners=[251:1] members=[2@251], adapt 0:0.00/0, factors 0:d0×0.70×a0.80, perf 648 us/tick, stasis [0:-0] (game: d0×a0.00)
+2026-11-16 00:40:17 trade test: colonist 231 goes to trade with 100000000, ordered by player 2
+2026-11-16 00:40:18 caravan summary: tick 18034, forming lords 0, caravans 0, player settlements 1, maps 1, colonists by map 3, colonies owners=[251:1] members=[2@251], adapt 0:0.00/0, factors 0:d0×0.70×a0.80, perf 634 us/tick, stasis [0:-0] (game: d0×a0.00)
+2026-11-16 00:40:20 caravan summary: tick 18538, forming lords 0, caravans 0, player settlements 1, maps 1, colonists by map 3, colonies owners=[251:1] members=[2@251], adapt 0:0.00/0, factors 0:d0×0.70×a0.80, perf 610 us/tick, stasis [0:-0] (game: d0×a0.00)
+2026-11-16 00:40:20 trade: window opened in tick for negotiator 231, ordered by 2, shown False
+2026-11-16 00:40:20 trade: executed by player 2: 1/1 lines, ok True, traded True
+2026-11-16 00:40:21 caravan summary: tick 19041, forming lords 0, caravans 0, player settlements 1, maps 1, colonists by map 3, colonies owners=[251:1] members=[2@251], adapt 0:0.00/0, factors 0:d0×0.70×a0.80, perf 644 us/tick, stasis [0:-0] (game: d0×a0.00)
+2026-11-16 00:40:23 caravan summary: tick 19545, forming lords 0, caravans 0, player settlements 1, maps 1, colonists by map 3, colonies owners=[251:1] members=[2@251], adapt 0:0.00/0, factors 0:d0×0.70×a0.80, perf 608 us/tick, stasis [0:-0] (game: d0×a0.00)
+2026-11-16 00:40:24 caravan summary: tick 20049, forming lords 0, caravans 0, player settlements 1, maps 1, colonists by map 3, colonies owners=[251:1] members=[2@251], adapt 0:0.00/0, factors 0:d0×0.70×a0.80, perf 637 us/tick, stasis [0:-0] (game: d0×a0.00)
+2026-11-16 00:40:25 caravan summary: tick 20552, forming lords 0, caravans 0, player settlements 1, maps 1, colonists by map 3, colonies owners=[251:1] members=[2@251], adapt 0:0.00/0, factors 0:d0×0.70×a0.80, perf 601 us/tick, stasis [0:-0] (game: d0×a0.00)
+2026-11-16 00:40:27 caravan summary: tick 21056, forming lords 0, caravans 0, player settlements 1, maps 1, colonists by map 3, colonies owners=[251:1] members=[2@251], adapt 0:0.00/0, factors 0:d0×0.70×a0.80, perf 627 us/tick, stasis [0:-0] (game: d0×a0.00)
+2026-11-16 00:40:28 caravan summary: tick 21559, forming lords 0, caravans 0, player settlements 1, maps 1, colonists by map 3, colonies owners=[251:1] members=[2@251], adapt 0:0.00/0, factors 0:d0×0.70×a0.80, perf 585 us/tick, stasis [0:-0] (game: d0×a0.00)
+2026-11-16 00:40:30 caravan summary: tick 22062, forming lords 0, caravans 0, player settlements 1, maps 1, colonists by map 3, colonies owners=[251:1] members=[2@251], adapt 0:0.00/0, factors 0:d0×0.70×a0.80, perf 635 us/tick, stasis [0:-0] (game: d0×a0.00)
+2026-11-16 00:40:31 caravan summary: tick 22566, forming lords 0, caravans 0, player settlements 1, maps 1, colonists by map 3, colonies owners=[251:1] members=[2@251], adapt 0:0.00/0, factors 0:d0×0.70×a0.80, perf 615 us/tick, stasis [0:-0] (game: d0×a0.00)
+2026-11-16 00:40:32 caravan summary: tick 23068, forming lords 0, caravans 0, player settlements 1, maps 1, colonists by map 3, colonies owners=[251:1] members=[2@251], adapt 0:0.00/0, factors 0:d0×0.70×a0.80, perf 635 us/tick, stasis [0:-0] (game: d0×a0.00)
+2026-11-16 00:40:34 caravan summary: tick 23571, forming lords 0, caravans 0, player settlements 1, maps 1, colonists by map 3, colonies owners=[251:1] members=[2@251], adapt 0:0.00/0, factors 0:d0×0.70×a0.80, perf 677 us/tick, stasis [0:-0] (game: d0×a0.00)
+2026-11-16 00:40:35 summary: map0 drafted=0 forbidden=56 plants=[]
+2026-11-16 00:40:35 summary: map0 jobs=[231:Wait_Wander@(121, 0, 125),234:GotoWander@(98, 0, 123),239:GotoWander@(130, 0, 117)]
+2026-11-16 00:40:35 summary: map0 settings=29B89D30A34E3B1A
+2026-11-16 00:40:35 summary: absence= offline=[]
+2026-11-16 00:40:35 summary: squads= rejected=0 drafted=[]
+2026-11-16 00:40:35 summary: map0 designations=0 blueprints=0 zones=0; commands sent=1 executed=5 failed=0
+2026-11-16 00:40:35 run finished: file=hash-c1-20261116-004004.txt
+2026-11-16 00:40:35 queue: finished
+2026-11-16 00:40:35 lockstep: disconnect: прогон завершён
+2026-11-16 00:40:35 quitting game
