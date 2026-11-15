@@ -86,6 +86,8 @@ public static class CaravanSelfTest
 
     private static int _stasisStep;
     private static bool _killSent;
+    private static int _clockStep;
+    private static int _clockTick;
     private static Game? _tracedGame;
     private static int _bannerStep;
     private static Map? _bannerBack;
@@ -255,6 +257,27 @@ public static class CaravanSelfTest
         {
             _bannerStep = 2;
             if (_bannerBack != null && Find.Maps.Contains(_bannerBack)) Current.Game.CurrentMap = _bannerBack;
+        }
+
+        // clocktest: после разморозки — колонист с размороженной карты на другую, через 600 тиков — обратно.
+        if (ArmKey("clocktest=1") && LockstepClient.PlayerId == 1 && _clockStep < 2)
+        {
+            Map? thawed = Find.Maps.FirstOrDefault(m => !PerMapSim.IsFrozen(m) && (MapSimState.For(m)?.stasisTicks ?? 0) > 0);
+            Map? other = thawed == null ? null : Find.Maps.FirstOrDefault(m => m != thawed && m.IsPlayerHome);
+            if (thawed != null && other != null)
+            {
+                if (_clockStep == 0)
+                {
+                    _clockStep = 1;
+                    _clockTick = tick;
+                    RWMLWC.Client.Input.WorldCommands.SendTestTransfer(thawed.uniqueID, other.uniqueID);
+                }
+                else if (_clockStep == 1 && tick >= _clockTick + 600)
+                {
+                    _clockStep = 2;
+                    RWMLWC.Client.Input.WorldCommands.SendTestTransfer(other.uniqueID, thawed.uniqueID);
+                }
+            }
         }
 
         // stasistest: хост объявляет игрока 2 (у него своя колония) «не в сети», через 6000 тиков — «снова в сети».
