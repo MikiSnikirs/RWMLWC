@@ -411,7 +411,16 @@ public static class CaravanSelfTest
     private static void RingCaptureMap(int t, Map map)
     {
         List<Thing> things = map.listerThings.AllThings;
-        int[] data = new int[things.Count * 6];
+        int[] data = new int[things.Count * 6 + 6];
+        // Первая строка — состояние Rand карты и глобальное (что разошлось первым: числа или вещи).
+        ulong rs = MapSimState.For(map)?.randState ?? 0;
+        ulong gs = MapRandContext.GlobalState;
+        data[things.Count * 6] = -1;
+        data[things.Count * 6 + 1] = (int)(rs & 0xFFFFFFFF);
+        data[things.Count * 6 + 2] = (int)(rs >> 32);
+        data[things.Count * 6 + 3] = (int)(gs & 0xFFFFFFFF);
+        data[things.Count * 6 + 4] = (int)(gs >> 32);
+        data[things.Count * 6 + 5] = 0;
         for (int i = 0; i < things.Count; i++)
         {
             Thing th = things[i];
@@ -447,6 +456,8 @@ public static class CaravanSelfTest
                 foreach (string r in rows) sb.AppendLine(r);
                 System.IO.File.WriteAllText(System.IO.Path.Combine(dir, $"ring-map{tick % 16}-{tick / 16}.txt"), sb.ToString());
             }
+            System.IO.File.WriteAllText(System.IO.Path.Combine(dir, $"fine-{Find.TickManager.TicksGame}.txt"), string.Concat(_fine));
+            _fine.Clear();
             TestAutomation.Note($"caravan: ring dump written, {_ring.Count} snapshots, ticks {_ring.Peek().tick}..");
             _ring.Clear();
         }
@@ -456,9 +467,41 @@ public static class CaravanSelfTest
         }
     }
 
+    // Тонкий буфер каждого тика: Rand карт, пешки (клетка), грязь (клетка, толщина) — последние 200 тиков.
+    private static readonly Queue<string> _fine = new Queue<string>();
+
+    private static void FineCapture(int t)
+    {
+        var sb = new System.Text.StringBuilder();
+        foreach (Map m in Find.Maps)
+        {
+            sb.Append("T").Append(t).Append(" map").Append(m.uniqueID).Append(" rand ").Append((MapSimState.For(m)?.randState ?? 0).ToString("X16")).Append('|');
+            foreach (Pawn p in m.mapPawns.AllPawnsSpawned)
+            {
+                sb.Append('p').Append(p.thingIDNumber).Append('@').Append(p.Position.x).Append(',').Append(p.Position.z).Append(' ');
+            }
+            sb.Append('|');
+            foreach (Thing f in m.listerThings.ThingsInGroup(ThingRequestGroup.Filth))
+            {
+                sb.Append('f').Append(f.thingIDNumber).Append('@').Append(f.Position.x).Append(',').Append(f.Position.z)
+                  .Append('x').Append((f as Filth)?.thickness ?? 0).Append(' ');
+            }
+            sb.Append(Environment.NewLine);
+        }
+        _fine.Enqueue(sb.ToString());
+        while (_fine.Count > 200)
+        {
+            _fine.Dequeue();
+        }
+    }
+
     private static void AfterTick()
     {
         int t = Find.TickManager.TicksGame;
+        if (ArmKey("ringdump=1") && Find.Maps.Count > 0)
+        {
+            FineCapture(t);
+        }
         if (t % 10 == 0 && Find.Maps.Count > 0 && ArmKey("ringdump=1"))
         {
             RingCapture(t);
