@@ -39,6 +39,30 @@ public static class CaravanSelfTest
     private static PlanetTile _destination2 = PlanetTile.Invalid;
     private static int _dumpedMaps = int.MaxValue;
 
+    private static bool? _abandonTest;
+    private static bool _abandonSent;
+
+    /// <summary>Ключ метки abandontest=1: проверка удаления брошенной колонии (тестовая команда разрешена).</summary>
+    public static bool AbandonTestArmed
+    {
+        get
+        {
+            if (_abandonTest == null)
+            {
+                try
+                {
+                    string arm = System.IO.Path.Combine(GenFilePaths.SaveDataFolderPath, "RWMLWC", "arm-determinism-run.txt");
+                    _abandonTest = System.IO.File.Exists(arm) && System.IO.File.ReadAllLines(arm).Any(l => l.Trim() == "abandontest=1");
+                }
+                catch (Exception)
+                {
+                    _abandonTest = false;
+                }
+            }
+            return _abandonTest.Value;
+        }
+    }
+
     private static bool Enabled
     {
         get
@@ -138,6 +162,14 @@ public static class CaravanSelfTest
         if (_dumpedMaps < Find.Maps.Count)
         {
             DumpNewMaps(tick);
+        }
+
+        // abandontest: хост (игрок 1) объявляет игрока 2 «не в сети 10 лет», когда у того есть своя колония.
+        if (AbandonTestArmed && !_abandonSent && LockstepClient.PlayerId == 1 && Colonies.Component?.OwnsColony(2) == true)
+        {
+            _abandonSent = true;
+            RWMLWC.Client.Input.WorldCommands.SendColonyTestAbsent(2);
+            TestAutomation.Note("caravan: abandon test — player 2 marked absent");
         }
 
         if (tick >= _nextSummary)

@@ -26,6 +26,7 @@ public static class WorldCommands
     private const byte OpColonyClaim = 6;
     private const byte OpColonyJoin = 7;
     private const byte OpColonyNew = 8;
+    private const byte OpColonyTestAbsent = 13; // только тестовые прогоны (ключ abandontest=1)
 
     private static readonly FieldInfo FormMapField = AccessTools.Field(typeof(Dialog_FormCaravan), "map");
     private static readonly FieldInfo FormReformField = AccessTools.Field(typeof(Dialog_FormCaravan), "reform");
@@ -652,6 +653,15 @@ public static class WorldCommands
         SendWorld(w);
     }
 
+    /// <summary>Тест: игрок «не был в сети 10 лет» — следующая суточная проверка покинет его колонию.</summary>
+    public static void SendColonyTestAbsent(int player)
+    {
+        PacketWriter w = BeginWorld();
+        w.WriteByte(OpColonyTestAbsent);
+        w.WriteInt32(player);
+        SendWorld(w);
+    }
+
     private static void ExecuteColony(byte op, ref PacketReader r)
     {
         RWMLWC.Client.World.ColoniesComponent? colonies = RWMLWC.Client.World.Colonies.Component;
@@ -684,6 +694,18 @@ public static class WorldCommands
                     TestAutomation.Note($"colonies: player {player} joined settlement {id} (owner {colonies.OwnerOf(s)})");
                     break;
                 }
+            case OpColonyTestAbsent:
+                {
+                    int target = r.ReadInt32();
+                    if (!RWMLWC.Client.World.CaravanSelfTest.AbandonTestArmed)
+                    {
+                        return; // вне тестового прогона команда ничего не делает
+                    }
+                    colonies.DebugSetLastActive(target, Find.TickManager.TicksGame - RWMLWC.Client.World.ColoniesComponent.AbandonAfterTicks - 1);
+                    RWMLWC.Client.Maps.PlayerPresence.Component?.Apply(target, false);
+                    TestAutomation.Note($"colonies: test — player {target} marked absent for 10 years");
+                    break;
+                }
             case OpColonyNew:
                 {
                     PlanetTile tile = ReadTile(ref r);
@@ -711,7 +733,7 @@ public static class WorldCommands
             SharedWindows.Execute(op, ref r);
             return;
         }
-        if (op == OpColonyClaim || op == OpColonyJoin || op == OpColonyNew)
+        if (op == OpColonyClaim || op == OpColonyJoin || op == OpColonyNew || op == OpColonyTestAbsent)
         {
             ExecuteColony(op, ref r);
             return;

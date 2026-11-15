@@ -5,6 +5,7 @@ using RimWorld;
 using RimWorld.Planet;
 using RWMLWC.Client.Input;
 using RWMLWC.Client.Sim;
+using UnityEngine;
 using Verse;
 
 namespace RWMLWC.Client.World;
@@ -25,8 +26,20 @@ public sealed class ColoniesComponent : GameComponent
     // Игрок → поселение, к которому он присоединился соавтором.
     private Dictionary<int, int> members = new Dictionary<int, int>();
 
+    // Игрок → последний тик, когда он был в сети (проверяется раз в игровые сутки).
+    private Dictionary<int, int> lastActive = new Dictionary<int, int>();
+
     private List<int>? tmpKeys;
     private List<int>? tmpValues;
+
+    /// <summary>
+    /// Колония удаляется (как «Покинуть поселение»), если ни владелец, ни её соавторы не были в сети столько
+    /// игрового времени (решение владельца 15.11: 10 лет). Время идёт, только пока кто-то играет.
+    /// </summary>
+    public const int AbandonAfterTicks = 10 * GenDate.TicksPerYear;
+
+    /// <summary>Как часто проверять — раз в игровые сутки, чтобы не нагружать игру.</summary>
+    public const int CheckIntervalTicks = GenDate.TicksPerDay;
 
     public ColoniesComponent(Game game)
     {
@@ -107,10 +120,62 @@ public sealed class ColoniesComponent : GameComponent
     private static Settlement? Find(int id) =>
         Verse.Find.WorldObjects.Settlements.FirstOrDefault(s => s.ID == id && s.Faction == Faction.OfPlayer);
 
+    public override void GameComponentTick()
+    {
+        if (!LockstepClient.InSession || Verse.Find.TickManager.TicksGame % CheckIntervalTicks != 0)
+        {
+            return;
+        }
+        CheckAbandoned(Verse.Find.TickManager.TicksGame);
+    }
+
+    /// <summary>Раз в сутки (в тике, у всех одинаково): отметить, кто в сети; удалить колонии, брошенные на 10 лет.</summary>
+    public void CheckAbandoned(int now)
+    {
+        foreach (int player in owners.Values.Concat(members.Keys).Distinct().OrderBy(p => p).ToList())
+        {
+            if (!lastActive.ContainsKey(player) || RWMLWC.Client.Maps.PlayerPresence.IsOnline(player))
+            {
+                lastActive[player] = now;
+            }
+        }
+        foreach (KeyValuePair<int, int> kv in owners.OrderBy(kv => kv.Key).ToList())
+        {
+            Settlement? s = Find(kv.Key);
+            if (s == null)
+            {
+                owners.Remove(kv.Key); // поселения уже нет (покинуто, разрушено)
+                continue;
+            }
+            int last = lastActive.TryGetValue(kv.Value, out int t) ? t : now;
+            foreach (KeyValuePair<int, int> m in members.Where(m => m.Value == kv.Key))
+            {
+                last = Mathf.Max(last, lastActive.TryGetValue(m.Key, out int mt) ? mt : now);
+            }
+            if (now - last < AbandonAfterTicks)
+            {
+                continue;
+            }
+            TestAutomation.Note($"colonies: settlement {s.ID} of player {kv.Value} abandoned — nobody of it online for {(now - last) / GenDate.TicksPerYear} years");
+            Messages.Message($"RWMLWC: колония «{s.LabelCap}» покинута — её игроки не заходили 10 игровых лет", MessageTypeDefOf.NeutralEvent, false);
+            owners.Remove(kv.Key);
+            foreach (int member in members.Where(m => m.Value == kv.Key).Select(m => m.Key).ToList())
+            {
+                members.Remove(member);
+            }
+            s.Abandon(wasGravshipLaunch: false);
+        }
+    }
+
+    /// <summary>Для теста: сдвинуть «последний раз в сети» игрока в прошлое.</summary>
+    public void DebugSetLastActive(int player, int tick) => lastActive[player] = tick;
+
     public override void ExposeData()
     {
         Scribe_Collections.Look(ref owners, "rwmlwcColonyOwners", LookMode.Value, LookMode.Value, ref tmpKeys, ref tmpValues);
         Scribe_Collections.Look(ref members, "rwmlwcColonyMembers", LookMode.Value, LookMode.Value, ref tmpKeys, ref tmpValues);
+        Scribe_Collections.Look(ref lastActive, "rwmlwcColonyLastActive", LookMode.Value, LookMode.Value, ref tmpKeys, ref tmpValues);
+        lastActive ??= new Dictionary<int, int>();
         owners ??= new Dictionary<int, int>();
         members ??= new Dictionary<int, int>();
     }
