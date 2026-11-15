@@ -377,9 +377,77 @@ public static class CaravanSelfTest
 
     private static int _dumpUntil = -1;
 
+    // ringdump: каждые 10 тиков — компактный список вещей карты 0 в памяти (последние 30), при сообщении сервера
+    // о расхождении — в файл. Почти не замедляет тики (поиск T-076 без смены темпа).
+    private static readonly Queue<(int tick, int[] data)> _ring = new Queue<(int, int[])>();
+
+    private static void RingCapture(int t)
+    {
+        foreach (Map m in Find.Maps)
+        {
+            RingCaptureMap(t, m);
+        }
+        while (_ring.Count > 30 * Math.Max(1, Find.Maps.Count))
+        {
+            _ring.Dequeue();
+        }
+    }
+
+    private static void RingCaptureMap(int t, Map map)
+    {
+        List<Thing> things = map.listerThings.AllThings;
+        int[] data = new int[things.Count * 6];
+        for (int i = 0; i < things.Count; i++)
+        {
+            Thing th = things[i];
+            data[i * 6] = th.thingIDNumber;
+            data[i * 6 + 1] = th.def.shortHash;
+            data[i * 6 + 2] = th.Position.x;
+            data[i * 6 + 3] = th.Position.z;
+            data[i * 6 + 4] = th.stackCount;
+            data[i * 6 + 5] = th.HitPoints;
+        }
+        _ring.Enqueue((t * 16 + map.uniqueID, data)); // тик и номер карты в одном числе
+    }
+
+    /// <summary>Сервер сообщил о расхождении: записать буфер вещей (ключ ringdump=1).</summary>
+    public static void OnDesyncNotice()
+    {
+        if (!ArmKey("ringdump=1") || _ring.Count == 0)
+        {
+            return;
+        }
+        try
+        {
+            string dir = System.IO.Path.Combine(GenFilePaths.SaveDataFolderPath, "RWMLWC");
+            foreach ((int tick, int[] data) in _ring)
+            {
+                var sb = new System.Text.StringBuilder();
+                var rows = new List<string>(data.Length / 6);
+                for (int i = 0; i < data.Length; i += 6)
+                {
+                    rows.Add($"{data[i]};{data[i + 1]};{data[i + 2]};{data[i + 3]};{data[i + 4]};{data[i + 5]}");
+                }
+                rows.Sort(StringComparer.Ordinal);
+                foreach (string r in rows) sb.AppendLine(r);
+                System.IO.File.WriteAllText(System.IO.Path.Combine(dir, $"ring-map{tick % 16}-{tick / 16}.txt"), sb.ToString());
+            }
+            TestAutomation.Note($"caravan: ring dump written, {_ring.Count} snapshots, ticks {_ring.Peek().tick}..");
+            _ring.Clear();
+        }
+        catch (Exception e)
+        {
+            TestAutomation.Note("caravan: ring dump failed: " + e.Message);
+        }
+    }
+
     private static void AfterTick()
     {
         int t = Find.TickManager.TicksGame;
+        if (t % 10 == 0 && Find.Maps.Count > 0 && ArmKey("ringdump=1"))
+        {
+            RingCapture(t);
+        }
         if (t <= _dumpUntil && t % 10 == 0 && Find.Maps.Count > 0)
         {
             try
