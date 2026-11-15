@@ -86,6 +86,7 @@ public static class CaravanSelfTest
 
     private static int _stasisStep;
     private static bool _killSent;
+    private static Game? _tracedGame;
     private static int _bannerStep;
     private static Map? _bannerBack;
     private static float _bannerTime;
@@ -125,6 +126,24 @@ public static class CaravanSelfTest
         }
         // Действует игрок 2: игрок 1 — хост, у него первая колония, а основать поселение может только игрок
         // без своей колонии (соавтор — ключ colonychoice=join).
+        // tracepostload: после каждой загрузки снимка — трассировка Rand со стеком на 400 тиков (оба клиента
+        // стартуют с одного снимка, первая отличающаяся строка — код, который ведёт себя по-разному).
+        if (!ReferenceEquals(_tracedGame, Current.Game))
+        {
+            _tracedGame = Current.Game;
+            if (ArmKey("tracepostload=1") && tick > 20000)
+            {
+                string file = System.IO.Path.Combine(GenFilePaths.SaveDataFolderPath, "RWMLWC", $"randtrace-post-{tick}.txt");
+                RandTracer.Start(file, tick, tick + 400);
+                TestAutomation.Note($"caravan: rand trace after snapshot load, ticks {tick}..{tick + 400}");
+            }
+            if (ArmKey("dumppostload=1") && tick > 20000)
+            {
+                _dumpUntil = tick + 300;
+                TestAutomation.Note($"caravan: thing dumps after snapshot load, ticks {tick}..{_dumpUntil}");
+            }
+        }
+
         bool issuer = LockstepClient.PlayerId == 2 && !ArmKey("adapttest=1"); // adapttest — только сводки
 
         if (issuer && !_formed && tick >= _startTick + 300)
@@ -356,8 +375,23 @@ public static class CaravanSelfTest
 
     private static void BeforeTick() => _tickWatch.Restart();
 
+    private static int _dumpUntil = -1;
+
     private static void AfterTick()
     {
+        int t = Find.TickManager.TicksGame;
+        if (t <= _dumpUntil && t % 10 == 0 && Find.Maps.Count > 0)
+        {
+            try
+            {
+                var sb = new System.Text.StringBuilder();
+                MapStateHasher.DumpThings(Find.Maps[0], sb);
+                System.IO.File.WriteAllText(System.IO.Path.Combine(GenFilePaths.SaveDataFolderPath, "RWMLWC", $"postdump-{t}.txt"), sb.ToString());
+            }
+            catch (Exception)
+            {
+            }
+        }
         _tickTicks += _tickWatch.ElapsedTicks;
         _tickCount++;
     }
