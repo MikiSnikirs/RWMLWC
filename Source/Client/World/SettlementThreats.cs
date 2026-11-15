@@ -50,6 +50,15 @@ public sealed class SettlementThreatsComponent : GameComponent
         StorytellerDef def = Find.Storyteller.def;
         bool growTick = Find.TickManager.TicksGame % 30000 == 0;
         List<Map> maps = Find.Maps;
+        if (growTick)
+        {
+            // Карты, которых больше нет (поселение покинуто), — убрать: номера карт не повторяются.
+            foreach (int id in adaptDays.Keys.Where(id => !maps.Any(m => m.uniqueID == id)).ToList())
+            {
+                adaptDays.Remove(id);
+                absentTicks.Remove(id);
+            }
+        }
         for (int i = 0; i < maps.Count; i++)
         {
             Map map = maps[i];
