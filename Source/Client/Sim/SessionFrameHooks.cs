@@ -21,6 +21,7 @@ public sealed class SessionFrameHooks : GameComponent
         {
             return;
         }
+        RoofCountIsolation.ProbeFrame();
         RWMLWC.Client.SessionView.ChatSelfTest.Frame();
         RWMLWC.Client.Absence.IdleAlarm.Frame();
         RWMLWC.Client.Net.Reconnect.Frame();

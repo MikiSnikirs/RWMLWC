@@ -257,6 +257,12 @@ public static class TestAutomation
                 case "roomdump":
                     RoomStateProbe.On = value == "1";
                     break;
+                case "uiprobe":
+                    RoofCountIsolation.UiProbe = value == "1";
+                    break;
+                case "noroofiso":
+                    RoofCountIsolation.Disabled = value == "1";
+                    break;
                 case "trace":
                     cfg.trace = value != "0";
                     break;

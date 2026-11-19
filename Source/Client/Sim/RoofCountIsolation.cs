@@ -27,7 +27,49 @@ namespace RWMLWC.Client.Sim;
 /// </summary>
 internal static class RoofCountIsolation
 {
-    public static bool Isolated => PerMapSim.Enabled && !(MapRandContext.InTick && VisualRandIsolation.Depth == 0);
+    /// <summary>Ключ uiprobe=1: имитация чтения комнат интерфейсом вне тика (диагностика T-076).</summary>
+    public static bool UiProbe;
+
+    /// <summary>Ключ noroofiso=1: выключить изоляцию (контрольный прогон A/B).</summary>
+    public static bool Disabled;
+
+    public static bool Isolated => !Disabled && PerMapSim.Enabled && !(MapRandContext.InTick && VisualRandIsolation.Depth == 0);
+
+    private static int lastProbeTick = -1;
+
+    /// <summary>
+    /// Вне тика (кадровый хук) читаем у комнат те же getters, что зовёт интерфейс рисующего клиента:
+    /// PsychologicallyOutdoors (порог 300), OutdoorsForWork (101), UsesOutdoorTemperature (полный подсчёт).
+    /// Без изоляции эти вызовы оставляют частичные перечислители районов — механизм T-076.
+    /// С изоляцией — свежий подсчёт без записи в кэши. В тихом окне OnGUI не приходит, поэтому
+    /// триггер воспроизводится этим зондом, а не настоящей отрисовкой.
+    /// </summary>
+    public static void ProbeFrame()
+    {
+        if (!UiProbe || Current.Game == null || !LockstepClient.InSession || Current.ProgramState != ProgramState.Playing)
+        {
+            return;
+        }
+        int t = Find.TickManager.TicksGame;
+        if (t == lastProbeTick || t % 10 != 0)
+        {
+            return;
+        }
+        lastProbeTick = t;
+        foreach (Map map in Find.Maps)
+        {
+            if (PerMapSim.IsFrozen(map))
+            {
+                continue;
+            }
+            foreach (Room r in map.regionGrid.AllRooms)
+            {
+                _ = r.PsychologicallyOutdoors;
+                _ = r.OutdoorsForWork;
+                _ = r.UsesOutdoorTemperature;
+            }
+        }
+    }
 }
 
 [HarmonyPatch(typeof(District), "OpenRoofCountStopAt")]
