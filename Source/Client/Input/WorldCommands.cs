@@ -32,6 +32,7 @@ public static class WorldCommands
     private const byte OpTestTransfer = 16;     // только тестовые прогоны (ключ clocktest=1)
     private const byte OpTestTrader = 18;       // только тестовые прогоны (ключ tradetest=1): караван торговцев
     private const byte OpTestGoTrade = 19;      // только тестовые прогоны (ключ tradetest=1): колонист идёт торговать
+    private const byte OpTestHomeArea = 20;     // только тестовые прогоны (ключ exchangetest=1): домашняя зона под вещами карты
 
     private static readonly FieldInfo FormMapField = AccessTools.Field(typeof(Dialog_FormCaravan), "map");
     private static readonly FieldInfo FormReformField = AccessTools.Field(typeof(Dialog_FormCaravan), "reform");
@@ -707,6 +708,7 @@ public static class WorldCommands
 
     public const byte TestTraderOp = OpTestTrader;
     public const byte TestGoTradeOp = OpTestGoTrade;
+    public const byte TestHomeAreaOp = OpTestHomeArea;
 
     private static void ExecuteColony(byte op, ref PacketReader r)
     {
@@ -771,6 +773,29 @@ public static class WorldCommands
                         colonist.jobs.TryTakeOrderedJob(Verse.JobMaker.MakeJob(JobDefOf.TradeWithPawn, trader), Verse.AI.JobTag.Misc);
                         TestAutomation.Note($"trade test: colonist {colonist.thingIDNumber} goes to trade with {trader.thingIDNumber}, ordered by player {CommandBus.CurrentPlayerId}");
                     }
+                    break;
+                }
+            case OpTestHomeArea:
+                {
+                    int a = r.ReadInt32();
+                    r.ReadInt32();
+                    if (!RWMLWC.Client.World.CaravanSelfTest.ArmKey("exchangetest=1"))
+                    {
+                        return;
+                    }
+                    Map? map = Find.Maps.FirstOrDefault(m => m.uniqueID == a);
+                    if (map == null) return;
+                    // Как если бы игрок обвёл склад домашней зоной: окно каравана предлагает только вещи дома или на складе.
+                    int cells = 0;
+                    foreach (Thing t in map.listerThings.AllThings.Where(t => t.def.category == ThingCategory.Item && t.Spawned && !t.Position.Fogged(map)).ToList())
+                    {
+                        if (!map.areaManager.Home[t.Position])
+                        {
+                            map.areaManager.Home[t.Position] = true;
+                            cells++;
+                        }
+                    }
+                    TestAutomation.Note($"exchange: home area on map {a}: +{cells} cells under items");
                     break;
                 }
             case OpTestTransfer:
@@ -874,7 +899,7 @@ public static class WorldCommands
             SharedWindows.Execute(op, ref r);
             return;
         }
-        if (op == OpColonyClaim || op == OpColonyJoin || op == OpColonyNew || op == OpColonyTestAbsent || op == OpTestPresence || op == OpTestKill || op == OpTestTransfer || op == OpTestTrader || op == OpTestGoTrade)
+        if (op == OpColonyClaim || op == OpColonyJoin || op == OpColonyNew || op == OpColonyTestAbsent || op == OpTestPresence || op == OpTestKill || op == OpTestTransfer || op == OpTestTrader || op == OpTestGoTrade || op == OpTestHomeArea)
         {
             ExecuteColony(op, ref r);
             return;
@@ -927,6 +952,7 @@ public static class WorldCommands
                         return;
                     }
                     caravan.pather.StartPath(dest, arrival, repath, reset);
+                    RWMLWC.Client.Maps.GuestsComponent.NoteRoute(caravan, CommandBus.CurrentPlayerId);
                     if (arrival != null)
                     {
                         TestAutomation.Note($"world: route of caravan {caravan.ID} to {dest} with {arrival.GetType().Name} by player {CommandBus.CurrentPlayerId}");

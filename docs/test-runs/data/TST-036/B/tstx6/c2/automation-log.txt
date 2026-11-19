@@ -1,0 +1,83 @@
+2026-11-16 01:37:41 autoload: loading save 'tst014'
+2026-11-16 01:37:55 lockstep: connecting to 127.0.0.1:53854 as 'c2'
+2026-11-16 01:37:57 lockstep: connected to quic:127.0.0.1:53854, Hello sent
+2026-11-16 01:37:58 lockstep: Welcome, playerId=1, serverTick=14998, seed=7
+2026-11-16 01:37:58 presence: player 1 online
+2026-11-16 01:37:58 presence: player 2 online
+2026-11-16 01:38:58 lockstep: hold is over, requesting speed 3
+2026-11-16 01:38:58 run started: #0, tick=14998, scenario=none, ticks=5500, trace=False, quit=True, file=hash-c2-20261116-013858.txt
+2026-11-16 01:39:01 colonies: claim sent (lowest online player)
+2026-11-16 01:39:05 colonies: player 1 is the host, settlements claimed: 1
+2026-11-16 01:39:09 colonies: new colony for player 2 at 240934,0: 3 colonists, 10 item stacks
+2026-11-16 01:39:09 colonies: settlement 253 belongs to player 2
+2026-11-16 01:39:17 caravan: map 1 generated at tick 15312: 35694 things, 53 pawns, global rand 0000081EFB25C5A1
+2026-11-16 01:39:18 caravan: new map 1 dumped at tick 15312: 35694 things, 53 pawns
+2026-11-16 01:39:18 exchange: cargo none, target settlement 253 map 1, home map 0
+2026-11-16 01:39:19 exchange: home area on map 0: +1653 cells under items
+2026-11-16 01:39:20 caravan summary: tick 15498, forming lords 0, caravans 0, player settlements 2, maps 2, colonists by map 3/3, colonies owners=[251:1,253:2] members=[], adapt 0:0.00/0,1:0.00/0, factors 0:d0×0.70×a0.80,1:d0×0.70×a0.80, perf 19067 us/tick, stasis [0:-0,1:-0] (game: d0×a0.00), guests []
+2026-11-16 01:39:21 exchange: cargo Steel, target settlement 253 map 1, home map 0
+2026-11-16 01:39:21 world: caravan form sent, pawns 1+0, item groups 4
+2026-11-16 01:39:21 exchange: form — отправка принята, колонист 231, груз Steel x20, цель 240934,0
+2026-11-16 01:39:21 world: caravan forming started by player 1, pawns 1+0, item groups 4
+2026-11-16 01:39:22 caravan summary: tick 15998, forming lords 1, caravans 0, player settlements 2, maps 2, colonists by map 3/3, colonies owners=[251:1,253:2] members=[], adapt 0:0.00/0,1:0.00/0, factors 0:d0×0.70×a0.80,1:d0×0.70×a0.80, perf 1490 us/tick, stasis [0:-0,1:-0] (game: d0×a0.00), cargo Steel [0:1170(ground 1170),1:0(ground 0)] caravans 0 total 1170, guests []
+2026-11-16 01:39:23 caravan summary: tick 16498, forming lords 1, caravans 0, player settlements 2, maps 2, colonists by map 3/3, colonies owners=[251:1,253:2] members=[], adapt 0:0.00/0,1:0.00/0, factors 0:d0×0.70×a0.80,1:d0×0.70×a0.80, perf 1539 us/tick, stasis [0:-0,1:-0] (game: d0×a0.00), cargo Steel [0:1170(ground 1150),1:0(ground 0)] caravans 0 total 1170, guests []
+2026-11-16 01:39:25 caravan summary: tick 16998, forming lords 1, caravans 0, player settlements 2, maps 2, colonists by map 3/3, colonies owners=[251:1,253:2] members=[], adapt 0:0.00/0,1:0.00/0, factors 0:d0×0.70×a0.80,1:d0×0.70×a0.80, perf 1356 us/tick, stasis [0:-0,1:-0] (game: d0×a0.00), cargo Steel [0:1170(ground 1150),1:0(ground 0)] caravans 0 total 1170, guests []
+2026-11-16 01:39:26 caravan summary: tick 17498, forming lords 1, caravans 0, player settlements 2, maps 2, colonists by map 3/3, colonies owners=[251:1,253:2] members=[], adapt 0:0.00/0,1:0.00/0, factors 0:d0×0.70×a0.80,1:d0×0.70×a0.80, perf 1416 us/tick, stasis [0:-0,1:-0] (game: d0×a0.00), cargo Steel [0:1170(ground 1150),1:0(ground 0)] caravans 0 total 1170, guests []
+2026-11-16 01:39:28 caravan summary: tick 18000, forming lords 1, caravans 0, player settlements 2, maps 2, colonists by map 3/3, colonies owners=[251:1,253:2] members=[], adapt 0:0.00/0,1:0.00/0, factors 0:d0×0.70×a0.80,1:d0×0.70×a0.80, perf 1218 us/tick, stasis [0:-0,1:-0] (game: d0×a0.00), cargo Steel [0:1170(ground 1150),1:0(ground 0)] caravans 0 total 1170, guests []
+2026-11-16 01:39:29 caravan summary: tick 18510, forming lords 1, caravans 0, player settlements 2, maps 2, colonists by map 3/3, colonies owners=[251:1,253:2] members=[], adapt 0:0.00/0,1:0.00/0, factors 0:d0×0.70×a0.80,1:d0×0.70×a0.80, perf 1217 us/tick, stasis [0:-0,1:-0] (game: d0×a0.00), cargo Steel [0:1170(ground 1150),1:0(ground 0)] caravans 0 total 1170, guests []
+2026-11-16 01:39:30 caravan summary: tick 19013, forming lords 1, caravans 0, player settlements 2, maps 2, colonists by map 3/3, colonies owners=[251:1,253:2] members=[], adapt 0:0.00/0,1:0.00/0, factors 0:d0×0.70×a0.80,1:d0×0.70×a0.80, perf 1211 us/tick, stasis [0:-0,1:-0] (game: d0×a0.00), cargo Steel [0:1170(ground 1150),1:0(ground 0)] caravans 0 total 1170, guests []
+2026-11-16 01:39:31 exchange: caravan 254 (20 Steel) → settlement 253, Enter
+2026-11-16 01:39:31 world: route of caravan 254 to 240934,0 with CaravanArrivalAction_Enter by player 1
+2026-11-16 01:39:32 caravan summary: tick 19523, forming lords 0, caravans 1, player settlements 2, maps 2, colonists by map 2/3, caravan at 240937,0 moving to 240934,0, colonies owners=[251:1,253:2] members=[], adapt 0:0.00/0,1:0.00/0, factors 0:d0×0.70×a0.80,1:d0×0.70×a0.80, perf 1326 us/tick, stasis [0:-0,1:-0] (game: d0×a0.00), cargo Steel [0:1150(ground 1150),1:0(ground 0)] caravans 20 total 1170, guests []
+2026-11-16 01:39:33 caravan summary: tick 20026, forming lords 0, caravans 1, player settlements 2, maps 2, colonists by map 2/3, caravan at 240937,0 moving to 240934,0, colonies owners=[251:1,253:2] members=[], adapt 0:0.00/0,1:0.00/0, factors 0:d0×0.70×a0.80,1:d0×0.70×a0.80, perf 1234 us/tick, stasis [0:-0,1:-0] (game: d0×a0.00), cargo Steel [0:1150(ground 1150),1:0(ground 0)] caravans 20 total 1170, guests []
+2026-11-16 01:39:34 summary: map0 drafted=0 forbidden=56 plants=[]
+2026-11-16 01:39:34 summary: map0 jobs=[234:Clean@(76, 0, 24),239:GotoWander@(63, 0, 124)]
+2026-11-16 01:39:34 camera: this client moved its camera 36 times during the run
+2026-11-16 01:39:34 summary: map0 settings=7C47AC7B3149885C
+2026-11-16 01:39:34 summary: absence= offline=[]
+2026-11-16 01:39:34 summary: squads= rejected=0 drafted=[]
+2026-11-16 01:39:34 summary: map0 designations=0 blueprints=0 zones=0; commands sent=4 executed=5 failed=0
+2026-11-16 01:39:34 summary: map1 drafted=0 forbidden=0 plants=[]
+2026-11-16 01:39:34 summary: map1 jobs=[41747:GotoWander@(133, 0, 125),41750:GotoWander@(130, 0, 106),41754:GotoWander@(131, 0, 121)]
+2026-11-16 01:39:34 camera: this client moved its camera 36 times during the run
+2026-11-16 01:39:34 summary: map1 settings=D62D5E0F567A1A66
+2026-11-16 01:39:34 summary: absence= offline=[]
+2026-11-16 01:39:34 summary: squads= rejected=0 drafted=[]
+2026-11-16 01:39:34 summary: map1 designations=0 blueprints=0 zones=0; commands sent=4 executed=5 failed=0
+2026-11-16 01:39:34 run finished: file=hash-c2-20261116-013858.txt
+2026-11-16 01:39:34 queue: finished
+2026-11-16 01:39:34 lockstep: disconnect: прогон завершён
+2026-11-16 01:39:35 quitting game
+2026-11-16 01:41:00 entry: will connect to 127.0.0.1:53854 in 5 s without a loaded game
+2026-11-16 01:41:05 lockstep: connecting to 127.0.0.1:53854 as 'c2'
+2026-11-16 01:41:06 lockstep: connected to quic:127.0.0.1:53854, Hello sent
+2026-11-16 01:41:06 lockstep: Welcome, playerId=1, serverTick=52744, game=none: requesting world snapshot
+2026-11-16 01:41:07 lockstep: snapshot 11 received, 3432864 bytes; loading
+2026-11-16 01:41:24 curtain: view restored — map -1, world view False
+2026-11-16 01:41:24 lockstep: snapshot loaded, tick 52744, serverTick=52744, perMapSim=True
+2026-11-16 01:41:24 exchange: cargo Steel, target settlement 253 map 1, home map 0
+2026-11-16 01:42:16 run started: #0, tick=52744, scenario=none, ticks=4000, trace=False, quit=True, file=hash-c2-20261116-014216.txt
+2026-11-16 01:42:19 stasis: map 0 thawed at tick 52800, stasis ticks 32220
+2026-11-16 01:42:31 caravan summary: tick 53244, forming lords 0, caravans 0, player settlements 2, maps 2, colonists by map 2/4, colonies owners=[251:1,253:2] members=[], adapt 0:0.00/32210,1:0.00/0, factors 0:d0×0.70×a0.80,1:d0×0.70×a0.80, perf 26847 us/tick, stasis [0:-32220,1:-0] (game: d0×a0.00), cargo Steel [0:1150(ground 1150),1:20(ground 20)] caravans 0 total 1170, guests [231:1]
+2026-11-16 01:42:32 caravan summary: tick 53744, forming lords 0, caravans 0, player settlements 2, maps 2, colonists by map 2/4, colonies owners=[251:1,253:2] members=[], adapt 0:0.00/32210,1:0.00/0, factors 0:d0×0.70×a0.80,1:d0×0.70×a0.80, perf 1243 us/tick, stasis [0:-32220,1:-0] (game: d0×a0.00), cargo Steel [0:1150(ground 1150),1:20(ground 20)] caravans 0 total 1170, guests [231:1]
+2026-11-16 01:42:33 caravan summary: tick 54244, forming lords 0, caravans 0, player settlements 2, maps 2, colonists by map 2/4, colonies owners=[251:1,253:2] members=[], adapt 0:0.00/32210,1:0.00/0, factors 0:d0×0.70×a0.80,1:d0×0.70×a0.80, perf 1257 us/tick, stasis [0:-32220,1:-0] (game: d0×a0.00), cargo Steel [0:1150(ground 1150),1:20(ground 20)] caravans 0 total 1170, guests [231:1]
+2026-11-16 01:42:34 caravan summary: tick 54744, forming lords 0, caravans 0, player settlements 2, maps 2, colonists by map 2/4, colonies owners=[251:1,253:2] members=[], adapt 0:0.00/32210,1:0.00/0, factors 0:d0×0.70×a0.80,1:d0×0.70×a0.80, perf 1384 us/tick, stasis [0:-32220,1:-0] (game: d0×a0.00), cargo Steel [0:1150(ground 1150),1:20(ground 20)] caravans 0 total 1170, guests [231:1]
+2026-11-16 01:42:36 caravan summary: tick 55244, forming lords 0, caravans 0, player settlements 2, maps 2, colonists by map 2/4, colonies owners=[251:1,253:2] members=[], adapt 0:0.00/32210,1:0.00/0, factors 0:d0×0.70×a0.80,1:d0×0.70×a0.80, perf 1390 us/tick, stasis [0:-32220,1:-0] (game: d0×a0.00), cargo Steel [0:1150(ground 1150),1:20(ground 20)] caravans 0 total 1170, guests [231:1]
+2026-11-16 01:42:37 caravan summary: tick 55744, forming lords 0, caravans 0, player settlements 2, maps 2, colonists by map 2/4, colonies owners=[251:1,253:2] members=[], adapt 0:0.00/32210,1:0.00/0, factors 0:d0×0.70×a0.80,1:d0×0.70×a0.80, perf 1446 us/tick, stasis [0:-32220,1:-0] (game: d0×a0.00), cargo Steel [0:1150(ground 1150),1:20(ground 20)] caravans 0 total 1170, guests [231:1]
+2026-11-16 01:42:39 caravan summary: tick 56244, forming lords 0, caravans 0, player settlements 2, maps 2, colonists by map 2/4, colonies owners=[251:1,253:2] members=[], adapt 0:0.00/32210,1:0.00/0, factors 0:d0×0.70×a0.80,1:d0×0.70×a0.80, perf 1412 us/tick, stasis [0:-32220,1:-0] (game: d0×a0.00), cargo Steel [0:1150(ground 1150),1:20(ground 20)] caravans 0 total 1170, guests [231:1]
+2026-11-16 01:42:40 summary: map0 drafted=0 forbidden=56 plants=[]
+2026-11-16 01:42:40 summary: map0 jobs=[234:LayDown@(15, 0, 5),239:LayDown@(51, 0, 119)]
+2026-11-16 01:42:40 summary: map0 settings=7C47AC7B3149885C
+2026-11-16 01:42:40 summary: absence= offline=[]
+2026-11-16 01:42:40 summary: squads= rejected=0 drafted=[]
+2026-11-16 01:42:40 summary: map0 designations=0 blueprints=0 zones=0; commands sent=1 executed=0 failed=0
+2026-11-16 01:42:40 summary: map1 drafted=0 forbidden=0 plants=[]
+2026-11-16 01:42:40 summary: map1 jobs=[231:Ingest@(131, 0, 120),41747:GoForWalk@(106, 0, 121),41750:Meditate@(116, 0, 117),41754:Meditate@(113, 0, 115)]
+2026-11-16 01:42:40 summary: map1 settings=5426B3268443855C
+2026-11-16 01:42:40 summary: absence= offline=[]
+2026-11-16 01:42:40 summary: squads= rejected=0 drafted=[]
+2026-11-16 01:42:40 summary: map1 designations=0 blueprints=0 zones=0; commands sent=1 executed=0 failed=0
+2026-11-16 01:42:40 run finished: file=hash-c2-20261116-014216.txt
+2026-11-16 01:42:40 queue: finished
+2026-11-16 01:42:40 lockstep: disconnect: прогон завершён
+2026-11-16 01:42:40 quitting game

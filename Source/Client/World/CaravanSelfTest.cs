@@ -120,7 +120,8 @@ public static class CaravanSelfTest
     public static void Frame()
     {
         if (!Enabled || !LockstepClient.InSession || Current.Game == null) return;
-        int tick = Find.TickManager.TicksGame;
+        // Общее время, не часы карты под камерой (камера может стоять на карте в стазисе).
+        int tick = Find.TickManager.TicksGame + RWMLWC.Client.Sim.StasisClock.Offset;
         if (_startTick < 0)
         {
             _startTick = tick;
@@ -163,7 +164,7 @@ public static class CaravanSelfTest
             }
         }
 
-        bool issuer = LockstepClient.PlayerId == 2 && !ArmKey("adapttest=1"); // adapttest — только сводки
+        bool issuer = LockstepClient.PlayerId == 2 && !ArmKey("adapttest=1") && !ArmKey("exchangetest=1"); // adapttest, exchangetest — свои шаги
 
         if (issuer && !_formed && tick >= _startTick + 300)
         {
@@ -319,6 +320,12 @@ public static class CaravanSelfTest
                 Find.WindowStack.TryRemove(typeof(Dialog_Trade));
                 var all = TradeSession.deal.AllTradeables; TestAutomation.Note($"caravan: trade lines {all.Count}, colony>0 {all.Count(t => t.CountHeldBy(Transactor.Colony) > 0)}, trader>0 {all.Count(t => t.CountHeldBy(Transactor.Trader) > 0)}, willTrade {all.Count(t => t.TraderWillTrade)}, currency {all.Count(t => t.IsCurrency)}"); TestAutomation.Note($"caravan: trade window — sold {buy?.ThingDef?.defName ?? "nothing"} x1 (count {buy?.CountToTransfer}), accept {ok}/{traded}");
             }
+        }
+
+        // exchangetest (T-036): хост — караван «колонист + стопка вещей» в колонию игрока 2 с действием «Войти».
+        if (ArmKey("exchangetest=1"))
+        {
+            ExchangeFrame(tick);
         }
 
         // stasistest: хост объявляет игрока 2 (у него своя колония) «не в сети», через 6000 тиков — «снова в сети».
@@ -650,7 +657,7 @@ public static class CaravanSelfTest
             if (!dest.Valid) return "нет тайла для поселения в двух шагах";
             if (second) _destination2 = dest; else _destination = dest;
             dialog.Notify_ChoseRoute(dest);
-            bool ok = (bool)AccessTools.Method(typeof(Dialog_FormCaravan), "TryFormAndSendCaravan").Invoke(dialog, null);
+            bool ok = (bool)AccessTools.Method(typeof(Dialog_FormCaravan), "TryFormAndSendCaravan").Invoke(dialog, null)!;
             return "отправка " + (ok ? "принята" : "отклонена") + ", колонист " + ((Pawn)colonist.AnyThing).thingIDNumber + ", цель " + dest;
         }
         catch (Exception e)
@@ -660,7 +667,7 @@ public static class CaravanSelfTest
     }
 
     /// <summary>Тайл в двух шагах от колонии, на котором кнопка «Основать поселение» разрешена (не рядом с поселением).</summary>
-    private static PlanetTile TileTwoAway(PlanetTile home, PlanetTile exclude)
+    internal static PlanetTile TileTwoAway(PlanetTile home, PlanetTile exclude)
     {
         var first = new List<PlanetTile>();
         var second = new List<PlanetTile>();
@@ -693,7 +700,7 @@ public static class CaravanSelfTest
             TransferableOneWay? colonist = dialog.transferables.FirstOrDefault(t => t.AnyThing is Pawn p && p.IsColonist && !p.Downed);
             if (colonist == null) return "нет колониста";
             colonist.AdjustTo(1);
-            bool ok = (bool)RWMLWC.Client.Input.WorldCommands.ReformMethod.Invoke(dialog, null);
+            bool ok = (bool)RWMLWC.Client.Input.WorldCommands.ReformMethod.Invoke(dialog, null)!;
             return $"«Отправить» — {(ok ? "принято" : "отклонено")}, карта {camp.uniqueID}, колонист {((Pawn)colonist.AnyThing).thingIDNumber}";
         }
         catch (Exception e)
@@ -758,7 +765,7 @@ public static class CaravanSelfTest
         }
         else if (_joinStep == 2 && Time.frameCount > _joinFrame + 120)
         {
-            bool ok = (bool)RWMLWC.Client.Input.WorldCommands.SplitMethod.Invoke(e.window, null);
+            bool ok = (bool)RWMLWC.Client.Input.WorldCommands.SplitMethod.Invoke(e.window, null)!;
             _joinStep = 3;
             TestAutomation.Note("caravan: joiner pressed Accept — " + (ok ? "sent" : "rejected"));
         }
@@ -771,11 +778,11 @@ public static class CaravanSelfTest
         {
             var dialog = new Dialog_SplitCaravan(caravan);
             AccessTools.Method(typeof(Dialog_SplitCaravan), "CalculateAndRecacheTransferables").Invoke(dialog, null);
-            var transferables = (List<TransferableOneWay>)AccessTools.Field(typeof(Dialog_SplitCaravan), "transferables").GetValue(dialog);
+            var transferables = (List<TransferableOneWay>)AccessTools.Field(typeof(Dialog_SplitCaravan), "transferables").GetValue(dialog)!;
             TransferableOneWay? colonist = transferables.FirstOrDefault(t => t.AnyThing is Pawn p && p.IsColonist && !p.Downed);
             if (colonist == null) return "нет колониста";
             colonist.AdjustTo(1);
-            bool ok = (bool)RWMLWC.Client.Input.WorldCommands.SplitMethod.Invoke(dialog, null);
+            bool ok = (bool)RWMLWC.Client.Input.WorldCommands.SplitMethod.Invoke(dialog, null)!;
             return $"«Принять» — {(ok ? "принято" : "отклонено")}, караван {caravan.ID} ({caravan.PawnsListForReading.Count} пешек), колонист {((Pawn)colonist.AnyThing).thingIDNumber}";
         }
         catch (Exception e)
@@ -838,6 +845,112 @@ public static class CaravanSelfTest
         }
     }
 
+    private static int _exchangeStep;
+    private static ThingDef? _exchangeDef;
+    private static int _exchangeCount;
+    private static int _exchangePawn = -1;
+    private static int _exchangeDefTick;
+    private static int _exchangeFormTick;
+
+    private static void ExchangeFrame(int tick)
+    {
+        // Отправитель — игрок 1; с ключом exchangefrom=stay — тот, кто остаётся в сети в сценарии rejoin (c1),
+        // а уходит получатель. Игроков двое: второй — 3 - мой номер.
+        int me = LockstepClient.PlayerId;
+        bool amSender = ArmKey("exchangefrom=stay") ? ArmKey("name=c1") : me == 1;
+        int sender = amSender ? me : 3 - me;
+        ColoniesComponent? colonies = Colonies.Component;
+        Settlement? target = colonies?.OwnedBy(3 - sender);
+        Map? home = colonies?.OwnedBy(sender)?.Map;
+        if (target?.Map == null || home == null)
+        {
+            return;
+        }
+        if (_exchangeStep == 0 && amSender && !ArmKey("save=") && tick >= _startTick + 150)
+        {
+            _exchangeStep = 1;
+            _exchangeFormTick = tick + 300;
+            RWMLWC.Client.Input.WorldCommands.SendTestOp(RWMLWC.Client.Input.WorldCommands.TestHomeAreaOp, home.uniqueID, 0);
+        }
+        if (_exchangeDef == null && tick >= _exchangeDefTick)
+        {
+            _exchangeDefTick = tick + 250;
+            // Что везём, должны знать оба клиента (для сводки): первая стопка стали или серебра на карте хоста.
+            // Только то, что окно «Сформировать караван» предлагает (дом, склад, не в тумане).
+            List<Thing> offered = CaravanFormingUtility.AllReachableColonyItems(home).ToList();
+            _exchangeDef = new[] { ThingDefOf.Steel, ThingDefOf.Silver, ThingDefOf.WoodLog, ThingDefOf.ComponentIndustrial, ThingDefOf.MedicineIndustrial, ThingDefOf.MealSurvivalPack }
+                .FirstOrDefault(d => offered.Any(t => t.def == d));
+            TestAutomation.Note($"exchange: cargo {_exchangeDef?.defName ?? "none"}, target settlement {target.ID} map {target.Map.uniqueID}, home map {home.uniqueID}");
+        }
+        // Вернувшийся после обрыва клиент (вход без сейва, сценарий rejoin) только наблюдает: груз уже отправлен.
+        if (!amSender || _exchangeDef == null || ArmKey("save="))
+        {
+            return;
+        }
+        if (_exchangeStep == 1 && tick >= _exchangeFormTick)
+        {
+            _exchangeStep = 2;
+            TestAutomation.Note("exchange: form — " + TryFormCargo(home, target.Tile));
+        }
+        else if (_exchangeStep == 2 && Find.WorldObjects.Caravans.FirstOrDefault(c => c.PawnsListForReading.Any(p => p.thingIDNumber == _exchangePawn)) is Caravan c)
+        {
+            _exchangeStep = 3;
+            try
+            {
+                c.pather.StartPath(target.Tile, new CaravanArrivalAction_Enter(target), repathImmediately: true);
+                TestAutomation.Note($"exchange: caravan {c.ID} ({CaravanInventoryUtility.AllInventoryItems(c).Where(t => t.def == _exchangeDef).Sum(t => t.stackCount)} {_exchangeDef.defName}) → settlement {target.ID}, Enter");
+            }
+            catch (Exception e)
+            {
+                TestAutomation.Note("exchange: route ERROR " + e);
+            }
+        }
+    }
+
+    private static string TryFormCargo(Map map, PlanetTile dest)
+    {
+        try
+        {
+            var dialog = new Dialog_FormCaravan(map);
+            AccessTools.Method(typeof(Dialog_FormCaravan), "CalculateAndRecacheTransferables").Invoke(dialog, null);
+            TransferableOneWay? colonist = dialog.transferables.FirstOrDefault(t => t.AnyThing is Pawn p && p.IsColonist && !p.Downed);
+            TransferableOneWay? cargo = dialog.transferables.FirstOrDefault(t => t.ThingDef == _exchangeDef);
+            if (colonist == null || cargo == null) return $"нет колониста или груза ({colonist != null}/{cargo != null})";
+            colonist.AdjustTo(1);
+            _exchangePawn = colonist.AnyThing.thingIDNumber;
+            _exchangeCount = Math.Min(20, cargo.MaxCount);
+            cargo.AdjustTo(_exchangeCount);
+            dialog.Notify_ChoseRoute(dest);
+            bool ok = (bool)AccessTools.Method(typeof(Dialog_FormCaravan), "TryFormAndSendCaravan").Invoke(dialog, null)!;
+            return $"отправка {(ok ? "принята" : "отклонена")}, колонист {((Pawn)colonist.AnyThing).thingIDNumber}, груз {_exchangeDef!.defName} x{_exchangeCount}, цель {dest}";
+        }
+        catch (Exception e)
+        {
+            return "ошибка: " + (e.InnerException ?? e).Message;
+        }
+    }
+
+    /// <summary>Сколько вещей груза на каждой карте (с инвентарями пешек) и в караванах — сумма не должна меняться.</summary>
+    private static string ExchangeCounts()
+    {
+        if (_exchangeDef == null) return "";
+        var list = new List<Thing>();
+        var parts = new List<string>();
+        int total = 0;
+        foreach (Map m in Find.Maps)
+        {
+            list.Clear();
+            ThingOwnerUtility.GetAllThingsRecursively(m, ThingRequest.ForDef(_exchangeDef), list, allowUnreal: false); // без товара кораблей на орбите
+            int n = list.Sum(t => t.stackCount);
+            total += n;
+            int onGround = m.listerThings.ThingsOfDef(_exchangeDef).Sum(t => t.stackCount);
+            parts.Add(m.uniqueID + ":" + n + "(ground " + onGround + ")");
+        }
+        int inCaravans = Find.WorldObjects.Caravans.Sum(c => CaravanInventoryUtility.AllInventoryItems(c).Where(t => t.def == _exchangeDef).Sum(t => t.stackCount));
+        total += inCaravans;
+        return $", cargo {_exchangeDef.defName} [{string.Join(",", parts)}] caravans {inCaravans} total {total}";
+    }
+
     private static string Summary()
     {
         int forming = Find.Maps.Sum(m => m.lordManager.lords.Count(l => l.LordJob is LordJob_FormAndSendCaravan));
@@ -847,6 +960,6 @@ public static class CaravanSelfTest
         Caravan? c = Find.WorldObjects.Caravans.FirstOrDefault(x => x.Faction == Faction.OfPlayer);
         string colonists = string.Join("/", Find.Maps.Select(m => m.mapPawns.FreeColonistsSpawnedCount));
         string where = c == null ? "" : $", caravan at {c.Tile}{(c.pather.Moving ? " moving to " + c.pather.Destination : "")}";
-        return $"tick {Find.TickManager.TicksGame}, forming lords {forming}, caravans {caravans}, player settlements {settlements}, maps {maps}, colonists by map {colonists}{where}, colonies {Colonies.Component?.Summary()}, adapt {SettlementThreats.Component?.Summary()}, factors {SettlementThreats.Component?.Factors()}, perf {TakePerf()}, stasis [{string.Join(",", Find.Maps.Select(m => m.uniqueID + ":" + (MapSimState.For(m)?.frozen == true ? "F" : "-") + (MapSimState.For(m)?.stasisTicks ?? 0)))}] (game: d{GenDate.DaysPassedSinceSettle}×a{Find.StoryWatcher.watcherAdaptation.AdaptDays:F2})";
+        return $"tick {Find.TickManager.TicksGame}, forming lords {forming}, caravans {caravans}, player settlements {settlements}, maps {maps}, colonists by map {colonists}{where}, colonies {Colonies.Component?.Summary()}, adapt {SettlementThreats.Component?.Summary()}, factors {SettlementThreats.Component?.Factors()}, perf {TakePerf()}, stasis [{string.Join(",", Find.Maps.Select(m => m.uniqueID + ":" + (MapSimState.For(m)?.frozen == true ? "F" : "-") + (MapSimState.For(m)?.stasisTicks ?? 0)))}] (game: d{GenDate.DaysPassedSinceSettle}×a{Find.StoryWatcher.watcherAdaptation.AdaptDays:F2}){ExchangeCounts()}, guests [{RWMLWC.Client.Maps.GuestsComponent.Component?.Digest()}]";
     }
 }
