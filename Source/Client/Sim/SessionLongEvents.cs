@@ -112,6 +112,31 @@ internal static class Patch_LongEventHandler_QueueLongEvent_Session
     }
 }
 
+// Долгое событие с обычным окном загрузки ждёт его отрисовки (ShouldWaitUntilDisplayed → repaint).
+// В тихом/свёрнутом окне Waylith repaint не приходит — событие висит вечно и держит тики
+// (ForcePause). Так вставали: ванильное автосохранение на суточной границе (t076-autosave) и
+// генерация карты новой колонии (t076-verify1, тик 15305). В сессии ждать отрисовку нельзя:
+// событие выполняется сразу на следующем кадре LongEventsUpdate, окно может не рисоваться вовсе.
+[HarmonyPatch]
+internal static class Patch_QueuedLongEvent_ShouldWaitUntilDisplayed_Session
+{
+    private static System.Reflection.MethodBase? TargetMethod()
+    {
+        var t = AccessTools.TypeByName("Verse.LongEventHandler+QueuedLongEvent");
+        return t == null ? null : AccessTools.PropertyGetter(t, "ShouldWaitUntilDisplayed");
+    }
+
+    private static bool Prefix(ref bool __result)
+    {
+        if (!LockstepClient.InSession)
+        {
+            return true;
+        }
+        __result = false;
+        return false;
+    }
+}
+
 // Ванильное автосохранение раз в игровые сутки ставит долгое событие с окном загрузки и ждёт его
 // отрисовки (ShouldWaitUntilDisplayed). В сессии это лишнее: сервер сам периодически получает копию
 // мира (SaveWorldSnapshotKind). А ожидание отрисовки в тихом тестовом окне не заканчивается никогда
