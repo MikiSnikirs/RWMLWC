@@ -1,0 +1,17 @@
+armed=1
+save=tst014
+scenarios=none
+ticks=400000
+trace=0
+quit=1
+server=127.0.0.1:58759
+thumbprint=EDDC8D45115FBFABAE543CCF9155AB2166E14EEE5FAA018AB8364CC935699667
+name=c1
+holdsec=60
+issuer=1
+camera=0
+snapsender=1
+colonychoice=new
+nodeath=1
+roomdump=1
+ringdump=1

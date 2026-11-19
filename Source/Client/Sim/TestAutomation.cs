@@ -1581,6 +1581,37 @@ public static class TestAutomation
         {
             Find.TickManager.CurTimeSpeed = TimeSpeed.Superfast;
         }
+        WatchFreeze();
+    }
+
+    private static int watchTick = -1;
+    private static int watchStill;
+    private static bool watchNoteWritten;
+
+    /// <summary>Сторож заморозки (T-076): тики не идут 300 кадров подряд — записать состояние.</summary>
+    private static void WatchFreeze()
+    {
+        if (!automationActive || Current.Game == null || !LockstepClient.InSession)
+        {
+            return;
+        }
+        int t = Find.TickManager.TicksGame;
+        if (t == watchTick)
+        {
+            watchStill++;
+        }
+        else
+        {
+            watchStill = 0;
+            watchTick = t;
+            watchNoteWritten = false;
+        }
+        if (watchStill == 300 && !watchNoteWritten)
+        {
+            watchNoteWritten = true;
+            string top = Find.WindowStack.Windows.Count > 0 ? Find.WindowStack.Windows[Find.WindowStack.Windows.Count - 1].GetType().Name : "-";
+            Note($"watchdog: no tick advance for 300 frames at tick {t}: speed={Find.TickManager.CurTimeSpeed}, paused={Find.TickManager.Paused}, topWindow={top}, windows={Find.WindowStack.Windows.Count}");
+        }
     }
 
     // Вражеский рейд на первую карту: бой, генерация пешек, выстрелы.

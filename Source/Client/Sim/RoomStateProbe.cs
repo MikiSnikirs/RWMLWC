@@ -47,10 +47,19 @@ internal static class RoomStateProbe
         {
             return;
         }
-        Ring.Enqueue((t, Digest()));
-        while (Ring.Count > 30)
+        try
         {
-            Ring.Dequeue();
+            Ring.Enqueue((t, Digest()));
+            while (Ring.Count > 30)
+            {
+                Ring.Dequeue();
+            }
+        }
+        catch (Exception e)
+        {
+            // Зонд не должен ломать игру: ошибка — в журнал автоматизации (Player.log общий у двух копий).
+            TestAutomation.Note("roomdump: capture failed at tick " + t + ": " + e);
+            On = false;
         }
     }
 
@@ -85,7 +94,7 @@ internal static class RoomStateProbe
         foreach (Map map in Find.Maps)
         {
             sb.Append("map ").Append(map.uniqueID).Append(" rand ").Append(MapSimState.For(map)?.randState.ToString("X16") ?? "-").AppendLine();
-            foreach (Room r in DistrictsOf(map.regionGrid).Select(d => d.Room).OfType<Room>().Distinct().OrderBy(r => FirstCell(map, r.Cells)))
+            foreach (Room r in DistrictsOf(map.regionGrid).Select(d => d.Room).OfType<Room>().Where(r => r.Map != null).Distinct().OrderBy(r => FirstCell(map, r.Cells)))
             {
                 int first = FirstCell(map, r.Cells);
                 int freshCells = r.Cells.Count();
