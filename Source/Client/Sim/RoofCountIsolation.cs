@@ -145,7 +145,12 @@ internal static class Patch_Room_OpenRoofCount_UiIsolation
         {
             return true;
         }
-        __result = __instance.OpenRoofCountStopAt(int.MaxValue);
+        int n = 0;
+        foreach (District d in __instance.Districts)
+        {
+            n += d.OpenRoofCountStopAt(int.MaxValue);
+        }
+        __result = n;
         return false;
     }
 }

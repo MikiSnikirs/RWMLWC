@@ -41,7 +41,9 @@ public static class GameSnapshot
     {
         stats = default;
         Stopwatch sw = Stopwatch.StartNew();
+        Sim.TestAutomation.Note("snapshot: SaveGame start (" + OutName + ")");
         GameDataSaveLoader.SaveGame(OutName);
+        Sim.TestAutomation.Note("snapshot: SaveGame done in " + sw.ElapsedMilliseconds + " ms");
         stats.saveMs = sw.ElapsedMilliseconds;
 
         byte[] raw = File.ReadAllBytes(GenFilePaths.FilePathForSavedGame(OutName));
