@@ -19,35 +19,16 @@ namespace RWMLWC.Client.Sim;
 /// зависит от порядка обхода районов/регионов и одинаков у клиентов с одинаковым миром.
 /// Вне сессии — ванильный порядок.
 ///
-/// Третий механизм (m2): <c>Map.MapUpdate</c> (кадр) перестраивает регионы у всех карт; при разном
-/// темпе кадров клиенты перестраивают в разные моменты → комнаты пересоздаются в разные тики →
-/// сброс температуры комнат в разное время → расхождение (кэши крыш identical, температура
-/// 13.556/13.555). Поэтому в сессии перестройка разрешена только в контексте симуляции
-/// (тик — BeforeTick идёт после BeginTick, команда, долгое событие) и при первой загрузке;
-/// кадровые перестройки пропускаются — регионы обновятся в BeforeTick следующего тика, одинаково
-/// у всех. Отрисовка читает чуть устаревшие регионы — это косметика, ваниль так же делает между
-/// перестройками.
+/// Третий механизм (m2, открыт): <c>Map.MapUpdate</c> (кадр) перестраивает регионы у всех карт;
+/// при разном темпе кадров клиенты перестраивают в разные моменты → комнаты пересоздаются в разные
+/// тики → сброс температуры комнат в разное время → расхождение (кэши крыш identical, температура
+/// 13.556/13.555). Попытка пропускать кадровые перестройки в сессии откачена (m5/m6: систематическое
+/// расхождение) — кадровый код, видимо, меняет состояние по свежим регионам. Нужен другой подход.
 /// </summary>
-[HarmonyPatch(typeof(RegionAndRoomUpdater), nameof(RegionAndRoomUpdater.TryRebuildDirtyRegionsAndRooms))]
-internal static class Patch_RegionAndRoomUpdater_SessionRebuildSync
-{
-    private static readonly AccessTools.FieldRef<RegionAndRoomUpdater, bool> Initialized =
-        AccessTools.FieldRefAccess<RegionAndRoomUpdater, bool>("initialized");
-
-    private static bool Prefix(RegionAndRoomUpdater __instance)
-    {
-        if (!LockstepClient.InSession)
-        {
-            return true;
-        }
-        if (MapRandContext.InTick || RWMLWC.Client.Input.CommandBus.Executing)
-        {
-            return true;
-        }
-        return !Initialized(__instance); // первая перестройка при загрузке карты
-    }
-}
-
+// Попытка синхронизировать момент перестройки (пропуск кадровых перестроек в сессии, m5/m6)
+// ОТКАЧЕНА: m6 дал систематическое расхождение каждые 60 тиков — пропуск кадровых перестроек
+// ломает что-то ещё (кадровый код читает регионы и меняет состояние). Третий механизм
+// (момент пересоздания комнат → сброс температуры) остаётся открытым; данные m5/m6 в репозитории.
 [HarmonyPatch(typeof(RegionAndRoomUpdater), nameof(RegionAndRoomUpdater.TryRebuildDirtyRegionsAndRooms))]
 internal static class Patch_RegionAndRoomUpdater_RoomOrder
 {
