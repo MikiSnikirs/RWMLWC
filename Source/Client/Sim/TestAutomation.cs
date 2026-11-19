@@ -243,6 +243,9 @@ public static class TestAutomation
                         cfg.traceFrames = frames;
                     }
                     break;
+                case "tracelong":
+                    SessionLongEvents.TraceLong = value == "1";
+                    break;
                 case "trace":
                     cfg.trace = value != "0";
                     break;
@@ -414,6 +417,20 @@ public static class TestAutomation
                 RWMLWC.Client.SessionView.SessionUi.ChooseColor(RWMLWC.Client.Maps.Squads.Palette[index]);
                 Find.WindowStack.TryRemove(typeof(RWMLWC.Client.SessionView.Dialog_ChooseColor));
                 Note($"color: chose {RWMLWC.Client.Maps.Squads.Palette[index]:X6} at tick {Find.TickManager.TicksGame}");
+            }));
+        }
+        if (cfg.issuer && cfg.scenario == "settle")
+        {
+            // T-073: путь игрока целиком, командами: караван → маршрут на подходящую соседнюю клетку → основать поселение.
+            sessionSteps.Enqueue((startTick + 300, "settle: form caravan", SettleFormCaravan));
+            stepGates["settle: route"] = () => PlayerCaravan() != null;
+            sessionSteps.Enqueue((startTick + 600, "settle: route", SettleRoute));
+            stepGates["settle: settle"] = () => PlayerCaravan() is RimWorld.Planet.Caravan c && settleTarget.Valid && c.Tile == settleTarget && !c.pather.Moving;
+            sessionSteps.Enqueue((startTick + 900, "settle: settle", () =>
+            {
+                RimWorld.Planet.Caravan c = PlayerCaravan()!;
+                RimWorld.Planet.SettleInEmptyTileUtility.Settle(c);
+                Note($"settle: settle pressed at tile {c.Tile.tileId}");
             }));
         }
         if (cfg.scenario == "cursors")
@@ -594,6 +611,7 @@ public static class TestAutomation
                 case "gizmo":
                 case "rightclick":
                 case "squads":
+                case "settle":
                 case "cursors":
                 case "color":
                     break; // срабатывают позже, из кадра (SessionFrame): приказы идут как ввод игрока
@@ -1327,6 +1345,9 @@ public static class TestAutomation
                 Note($"camera: this client moved its camera {cameraJumps} times during the run");
             }
             Note($"summary: map{map.uniqueID} settings={SettingsDigest(map)}");
+            RimWorld.Planet.Caravan? car = PlayerCaravan();
+            Note($"summary: maps={Find.Maps.Count} player settlements={Find.WorldObjects.Settlements.Count(s => s.Faction == Faction.OfPlayer)} caravans={Find.WorldObjects.Caravans.Count(c => c.Faction == Faction.OfPlayer)}"
+                + (car != null ? $" caravan at {car.Tile.tileId} moving={car.pather.Moving} dest={car.pather.Destination.tileId}" : ""));
             Note("summary: absence=" + (RWMLWC.Client.Maps.AbsenceModes.Component?.Digest() ?? "-") + " offline=[" + (RWMLWC.Client.Maps.PlayerPresence.Component?.Digest() ?? "-") + "]");
             Note("summary: squads=" + (RWMLWC.Client.Maps.Squads.Component?.Digest() ?? "-") + " rejected=" + RWMLWC.Client.Maps.SquadRules.Rejected
                 + " drafted=[" + string.Join(",", map.mapPawns.FreeColonistsSpawned.Where(p => p.Drafted).Select(p => p.thingIDNumber).OrderBy(i => i)) + "]");
@@ -1601,6 +1622,42 @@ public static class TestAutomation
         RimWorld.Planet.SettleInEmptyTileUtility.Settle(caravan);
         LongEventHandler.ExecuteWhenFinished(() =>
             Note($"settle: after long events: maps {Find.Maps.Count}, player settlements {Find.WorldObjects.Settlements.Count(s => s.Faction == Faction.OfPlayer)}, caravan alive={Find.WorldObjects.Caravans.Contains(caravan)}"));
+    }
+
+    private static RimWorld.Planet.PlanetTile settleTarget = RimWorld.Planet.PlanetTile.Invalid;
+
+    private static RimWorld.Planet.Caravan? PlayerCaravan() =>
+        Find.WorldObjects.Caravans.Where(c => c.Faction == Faction.OfPlayer).OrderBy(c => c.ID).FirstOrDefault();
+
+    private static void SettleFormCaravan()
+    {
+        Map map = Find.Maps[0];
+        Pawn? pawn = map.mapPawns.FreeColonistsSpawned.OrderBy(p => p.thingIDNumber).FirstOrDefault();
+        if (pawn == null || !RCellFinder.TryFindClosestEdgeCellTo(pawn.Position, map, out IntVec3 exit))
+        {
+            Note("settle: no colonist or exit spot");
+            return;
+        }
+        TransferableOneWay t = new TransferableOneWay();
+        t.things.Add(pawn);
+        t.AdjustTo(1);
+        CaravanFormingUtility.StartFormingCaravan(new List<Pawn> { pawn }, new List<Pawn>(), Faction.OfPlayer, new List<TransferableOneWay> { t },
+            pawn.Position, exit, map.Tile, RimWorld.Planet.PlanetTile.Invalid);
+        Note($"settle: form caravan with {pawn.LabelShort}, sent={LockstepClient.PlayerCommandsSent}");
+    }
+
+    private static void SettleRoute()
+    {
+        RimWorld.Planet.Caravan c = PlayerCaravan()!;
+        // Поселения нельзя ставить вплотную к колонии: ближайшая подходящая клетка в 4–8 переходах.
+        if (!RimWorld.Planet.TileFinder.TryFindPassableTileWithTraversalDistance(c.Tile, 4, 8, out settleTarget,
+                x => RimWorld.Planet.TileFinder.IsValidTileForNewSettlement(x)))
+        {
+            Note("settle: no valid tile within 8 steps");
+            return;
+        }
+        c.pather.StartPath(settleTarget, null, true);
+        Note($"settle: route caravan {c.ID} to tile {settleTarget.tileId}");
     }
 
     private static bool FireRaidViaStoryteller(Map map)

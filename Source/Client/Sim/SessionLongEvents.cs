@@ -1,6 +1,8 @@
 using System;
+using System.Linq;
 using HarmonyLib;
 using RWMLWC.Client.Input;
+using RimWorld.Planet;
 using Verse;
 
 namespace RWMLWC.Client.Sim;
@@ -26,6 +28,12 @@ internal static class SessionLongEvents
 
     private static int pending;
 
+    /// <summary>Тест (ключ tracelong=1): писать вызовы Rand внутри долгих событий сессии в randtrace-long-*.txt.</summary>
+    public static bool TraceLong;
+
+    /// <summary>Идёт долгое событие, поставленное чужой командой: камера и выделение автора не трогают.</summary>
+    public static bool RunningRemote { get; private set; }
+
     internal static void Wrap(ref Action action, string textKey, ref bool doAsynchronously, ref Action<Exception> exceptionHandler)
     {
         if (!PerMapSim.Enabled || !(CommandBus.Executing || MapRandContext.InTick))
@@ -34,6 +42,7 @@ internal static class SessionLongEvents
         }
         doAsynchronously = false;
         Action inner = action;
+        bool remote = CommandBus.Executing && CommandBus.ExecutingRemote;
         pending++;
         action = () =>
         {
@@ -42,15 +51,41 @@ internal static class SessionLongEvents
             {
                 MapRandContext.BeginTick();
             }
+            bool wasRemote = RunningRemote;
+            RunningRemote = remote;
             try
             {
                 MapRandContext.Enter(null);
                 TestAutomation.Note($"long event '{textKey}' start, maps {Find.Maps.Count}");
-                inner();
+                bool tracing = TraceLong && !RandTracer.Running;
+                if (tracing)
+                {
+                    RandTracer.StartNow(System.IO.Path.Combine(GenFilePaths.SaveDataFolderPath, "RWMLWC", "randtrace-long-" + textKey + ".txt"));
+                }
+                try
+                {
+                    inner();
+                }
+                finally
+                {
+                    if (tracing)
+                    {
+                        RandTracer.Stop();
+                    }
+                }
                 TestAutomation.Note($"long event '{textKey}' done, maps {Find.Maps.Count}");
+                if (Find.Maps.Count > 0)
+                {
+                    // Диагностика T-073: состав самой новой карты, чтобы сравнить игроков.
+                    Map last = Find.Maps[Find.Maps.Count - 1];
+                    string byCat = string.Join(",", last.listerThings.AllThings.GroupBy(t => t.def.category).OrderBy(g => g.Key).Select(g => g.Key + "=" + g.Count()));
+                    string pawns = string.Join(",", last.mapPawns.AllPawns.OrderBy(p => p.thingIDNumber).Select(p => p.def.defName + "#" + p.thingIDNumber + "@" + p.Position));
+                    TestAutomation.Note($"map {last.uniqueID} after '{textKey}': {byCat}; pawns {pawns}; rand {MapRandContext.CurrentRawState:X16}");
+                }
             }
             finally
             {
+                RunningRemote = wasRemote;
                 if (began)
                 {
                     MapRandContext.EndTick();
@@ -75,4 +110,17 @@ internal static class Patch_LongEventHandler_QueueLongEvent_Session
     {
         SessionLongEvents.Wrap(ref action, textKey, ref doAsynchronously, ref exceptionHandler);
     }
+}
+
+// Прыжок камеры и выделение — только у того, чья команда (после основания поселения игра переводит камеру на пешку).
+[HarmonyPatch(typeof(CameraJumper), nameof(CameraJumper.TryJump), new[] { typeof(GlobalTargetInfo), typeof(CameraJumper.MovementMode) })]
+internal static class Patch_CameraJumper_TryJump_Remote
+{
+    private static bool Prefix() => !(CommandBus.ExecutingRemote || SessionLongEvents.RunningRemote);
+}
+
+[HarmonyPatch(typeof(CameraJumper), nameof(CameraJumper.TryJumpAndSelect))]
+internal static class Patch_CameraJumper_TryJumpAndSelect_Remote
+{
+    private static bool Prefix() => !(CommandBus.ExecutingRemote || SessionLongEvents.RunningRemote);
 }
