@@ -1,0 +1,53 @@
+2026-11-19 10:19:24 autoload: loading save 'tst014'
+2026-11-19 10:19:31 lockstep: connecting to 127.0.0.1:53728 as 'c1'
+2026-11-19 10:19:31 regionids: after load room=18 district=24 region=483
+2026-11-19 10:19:32 lockstep: connected to quic:127.0.0.1:53728, Hello sent
+2026-11-19 10:19:33 mapinterface postfix: alive (diag T-076)
+2026-11-19 10:19:33 lockstep: Welcome, playerId=1, serverTick=14998, seed=7
+2026-11-19 10:19:33 presence: player 1 online
+2026-11-19 10:19:33 presence: player 2 online
+2026-11-19 10:19:33 colonies diag: me=1, tick=14998, anyOwner=False, lowestOnline=True
+2026-11-19 10:19:35 watchdog: no tick advance for 300 frames at tick 14998: speed=Paused, paused=True, topWindow=ImmediateWindow, windows=3
+2026-11-19 10:20:33 regionids: run start room=18 district=24 region=483
+2026-11-19 10:20:33 run started: #0, tick=14998, scenario=none, ticks=400000, trace=False, quit=True, file=hash-c1-20261119-102033.txt
+2026-11-19 10:20:34 colonies: claim sent (lowest online player)
+2026-11-19 10:20:36 colonies: player 1 is the host, settlements claimed: 1
+2026-11-19 10:20:37 colonies: new colony for player 2 at 51715,0: 3 colonists, 10 item stacks
+2026-11-19 10:20:37 colonies: settlement 253 belongs to player 2
+2026-11-19 10:20:37 long event 'GeneratingMap' start, maps 1
+2026-11-19 10:20:41 long event 'GeneratingMap' done, maps 2
+2026-11-19 10:20:41 map 1 after 'GeneratingMap': Pawn=12,Item=1041,Building=6723,Plant=3907,Filth=3931,Ethereal=3; pawns Mech_Militor#46923@(24, 0, 117),Human#47945@(-1000, -1000, -1000),Mech_Pikeman#47955@(197, 0, 215),Boomrat#59216@(218, 0, 45),Raccoon#59217@(186, 0, 123),Rat#59218@(190, 0, 195),Rat#59219@(1, 0, 246),Rat#59220@(60, 0, 249),Boomalope#59221@(97, 0, 193),Boomalope#59222@(94, 0, 193),Boomalope#59223@(95, 0, 198),Boomalope#59224@(96, 0, 193),Boomalope#59225@(93, 0, 197); rand 0000081EFB25C5A1
+2026-11-19 10:20:41 long event 'SpawningColonists' start, maps 2
+2026-11-19 10:20:41 long event 'SpawningColonists' done, maps 2
+2026-11-19 10:20:41 map 1 after 'SpawningColonists': Pawn=16,Item=1058,Building=6723,Plant=3907,Filth=3931,Ethereal=3; pawns Human#41747@(135, 0, 114),Human#41750@(131, 0, 114),Human#41754@(133, 0, 115),Cat#41767@(132, 0, 116),Mech_Militor#46923@(24, 0, 117),Human#47945@(-1000, -1000, -1000),Mech_Pikeman#47955@(197, 0, 215),Boomrat#59216@(218, 0, 45),Raccoon#59217@(186, 0, 123),Rat#59218@(190, 0, 195),Rat#59219@(1, 0, 246),Rat#59220@(60, 0, 249),Boomalope#59221@(97, 0, 193),Boomalope#59222@(94, 0, 193),Boomalope#59223@(95, 0, 198),Boomalope#59224@(96, 0, 193),Boomalope#59225@(93, 0, 197); rand 000008D3FB25C5A1
+2026-11-19 10:20:48 presence: player 2 offline
+2026-11-19 10:20:48 lockstep: autosave #6 at tick 18007: taking world snapshot
+2026-11-19 10:20:48 snapshot: SaveGame start (RWMLWC-snapshot-out)
+2026-11-19 10:20:49 snapshot: SaveGame done in 987 ms
+2026-11-19 10:20:49 lockstep: autosave #6: snapshot taken, sending 2976597 bytes
+2026-11-19 10:20:49 lockstep: autosave #6 at tick 18007: raw=23373967 bytes, packed=2976597 bytes (12.7%), save=987 ms, pack=20 ms, 15 chunks sent to the server
+2026-11-19 10:20:49 stasis: map 1 frozen at tick 18060, stasis ticks 0
+2026-11-19 10:25:48 lockstep: autosave #7 at tick 125796: taking world snapshot
+2026-11-19 10:25:48 snapshot: SaveGame start (RWMLWC-snapshot-out)
+2026-11-19 10:25:49 snapshot: SaveGame done in 462 ms
+2026-11-19 10:25:49 lockstep: autosave #7: snapshot taken, sending 2977289 bytes
+2026-11-19 10:25:49 lockstep: autosave #7 at tick 125796: raw=22943692 bytes, packed=2977289 bytes (13.0%), save=462 ms, pack=19 ms, 15 chunks sent to the server
+2026-11-19 10:26:08 presence: player 2 online
+2026-11-19 10:26:08 snapshot: SaveGame start (RWMLWC-snapshot-out)
+2026-11-19 10:26:08 snapshot: SaveGame done in 399 ms
+2026-11-19 10:26:08 lockstep: snapshot for player 2 at tick 132756: raw=22911518 bytes, packed=2971652 bytes (13.0%), save=399 ms, pack=20 ms, 15 chunks sent; reloading it here too
+2026-11-19 10:26:08 curtain: shown (c2 подключается — синхронизация мира…), map 0, world view False
+2026-11-19 10:26:09 regionids: reset at load, bump=0
+2026-11-19 10:26:11 regionids: after load room=331 district=381 region=1475
+2026-11-19 10:26:14 curtain: view restored — map 0, world view False
+2026-11-19 10:26:14 lockstep: snapshot loaded, tick 132756, serverTick=132756, perMapSim=True
+2026-11-19 10:26:15 watchdog: no tick advance for 300 frames at tick 132756: speed=Paused, paused=True, topWindow=ImmediateWindow, windows=3
+2026-11-19 10:26:17 resumed after snapshot reload at tick 132756, perMapSim=True
+2026-11-19 10:26:18 stasis: map 1 thawed at tick 132780, stasis ticks 114720
+2026-11-19 10:26:45 presence: player 2 offline
+2026-11-19 10:26:45 lockstep: autosave #11 at tick 140763: taking world snapshot
+2026-11-19 10:26:45 snapshot: SaveGame start (RWMLWC-snapshot-out)
+2026-11-19 10:26:45 snapshot: SaveGame done in 415 ms
+2026-11-19 10:26:45 lockstep: autosave #11: snapshot taken, sending 2975502 bytes
+2026-11-19 10:26:45 lockstep: autosave #11 at tick 140763: raw=22552624 bytes, packed=2975502 bytes (13.2%), save=415 ms, pack=18 ms, 15 chunks sent to the server
+2026-11-19 10:26:47 watchdog: no tick advance for 300 frames at tick 140763: speed=Paused, paused=True, topWindow=ImmediateWindow, windows=3
