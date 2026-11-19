@@ -189,7 +189,8 @@ namespace RWMLWC.Client.Maps
         {
             SquadsComponent? squads = Squads.Component;
             GuestsComponent? guests = GuestsComponent.Component;
-            foreach (Pawn p in map.mapPawns.FreeColonistsSpawned)
+            // И ещё не вышедшие из капсул (капсула на замороженной карте не тикает и пешку не выпустит).
+            foreach (Pawn p in map.mapPawns.FreeColonistsSpawned.Concat(map.mapPawns.AllPawnsUnspawned.Where(x => x.IsFreeColonist)))
             {
                 // Гость: его караван отправил игрок не из этой колонии (Guests.cs).
                 int guestOf = guests?.GuestPlayer(p) ?? 0;

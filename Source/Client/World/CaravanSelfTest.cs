@@ -871,6 +871,10 @@ public static class CaravanSelfTest
             _exchangeStep = 1;
             _exchangeFormTick = tick + 300;
             RWMLWC.Client.Input.WorldCommands.SendTestOp(RWMLWC.Client.Input.WorldCommands.TestHomeAreaOp, home.uniqueID, 0);
+            if (ArmKey("podtest=1"))
+            {
+                RWMLWC.Client.Input.WorldCommands.SendTestOp(RWMLWC.Client.Input.WorldCommands.TestPodKitOp, home.uniqueID, 0);
+            }
         }
         if (_exchangeDef == null && tick >= _exchangeDefTick)
         {
@@ -885,6 +889,11 @@ public static class CaravanSelfTest
         // Вернувшийся после обрыва клиент (вход без сейва, сценарий rejoin) только наблюдает: груз уже отправлен.
         if (!amSender || _exchangeDef == null || ArmKey("save="))
         {
+            return;
+        }
+        if (ArmKey("podtest=1"))
+        {
+            PodFrame(tick, home, target);
             return;
         }
         if (_exchangeStep == 1 && tick >= _exchangeFormTick)
@@ -904,6 +913,67 @@ public static class CaravanSelfTest
             {
                 TestAutomation.Note("exchange: route ERROR " + e);
             }
+        }
+    }
+
+    private static int _podLogTick;
+
+    /// <summary>podtest (T-053): тот же груз, но капсулой — окно загрузки, погрузка, запуск с посадкой в колонию игрока 2.</summary>
+    private static void PodFrame(int tick, Map home, Settlement target)
+    {
+        CompTransporter? pod = home.listerThings.ThingsOfDef(ThingDefOf.TransportPod).Select(t => t.TryGetComp<CompTransporter>()).FirstOrDefault(c => c != null);
+        if (_exchangeStep == 1 && tick >= _exchangeFormTick && pod != null)
+        {
+            _exchangeStep = 2;
+            TestAutomation.Note("pods: load — " + TryLoadPod(home, pod));
+        }
+        // С exchangefrom=stay запуск — когда получатель уже не в сети (посадка на замороженную карту).
+        else if (_exchangeStep == 2 && pod != null && pod.LoadingInProgressOrReadyToLaunch && !pod.AnythingLeftToLoad
+            && (!ArmKey("exchangefrom=stay") || !RWMLWC.Client.Maps.PlayerPresence.IsOnline(Colonies.Component!.OwnerOf(target))))
+        {
+            _exchangeStep = 3;
+            try
+            {
+                int inside = pod.innerContainer.Where(t => t.def == _exchangeDef).Sum(t => t.stackCount);
+                pod.Launchable.TryLaunch(target.Tile, new TransportersArrivalAction_LandInSpecificCell(target, target.Map!.Center));
+                TestAutomation.Note($"pods: launch pressed, pod {pod.parent.thingIDNumber} ({inside} {_exchangeDef!.defName}, pawns {pod.innerContainer.OfType<Pawn>().Count()}) → settlement {target.ID}");
+            }
+            catch (Exception e)
+            {
+                TestAutomation.Note("pods: launch ERROR " + e);
+            }
+        }
+        else if (_exchangeStep == 2 && pod != null && tick >= _podLogTick)
+        {
+            _podLogTick = tick + 1000;
+            Pawn? any = home.mapPawns.FreeColonistsSpawned.FirstOrDefault();
+            string why = string.Join("; ", (pod.leftToLoad ?? new List<TransferableOneWay>()).SelectMany(t => t.things).Take(4).Select(t =>
+                $"{t.LabelShort} spawned {t.Spawned} at {t.PositionHeld} forbidden {t.IsForbidden(Faction.OfPlayer)} reach {(any != null && t.Spawned ? any.CanReach(t, Verse.AI.PathEndMode.Touch, Danger.Deadly) : false)}"));
+            string jobs = string.Join(", ", home.mapPawns.FreeColonistsSpawned.Select(p => p.thingIDNumber + ":" + (p.CurJobDef?.defName ?? "-") + (p.workSettings?.WorkIsActive(WorkTypeDefOf.Hauling) == true ? "" : "(no haul)")));
+            TestAutomation.Note($"pods: loading, left {pod.leftToLoad?.Sum(t => t.CountToTransfer) ?? -1}, inside {pod.innerContainer.Count}; {why}; colonists {jobs}");
+        }
+    }
+
+    private static string TryLoadPod(Map map, CompTransporter pod)
+    {
+        try
+        {
+            var dialog = new Dialog_LoadTransporters(map, new List<CompTransporter> { pod });
+            AccessTools.Method(typeof(Dialog_LoadTransporters), "CalculateAndRecacheTransferables").Invoke(dialog, null);
+            var transferables = (List<TransferableOneWay>)AccessTools.Field(typeof(Dialog_LoadTransporters), "transferables").GetValue(dialog)!;
+            TransferableOneWay? colonist = transferables.FirstOrDefault(t => t.AnyThing is Pawn p && p.IsColonist && !p.Downed);
+            TransferableOneWay? cargo = transferables.FirstOrDefault(t => t.ThingDef == _exchangeDef);
+            if (colonist == null || cargo == null) return $"нет колониста или груза ({colonist != null}/{cargo != null})";
+            colonist.AdjustTo(1);
+            _exchangePawn = colonist.AnyThing.thingIDNumber;
+            _exchangeCount = Math.Min(20, cargo.MaxCount);
+            cargo.AdjustTo(_exchangeCount);
+            bool ok = (bool)TransportPods.DialogTryAccept.Invoke(dialog, null)!;
+            return $"погрузка {(ok ? "принята" : "отклонена")}, капсула {pod.parent.thingIDNumber}, колонист {_exchangePawn}, груз {_exchangeDef!.defName} x{_exchangeCount}";
+        }
+        catch (Exception e)
+        {
+            return "ошибка: " + (e.InnerException ?? e).Message;
         }
     }
 
@@ -948,7 +1018,10 @@ public static class CaravanSelfTest
         }
         int inCaravans = Find.WorldObjects.Caravans.Sum(c => CaravanInventoryUtility.AllInventoryItems(c).Where(t => t.def == _exchangeDef).Sum(t => t.stackCount));
         total += inCaravans;
-        return $", cargo {_exchangeDef.defName} [{string.Join(",", parts)}] caravans {inCaravans} total {total}";
+        int inFlight = Find.WorldObjects.AllWorldObjects.OfType<TravellingTransporters>()
+            .Sum(o => { var l = new List<Thing>(); ThingOwnerUtility.GetAllThingsRecursively(o, l, allowUnreal: false); return l.Where(t => t.def == _exchangeDef).Sum(t => t.stackCount); });
+        total += inFlight;
+        return $", cargo {_exchangeDef.defName} [{string.Join(",", parts)}] caravans {inCaravans} pods {inFlight} total {total}";
     }
 
     private static string Summary()

@@ -33,6 +33,8 @@ public static class WorldCommands
     private const byte OpTestTrader = 18;       // только тестовые прогоны (ключ tradetest=1): караван торговцев
     private const byte OpTestGoTrade = 19;      // только тестовые прогоны (ключ tradetest=1): колонист идёт торговать
     private const byte OpTestHomeArea = 20;     // только тестовые прогоны (ключ exchangetest=1): домашняя зона под вещами карты
+    // 21, 22 — капсулы (TransportPods)
+    private const byte OpTestPodKit = 23;       // только тестовые прогоны (ключ podtest=1): пусковая площадка с капсулой и топливом
 
     private static readonly FieldInfo FormMapField = AccessTools.Field(typeof(Dialog_FormCaravan), "map");
     private static readonly FieldInfo FormReformField = AccessTools.Field(typeof(Dialog_FormCaravan), "reform");
@@ -709,6 +711,43 @@ public static class WorldCommands
     public const byte TestTraderOp = OpTestTrader;
     public const byte TestGoTradeOp = OpTestGoTrade;
     public const byte TestHomeAreaOp = OpTestHomeArea;
+    public const byte TestPodKitOp = OpTestPodKit;
+
+    /// <summary>Тест капсул: как если бы игрок построил пусковую площадку с капсулой у колонистов и заправил её.</summary>
+    private static string SpawnPodKit(Map map)
+    {
+        List<Pawn> colonists = map.mapPawns.FreeColonistsSpawned.ToList();
+        if (colonists.Count == 0) return "no colonists";
+        IntVec3 center = new IntVec3((int)colonists.Average(p => p.Position.x), 0, (int)colonists.Average(p => p.Position.z));
+        Rot4 rot = Rot4.North;
+        bool Free(IntVec3 c) => c.InBounds(map) && c.Standable(map) && !c.Roofed(map) && !c.Fogged(map)
+            && c.GetEdifice(map) == null && c.GetFirstItem(map) == null && c.GetFirstPawn(map) == null && c.GetTerrain(map).affordances.Contains(TerrainAffordanceDefOf.Heavy);
+        foreach (IntVec3 c in GenRadial.RadialCellsAround(center, 40f, useCenter: true))
+        {
+            CellRect rect = GenAdj.OccupiedRect(c, rot, DefDatabase<ThingDef>.GetNamed("PodLauncher").size);
+            IntVec3 port = FuelingPortUtility.GetFuelingPortCell(c, rot);
+            if (!rect.Cells.All(Free) || !Free(port) || rect.Contains(port))
+            {
+                continue;
+            }
+            Thing launcher = ThingMaker.MakeThing(DefDatabase<ThingDef>.GetNamed("PodLauncher"));
+            launcher.SetFaction(Faction.OfPlayer);
+            GenSpawn.Spawn(launcher, c, map, rot);
+            launcher.TryGetComp<CompRefuelable>()?.Refuel(150f);
+            Thing pod = ThingMaker.MakeThing(ThingDefOf.TransportPod);
+            pod.SetFaction(Faction.OfPlayer);
+            GenSpawn.Spawn(pod, port, map);
+            // Стартовые вещи (сталь с корабля) запрещены — игра их в капсулы не грузит; игрок снял бы запрет.
+            int allowed = 0;
+            foreach (Thing t in map.listerThings.AllThings.Where(t => t.def.category == ThingCategory.Item && t.Spawned && t.IsForbidden(Faction.OfPlayer)).ToList())
+            {
+                t.SetForbidden(false, warnOnFail: false);
+                allowed++;
+            }
+            return $"launcher {launcher.thingIDNumber} at {c}, pod {pod.thingIDNumber} at {port}, unforbidden {allowed}";
+        }
+        return "no place";
+    }
 
     private static void ExecuteColony(byte op, ref PacketReader r)
     {
@@ -796,6 +835,20 @@ public static class WorldCommands
                         }
                     }
                     TestAutomation.Note($"exchange: home area on map {a}: +{cells} cells under items");
+                    break;
+                }
+            case OpTestPodKit:
+                {
+                    int a = r.ReadInt32();
+                    r.ReadInt32();
+                    if (!RWMLWC.Client.World.CaravanSelfTest.ArmKey("podtest=1"))
+                    {
+                        return;
+                    }
+                    Map? map = Find.Maps.FirstOrDefault(m => m.uniqueID == a);
+                    if (map == null) return;
+                    MapRandContext.Enter(map);
+                    TestAutomation.Note("pods: kit on map " + a + ": " + SpawnPodKit(map));
                     break;
                 }
             case OpTestTransfer:
@@ -894,12 +947,17 @@ public static class WorldCommands
             RWMLWC.Client.World.TradeCommands.Execute(ref r);
             return;
         }
+        if (op == RWMLWC.Client.World.TransportPods.OpLoad || op == RWMLWC.Client.World.TransportPods.OpLaunch)
+        {
+            RWMLWC.Client.World.TransportPods.Execute(op, ref r);
+            return;
+        }
         if (op >= SharedWindows.OpCount && op <= SharedWindows.OpSlider)
         {
             SharedWindows.Execute(op, ref r);
             return;
         }
-        if (op == OpColonyClaim || op == OpColonyJoin || op == OpColonyNew || op == OpColonyTestAbsent || op == OpTestPresence || op == OpTestKill || op == OpTestTransfer || op == OpTestTrader || op == OpTestGoTrade || op == OpTestHomeArea)
+        if (op == OpColonyClaim || op == OpColonyJoin || op == OpColonyNew || op == OpColonyTestAbsent || op == OpTestPresence || op == OpTestKill || op == OpTestTransfer || op == OpTestTrader || op == OpTestGoTrade || op == OpTestHomeArea || op == OpTestPodKit)
         {
             ExecuteColony(op, ref r);
             return;

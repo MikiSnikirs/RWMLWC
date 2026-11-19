@@ -26,6 +26,9 @@ public sealed class GuestsComponent : GameComponent
     /// <summary>Пешка → игрок, чьим гостем она стоит в чужой колонии.</summary>
     public Dictionary<int, int> guestOf = new Dictionary<int, int>();
 
+    /// <summary>Пешка в летящей капсуле → игрок, который запустил капсулы (T-053).</summary>
+    public Dictionary<int, int> podSender = new Dictionary<int, int>();
+
     public GuestsComponent(Game game)
     {
     }
@@ -36,8 +39,10 @@ public sealed class GuestsComponent : GameComponent
     {
         Scribe_Collections.Look(ref caravanSender, "rwmlwcCaravanSender", LookMode.Value, LookMode.Value);
         Scribe_Collections.Look(ref guestOf, "rwmlwcGuestOf", LookMode.Value, LookMode.Value);
+        Scribe_Collections.Look(ref podSender, "rwmlwcPodSender", LookMode.Value, LookMode.Value);
         caravanSender ??= new Dictionary<int, int>();
         guestOf ??= new Dictionary<int, int>();
+        podSender ??= new Dictionary<int, int>();
     }
 
     /// <summary>Игрок, чьим гостем стоит пешка (0 — не гость).</summary>
@@ -62,6 +67,50 @@ public sealed class GuestsComponent : GameComponent
         }
         int sender = c.caravanSender.TryGetValue(caravan.ID, out int s) ? s : 0;
         c.caravanSender.Remove(caravan.ID);
+        int guestOfPlayer = c.Mark(caravan.PawnsListForReading, sender, map);
+        if (guestOfPlayer != 0)
+        {
+            TestAutomation.Note($"guests: caravan {caravan.ID} entered map {map.uniqueID} — {caravan.PawnsListForReading.Count} pawns are guests of player {guestOfPlayer}");
+        }
+    }
+
+    /// <summary>Из исполнения команды запуска капсул: пешки в них отправил этот игрок.</summary>
+    public static void NotePodPawns(IEnumerable<Pawn> pawns, int player)
+    {
+        if (player > 0 && Component is GuestsComponent c)
+        {
+            foreach (Pawn p in pawns)
+            {
+                c.podSender[p.thingIDNumber] = player;
+            }
+        }
+    }
+
+    /// <summary>Капсулы высаживаются на карту: пешки — гости запустившего в чужой колонии, иначе запись снимается.</summary>
+    internal static void OnPodsDrop(List<Pawn> pawns, Map map)
+    {
+        GuestsComponent? c = Component;
+        if (c == null || pawns.Count == 0)
+        {
+            return;
+        }
+        foreach (IGrouping<int, Pawn> bySender in pawns.GroupBy(p => c.podSender.TryGetValue(p.thingIDNumber, out int s) ? s : 0))
+        {
+            foreach (Pawn p in bySender)
+            {
+                c.podSender.Remove(p.thingIDNumber);
+            }
+            int guestOfPlayer = c.Mark(bySender.ToList(), bySender.Key, map);
+            if (guestOfPlayer != 0)
+            {
+                TestAutomation.Note($"guests: pods landed on map {map.uniqueID} — {bySender.Count()} pawns are guests of player {guestOfPlayer}");
+            }
+        }
+    }
+
+    /// <summary>Пешки входят на карту: гости отправителя, если это чужая колония; иначе запись снимается.</summary>
+    private int Mark(IEnumerable<Pawn> pawns, int sender, Map map)
+    {
         int guestOfPlayer = 0;
         if (sender > 0 && map.Parent is Settlement settlement && settlement.Faction == Faction.OfPlayer
             && RWMLWC.Client.World.Colonies.Component is RWMLWC.Client.World.ColoniesComponent colonies)
@@ -72,21 +121,18 @@ public sealed class GuestsComponent : GameComponent
                 guestOfPlayer = sender;
             }
         }
-        foreach (Pawn p in caravan.PawnsListForReading)
+        foreach (Pawn p in pawns)
         {
             if (guestOfPlayer != 0)
             {
-                c.guestOf[p.thingIDNumber] = guestOfPlayer;
+                guestOf[p.thingIDNumber] = guestOfPlayer;
             }
             else
             {
-                c.guestOf.Remove(p.thingIDNumber);
+                guestOf.Remove(p.thingIDNumber);
             }
         }
-        if (guestOfPlayer != 0)
-        {
-            TestAutomation.Note($"guests: caravan {caravan.ID} entered map {map.uniqueID} — {caravan.PawnsListForReading.Count} pawns are guests of player {guestOfPlayer}");
-        }
+        return guestOfPlayer;
     }
 
     /// <summary>Для сравнения у игроков.</summary>
