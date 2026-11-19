@@ -153,6 +153,7 @@ public static class CommandBus
 
         bool own = command.PlayerId == LockstepClient.PlayerId;
         sbyte previousMapIndex = game.currentMapIndex;
+        Map? previousMap = game.CurrentMap;
         bool previousGodMode = DebugSettings.godMode;
         List<object> selection = Find.Selector.SelectedObjects;
         List<object>? savedSelection = null;
@@ -265,9 +266,25 @@ public static class CommandBus
             {
                 // Чужая команда: вернуть игроку его выделение.
                 selection.Clear();
-                selection.AddRange(savedSelection);
+                foreach (object o in savedSelection)
+                {
+                    if (!(o is Thing t) || t.Spawned)
+                    {
+                        selection.Add(o); // вещи с убранной командой карты в выделение не возвращаем
+                    }
+                }
             }
-            game.currentMapIndex = previousMapIndex;
+            // Команда могла убрать карту (переформирование каравана уводит его с временной карты, и она удаляется):
+            // прежний номер тогда указывает мимо списка. Возвращаем ту же карту, если она есть; иначе — как оставила игра.
+            int back = previousMap != null ? Find.Maps.IndexOf(previousMap) : previousMapIndex;
+            if (back >= 0 && back < Find.Maps.Count)
+            {
+                game.currentMapIndex = (sbyte)back;
+            }
+            else if (game.currentMapIndex >= Find.Maps.Count)
+            {
+                game.currentMapIndex = (sbyte)(Find.Maps.Count > 0 ? 0 : -1);
+            }
         }
     }
 }

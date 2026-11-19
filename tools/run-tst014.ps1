@@ -28,6 +28,8 @@ param(
     [int]$DenseTo = -1,
     [int]$Camera = -1,          # camera wander for c2: 1/0 (default 1)
     [string]$LanguageC2 = '',
+    [int]$RejoinDelaySec = 600, # -Scenario rejoin: how long c1 plays alone after c2 quits
+    [int]$RejoinTicks = 3000,   # -Scenario rejoin: ticks c2 plays after coming back
     [string[]]$ExtraArm = @(),  # extra key=value lines for every client's arm file, e.g. caravantest=1   # game language folder for c2 only, e.g. English (players with different languages)
     [switch]$NoBuild
 )
@@ -152,6 +154,11 @@ for ($c = 1; $c -le $Clients; $c++) {
         if ($c -eq 1) { $armTicks = $HostTicks; $extra = @('snapsender=1') }
         else { $saveLine = 'save='; $extra = @("connectdelay=$ConnectDelaySec") }
     }
+    if ($Scenario -eq 'rejoin') {
+        # c1 plays long and serves the world; c2 plays $Ticks, quits, and later comes back from the main menu.
+        $armScenario = 'none'
+        if ($c -eq 1) { $armTicks = $HostTicks; $extra = @('snapsender=1') }
+    }
     if ($Scenario -eq 'squads') {
         # TST-060: c1 edits squads and asks for a common snapshot, so c1 must be able to serve it.
         if ($c -eq 1) { $extra = @('snapsender=1') }
@@ -172,7 +179,7 @@ for ($c = 1; $c -le $Clients; $c++) {
     [IO.File]::WriteAllText((Join-Path $dir 'RWMLWC\automation-progress.txt'), '0')
     # Without taking focus from the person's own game (tools/StartQuiet.ps1).
     . (Join-Path $PSScriptRoot 'StartQuiet.ps1')
-    [RwmlwcQuiet]::Guard()   # remember the person's window before the game takes it
+    if (Test-FocusGuardOn) { [RwmlwcQuiet]::Guard() }   # remember the person's window before the game takes it
     $procs += Start-GameQuiet $exe "-savedatafolder=$dir" $game
     Write-Host "client c$c pid $($procs[-1].Id), data $dir"
 }
@@ -180,6 +187,24 @@ foreach ($p in $procs) { [void](Show-GameQuiet $p) }
 
 Step "Waiting for the game to close itself (up to $TimeoutMin min)"
 $deadline = (Get-Date).AddMinutes($TimeoutMin)
+if ($Scenario -eq 'rejoin' -and $Clients -ge 2) {
+    # c2 quits by itself after its run; c1 keeps playing alone; then c2 comes back without a save (world by snapshot).
+    while ((Get-Date) -lt $deadline -and -not $procs[1].HasExited) { Wait-GuardingFocus 2 }
+    Write-Host "c2 quit; c1 plays alone for $RejoinDelaySec s"
+    $until = (Get-Date).AddSeconds($RejoinDelaySec)
+    while ((Get-Date) -lt $until -and -not $procs[0].HasExited) { Wait-GuardingFocus 2 }
+    $dir2 = Join-Path $work 'c2'
+    $arm2 = @('armed=1', 'save=', 'scenarios=none', "ticks=$RejoinTicks", 'trace=0', 'quit=1', "server=127.0.0.1:$port", "thumbprint=$thumb",
+              'name=c2', 'holdsec=0', 'issuer=0', 'camera=0', 'connectdelay=5') + @($ExtraArm | ForEach-Object { $_ -split "," } | Where-Object { $_ })
+    [IO.File]::WriteAllLines((Join-Path $dir2 'RWMLWC\arm-determinism-run.txt'), $arm2)
+    [IO.File]::WriteAllText((Join-Path $dir2 'RWMLWC\automation-progress.txt'), '0')
+    $procs[1] = Start-GameQuiet $exe "-savedatafolder=$dir2" $game
+    [void](Show-GameQuiet $procs[1])
+    Write-Host "client c2 back, pid $($procs[1].Id)"
+    while ((Get-Date) -lt $deadline -and -not $procs[1].HasExited) { Wait-GuardingFocus 2 }
+    Start-Sleep -Seconds 10
+    if (-not $procs[0].HasExited) { Stop-Process -Id $procs[0].Id -Force }   # c1's run is open-ended here
+}
 while ((Get-Date) -lt $deadline -and ($procs | Where-Object { -not $_.HasExited })) { Wait-GuardingFocus 2 }
 Write-Host "focus given back to your window: $([RwmlwcQuiet]::Restored) time(s)"
 $timedOut = $false

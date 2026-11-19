@@ -57,6 +57,11 @@ public static class VirtualUi
     /// <summary>Из префикса WindowStack.Add. false — окно не показывать.</summary>
     public static bool OnWindowAdd(Window window)
     {
+        if (!CommandBus.Executing && MapRandContext.InTick && window is RimWorld.Dialog_Trade && LockstepClient.InSession)
+        {
+            // Колонист дошёл до торговца: окно — только тому, кто отдал приказ (склад у всех создан одинаково).
+            return RWMLWC.Client.World.OrderedBy.ShowTickTrade();
+        }
         if (!CommandBus.Executing)
         {
             // Меню, открытое прямо из интерфейса методом, за объектом которого идёт наблюдение
@@ -81,6 +86,12 @@ public static class VirtualUi
                 }
             }
             return true;
+        }
+        // Общие окна (подтверждения, ползунок, окна со списком): у всех под одним номером, к ним можно присоединиться.
+        bool? shared = SharedWindows.Register(window);
+        if (shared.HasValue)
+        {
+            return shared.Value;
         }
         if (window is FloatMenu menu)
         {

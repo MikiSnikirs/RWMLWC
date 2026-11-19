@@ -1589,6 +1589,8 @@ public static class TestAutomation
         RWMLWC.Client.Maps.AbsenceModes.Component?.SetDirect(map.uniqueID, RWMLWC.Client.Maps.AbsenceMode.Autopilot, 7);
         RWMLWC.Client.Maps.PlayerPresence.Component?.Apply(7, false);
         Note("absence-raid: offline owner, raid fired=" + FireRaidViaStoryteller(map));
+        // Как рейд из задания (QuestPart_Incident): мимо рассказчика, прямо через IncidentWorker.
+        Note("absence-raid: offline owner, quest-style raid executed=" + FireRaidDirect(map));
         RWMLWC.Client.Maps.PlayerPresence.Component?.Apply(7, true);
         Note("absence-raid: owner back, raid fired=" + FireRaidViaStoryteller(map));
     }
@@ -1658,6 +1660,14 @@ public static class TestAutomation
         }
         c.pather.StartPath(settleTarget, null, true);
         Note($"settle: route caravan {c.ID} to tile {settleTarget.tileId}");
+    }
+
+    private static bool FireRaidDirect(Map map)
+    {
+        IncidentParms parms = StorytellerUtility.DefaultParmsNow(IncidentCategoryDefOf.ThreatBig, map);
+        parms.points = 500f;
+        parms.forced = true;
+        return IncidentDefOf.RaidEnemy.Worker.TryExecute(parms);
     }
 
     private static bool FireRaidViaStoryteller(Map map)

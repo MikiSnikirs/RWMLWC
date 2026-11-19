@@ -152,6 +152,17 @@ public static class SessionUi
 /// <summary>Окно сессии: игроки с пингом, чат и поле ввода.</summary>
 public class Dialog_Session : Window
 {
+    // «, колония X» / «, соавтор X» — к строке игрока.
+    private static string ColonyNote(int playerId)
+    {
+        var colonies = RWMLWC.Client.World.Colonies.Component;
+        if (colonies == null) return "";
+        RimWorld.Planet.Settlement? own = colonies.OwnedBy(playerId);
+        if (own != null) return ", колония «" + own.LabelCap + "»";
+        RimWorld.Planet.Settlement? member = colonies.MemberOf(playerId);
+        return member != null ? ", соавтор «" + member.LabelCap + "»" : "";
+    }
+
     private string _input = "";
     private Vector2 _scroll;
     private int _seenLines = -1;
@@ -196,11 +207,21 @@ public class Dialog_Session : Window
             string me = p.PlayerId == LockstepClient.PlayerId ? " (вы)" : "";
             Widgets.DrawBoxSolid(new Rect(inRect.x + 8f, y + 5f, 12f, 12f), SessionUi.ToUnityColor(p.Color));
             GUI.color = p.Online ? Color.white : Color.gray;
-            Widgets.Label(new Rect(inRect.x + 26f, y, inRect.width - 130f, 22f), $"{p.PlayerId}. {p.Name}{me} — {ping}");
+            Widgets.Label(new Rect(inRect.x + 26f, y, inRect.width - 130f, 22f), $"{p.PlayerId}. {p.Name}{me} — {ping}{ColonyNote(p.PlayerId)}");
             GUI.color = Color.white;
             if (p.PlayerId == LockstepClient.PlayerId && Widgets.ButtonText(new Rect(inRect.xMax - 100f, y, 100f, 22f), "Цвет"))
                 Find.WindowStack.Add(new Dialog_ChooseColor());
             y += 22f;
+        }
+        var colonies = RWMLWC.Client.World.Colonies.Component;
+        if (LockstepClient.InSession && colonies != null && colonies.AnyOwner && !colonies.HasChosen(LockstepClient.PlayerId))
+        {
+            y += 4f;
+            if (Widgets.ButtonText(new Rect(inRect.x + 8f, y, 220f, 24f), "Выбрать колонию"))
+            {
+                RWMLWC.Client.World.ColonyChoice.Reopen();
+            }
+            y += 26f;
         }
         y = AbsenceRow(inRect, y + 4f);
         y += 4f;
@@ -345,7 +366,11 @@ internal static class Patch_MapInterface_SessionStatus
         ChatSelfTest.Frame();
         RWMLWC.Client.Absence.IdleAlarm.Frame();
         RWMLWC.Client.Net.Reconnect.Frame();
+        RWMLWC.Client.World.CaravanSelfTest.Frame();
+        RWMLWC.Client.World.ColonyChoice.Frame();
+        RWMLWC.Client.Input.SharedWindows.Frame();
         RWMLWC.Client.Net.NetworkGameMenu.Frame();
+        StasisBanner.OnGUI();
         StatusLineView.OnGUI();
     }
 }

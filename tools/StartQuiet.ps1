@@ -82,9 +82,18 @@ public static class RwmlwcQuiet
 }
 
 # Poll the focus guard for $Seconds (use instead of Start-Sleep while test instances run).
+# The guard is OFF by default (owner's request 2026-11-15): it handed focus back with Alt taps whenever the
+# person clicked a test window, so the test windows could not be used at all. Turn it on with the user
+# variable RWMLWC_TEST_FOCUS_GUARD=1. Without it this is a plain wait; test windows still start without focus.
+function Test-FocusGuardOn {
+    $v = [Environment]::GetEnvironmentVariable('RWMLWC_TEST_FOCUS_GUARD', 'User')
+    if (-not $v) { $v = $env:RWMLWC_TEST_FOCUS_GUARD }
+    return $v -eq '1'
+}
 function Wait-GuardingFocus([double]$Seconds) {
+    $guard = Test-FocusGuardOn
     $until = (Get-Date).AddSeconds($Seconds)
-    do { [RwmlwcQuiet]::Guard(); Start-Sleep -Milliseconds 100 } while ((Get-Date) -lt $until)
+    do { if ($guard) { [RwmlwcQuiet]::Guard() }; Start-Sleep -Milliseconds 100 } while ((Get-Date) -lt $until)
 }
 
 # A fullscreen game of the person minimizes on any focus loss, and a starting RimWorld takes focus for a moment.

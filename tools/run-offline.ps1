@@ -96,7 +96,7 @@ if ($blockers.Count -gt 0) {
 Step "Starting the game: queue $($Queue -join ','), $Ticks ticks each"
 # Without taking focus from the person's own game (tools/StartQuiet.ps1).
 . (Join-Path $PSScriptRoot 'StartQuiet.ps1')
-[RwmlwcQuiet]::Guard()   # remember the person's window before the game takes it
+if (Test-FocusGuardOn) { [RwmlwcQuiet]::Guard() }   # remember the person's window before the game takes it
 $p = Start-GameQuiet $exe "-savedatafolder=$dir" $game
 Write-Host "pid $($p.Id), data $dir"
 [void](Show-GameQuiet $p)

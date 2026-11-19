@@ -50,10 +50,27 @@ public static class PlayerPresence
     /// ни в одном режиме (docs/ARCHITECTURE.md, раздел 4). Карта без выбранного режима — без запрета: кто её
     /// владелец, знает только сервер, а решение должно быть одинаковым у всех.
     /// </summary>
-    public static bool BlocksThreats(Map map)
+    public static bool BlocksThreats(Map map) => OwnerAbsent(map);
+
+    /// <summary>
+    /// Колонии карты сейчас нет в игре: её владелец не в сети (владелец колонии, иначе тот, кто выбирал режим
+    /// отсутствия) и никто из её соавторов не в сети. Одно правило для запрета угроз, заморозки адаптации
+    /// и стазиса. Владелец неизвестен — колония считается в игре.
+    /// </summary>
+    public static bool OwnerAbsent(Map map)
     {
-        int owner = AbsenceModes.Component?.OwnerOf(map.uniqueID) ?? 0;
-        return owner > 0 && !IsOnline(owner);
+        RWMLWC.Client.World.ColoniesComponent? colonies = RWMLWC.Client.World.Colonies.Component;
+        RimWorld.Planet.Settlement? settlement = map.Parent as RimWorld.Planet.Settlement;
+        int owner = settlement != null ? colonies?.OwnerOf(settlement) ?? 0 : 0;
+        if (owner == 0)
+        {
+            owner = AbsenceModes.Component?.OwnerOf(map.uniqueID) ?? 0;
+        }
+        if (owner == 0 || IsOnline(owner))
+        {
+            return false;
+        }
+        return settlement == null || colonies == null || !colonies.MembersOf(settlement).Any(IsOnline);
     }
 }
 
@@ -68,6 +85,28 @@ internal static class Patch_Storyteller_TryFire_AbsentOwner
             return true;
         }
         TestAutomation.Note($"presence: {fi.def.defName} on map {map.uniqueID} skipped — owner {AbsenceModes.Component?.OwnerOf(map.uniqueID)} is offline");
+        __result = false;
+        return false;
+    }
+}
+
+/// <summary>
+/// То же для крупных угроз мимо рассказчика (T-072): рейды из заданий (<c>QuestPart_Incident</c>,
+/// <c>QuestPart_RandomRaid</c>), сигналов, мест и способностей идут через <c>IncidentWorker.TryExecute</c>.
+/// На карту отсутствующего владельца такая угроза не исполняется; задание получает «не вышло» (false).
+/// Решение B на время отсутствия A (docs/ARCHITECTURE.md, раздел 4: «ни в одном режиме»).
+/// </summary>
+[HarmonyPatch(typeof(IncidentWorker), nameof(IncidentWorker.TryExecute))]
+internal static class Patch_IncidentWorker_TryExecute_AbsentOwner
+{
+    private static bool Prefix(IncidentWorker __instance, IncidentParms parms, ref bool __result)
+    {
+        IncidentDef? def = __instance.def;
+        if (def == null || def.category != IncidentCategoryDefOf.ThreatBig || !(parms?.target is Map map) || !PlayerPresence.BlocksThreats(map))
+        {
+            return true;
+        }
+        TestAutomation.Note($"presence: {def.defName} (not from storyteller) on map {map.uniqueID} skipped — owner {AbsenceModes.Component?.OwnerOf(map.uniqueID)} is offline");
         __result = false;
         return false;
     }

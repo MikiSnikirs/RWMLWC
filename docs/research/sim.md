@@ -319,6 +319,26 @@ ilspycmd -p -o "$env:USERPROFILE\rw-decompiled\Waylith" "$game\Waylith.dll"
 
 Проверка: TST-015 (60 000 тиков) с правками; отдельного сценария на биоскульптор и на много приказов на паузе нет.
 
+## 6о. `System.HashCode.Combine` в зёрнах генерации (T-073, 15.11.2026, машина B)
+
+В .NET у `System.HashCode` случайное зерно **в каждом процессе**. Игра местами берёт `HashCode.Combine(...)` как зерно для `Rand`, и тогда два процесса получают разные числа при одинаковом состоянии.
+
+Найдено так: карта поселения у двух клиентов совпадала по вещам до первого разброса группы (`GenStep_ScatterGroup`, мусор вокруг `AncientMechDropBeacon`), дальше — разные руины, обломки и мусор, а растения, которые постройки потом сносят, пропадают в разных местах. Трассировка `Rand` со стеком во время генерации (самопроверка `caravantest=1`, файл `genrand-<карта>.txt`) разошлась в `GenStep_ScatterGroup.ScatterAt`: блок `Rand.Block(map.NextGenSeed)`, а `Map.NextGenSeed => HashCode.Combine(тайл, generatedId++, зерно мира)`.
+
+Поиск по всей декомпилированной сборке: 13 файлов с `HashCode.Combine`. Влияют на симуляцию или генерацию:
+
+| Место | Что | Решение (`Source/Client/Sim/DeterministicGenSeed.cs`) |
+|---|---|---|
+| `Map.NextGenSeed` | зерно частей генерации карты | то же через `Gen.HashCombineInt` |
+| `LayoutWorker.FillAllRooms` | наполнение комнат строений при генерации | замена вызова в IL |
+| `Building_Trap.KnowsOfTrap` | обходит ли рейдер ловушку (тик) | замена вызова в IL |
+| `Gravship.ConstantRandSeed` | зерно событий гравикорабля | то же через `Gen.HashCombineInt` |
+| `WindManager.BaseWindSpeedAt` | шум ветра: `map.GetHashCode()` — хеш объекта (у `Map` нет своего), ветер читают ветряки | номер карты вместо хеша объекта (найдено позже, T-076) |
+
+Остальные (`PathFinder`, `FastTileFinder`, `PathFinderCostTuning`, `SimplifiedPastureNutritionSimulator`, `XmlToObjectUtils`, `GenStepWithParams`, `LayerConnection`, `GenCollection.DictHashCode`, `ScenPart_PlanetLayer`, `Toils_Ingest`) — ключи кэшей, `GetHashCode` для словарей и `Log.WarningOnce`. Не проверено: обходится ли где-то `HashSet`/`Dictionary` с такими ключами в порядке, влияющем на симуляцию.
+
+Проверка: tst073c — карта поселения у двух клиентов совпала построчно (35 694 вещи), 719 общих замеров хешей без расхождений (до правки — расходилась на первом же замере).
+
 ## 7. Что это меняет в плане
 
 1. T-014: точка входа — замена `TickManagerUpdate`.

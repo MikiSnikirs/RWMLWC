@@ -20,6 +20,31 @@ public static class WorldCommands
 {
     private const byte OpSettle = 1;
     private const byte OpRoute = 2;
+    private const byte OpGizmo = 3;
+    private const byte OpSplit = 4;
+    private const byte OpReform = 5;
+    private const byte OpColonyClaim = 6;
+    private const byte OpColonyJoin = 7;
+    private const byte OpColonyNew = 8;
+    private const byte OpColonyTestAbsent = 13; // только тестовые прогоны (ключ abandontest=1)
+    private const byte OpTestPresence = 14;     // только тестовые прогоны (ключ stasistest=1)
+    private const byte OpTestKill = 15;         // только тестовые прогоны (ключ adapttest=1)
+    private const byte OpTestTransfer = 16;     // только тестовые прогоны (ключ clocktest=1)
+    private const byte OpTestTrader = 18;       // только тестовые прогоны (ключ tradetest=1): караван торговцев
+    private const byte OpTestGoTrade = 19;      // только тестовые прогоны (ключ tradetest=1): колонист идёт торговать
+
+    private static readonly FieldInfo FormMapField = AccessTools.Field(typeof(Dialog_FormCaravan), "map");
+    private static readonly FieldInfo FormReformField = AccessTools.Field(typeof(Dialog_FormCaravan), "reform");
+    private static readonly FieldInfo FormDestinationField = AccessTools.Field(typeof(Dialog_FormCaravan), "destinationTile");
+    private static readonly FieldInfo FormAboutToBeRemovedField = AccessTools.Field(typeof(Dialog_FormCaravan), "mapAboutToBeRemoved");
+    private static readonly MethodInfo FormRecacheMethod = AccessTools.Method(typeof(Dialog_FormCaravan), "CalculateAndRecacheTransferables");
+    internal static readonly MethodInfo ReformMethod = AccessTools.Method(typeof(Dialog_FormCaravan), "TryReformCaravan");
+
+    private static readonly FieldInfo SplitCaravanField = AccessTools.Field(typeof(Dialog_SplitCaravan), "caravan");
+    private static readonly FieldInfo SplitTransferablesField = AccessTools.Field(typeof(Dialog_SplitCaravan), "transferables");
+    private static readonly MethodInfo SplitCheckMethod = AccessTools.Method(typeof(Dialog_SplitCaravan), "CheckForErrors");
+    private static readonly MethodInfo SplitRecacheMethod = AccessTools.Method(typeof(Dialog_SplitCaravan), "CalculateAndRecacheTransferables");
+    internal static readonly MethodInfo SplitMethod = AccessTools.Method(typeof(Dialog_SplitCaravan), "TrySplitCaravan");
     private const int MaxItems = 4096;
 
     private static readonly FieldInfo LayerIdField = AccessTools.Field(typeof(PlanetTile), "layerId");
@@ -160,6 +185,7 @@ public static class WorldCommands
             return;
         }
         CaravanFormingUtility.StartFormingCaravan(pawns, downed, Faction.OfPlayer, transferables, meeting, exit, start, dest);
+        SharedWindows.CloseMatching(w => w is Dialog_FormCaravan d && ReferenceEquals(FormMapField.GetValue(d), map));
         TestAutomation.Note($"world: caravan forming started by player {CommandBus.CurrentPlayerId}, pawns {pawns.Count}+{downed.Count}, item groups {transferables.Count}");
     }
 
@@ -193,10 +219,9 @@ public static class WorldCommands
 
     internal static bool CaptureRoute(Caravan caravan, PlanetTile destTile, CaravanArrivalAction? arrivalAction, bool repathImmediately, bool resetPauseStatus)
     {
-        if (arrivalAction != null)
+        if (arrivalAction != null && !ArrivalSupported(arrivalAction, out string why))
         {
-            // Действия по прибытии (войти в поселение, торговать, атаковать…) — следующий шаг T-073.
-            Messages.Message("RWMLWC: в сетевой игре пока можно отправить караван только в точку, без действия по прибытии", MessageTypeDefOf.RejectInput, false);
+            Messages.Message("RWMLWC: " + why, MessageTypeDefOf.RejectInput, false);
             return false;
         }
         if (!RWMLWC.Client.Maps.SquadRules.LocalMay(caravan.PawnsListForReading.Cast<object>()))
@@ -209,13 +234,661 @@ public static class WorldCommands
         WriteTile(w, destTile);
         w.WriteBool(repathImmediately);
         w.WriteBool(resetPauseStatus);
+        WriteArrival(w, arrivalAction);
         SendWorld(w);
         return false;
+    }
+
+    // ---------- действие по прибытии ----------
+    // Все действия игры устроены одинаково: одно поле с объектом мира (поселение, место, карта) и конструктор
+    // без параметров. Передаются тип и номер объекта; у всех действие собирается заново.
+
+    // Открывают окно торговли у того, кто прибыл, — а оно в сессии ещё не умеет командами (T-036).
+    private static readonly HashSet<Type> ArrivalWithWindow = new HashSet<Type>
+    {
+        typeof(CaravanArrivalAction_Trade),
+        typeof(CaravanArrivalAction_OfferGifts),
+    };
+
+    private static FieldInfo? ArrivalTargetField(Type type)
+    {
+        FieldInfo? found = null;
+        for (Type? t = type; t != null && t != typeof(CaravanArrivalAction); t = t.BaseType)
+        {
+            foreach (FieldInfo f in t.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
+            {
+                if (!typeof(WorldObject).IsAssignableFrom(f.FieldType) || found != null)
+                {
+                    return null; // другие поля или второй объект — общим способом не передать
+                }
+                found = f;
+            }
+        }
+        return found;
+    }
+
+    internal static bool ArrivalSupported(CaravanArrivalAction action, out string why)
+    {
+        Type type = action.GetType();
+        if (ArrivalWithWindow.Contains(type))
+        {
+            why = "торговля караваном в сетевой игре пока недоступна";
+            return false;
+        }
+        if (ArrivalTargetField(type) == null || AccessTools.Constructor(type, Type.EmptyTypes) == null)
+        {
+            why = "это действие каравана по прибытии пока не работает в сетевой игре: " + type.Name;
+            return false;
+        }
+        why = "";
+        return true;
+    }
+
+    private static void WriteArrival(PacketWriter w, CaravanArrivalAction? action)
+    {
+        if (action == null)
+        {
+            w.WriteString("");
+            return;
+        }
+        Type type = action.GetType();
+        WorldObject? target = (WorldObject?)ArrivalTargetField(type)!.GetValue(action);
+        w.WriteString(type.FullName!);
+        w.WriteInt32(target?.ID ?? -1);
+    }
+
+    private static CaravanArrivalAction? ReadArrival(ref PacketReader r, out bool failed)
+    {
+        failed = false;
+        string typeName = r.ReadString();
+        if (typeName.Length == 0)
+        {
+            return null;
+        }
+        int targetId = r.ReadInt32();
+        Type? type = AccessTools.TypeByName(typeName);
+        FieldInfo? field = type == null || !typeof(CaravanArrivalAction).IsAssignableFrom(type) ? null : ArrivalTargetField(type);
+        WorldObject? target = FindWorldObject(targetId);
+        if (type == null || field == null || target == null || !field.FieldType.IsInstanceOfType(target))
+        {
+            failed = true;
+            TestAutomation.Note($"world: arrival action {typeName} for {targetId} can't be rebuilt");
+            return null;
+        }
+        CaravanArrivalAction action = (CaravanArrivalAction)Activator.CreateInstance(type, true)!;
+        field.SetValue(action, target);
+        return action;
+    }
+
+    /// <summary>
+    /// Кнопка объекта мира (лагерь, объединить, бросить вещи, покинуть…) — общим механизмом, как кнопки вещей
+    /// (<see cref="GizmoCommands"/>): адрес «у объекта мира X кнопка номер N» и выделение на карте мира автора
+    /// (кнопка «Объединить» берёт выделенные караваны). Исполнение — тем же нажатием у всех.
+    /// </summary>
+    internal static void CaptureWorldGizmo(WorldObject owner, int index, ulong signature)
+    {
+        List<WorldObject> selection = Find.WorldSelector.SelectedObjects;
+        if (!RWMLWC.Client.Maps.SquadRules.LocalMay(selection.OfType<Caravan>().SelectMany(c => c.PawnsListForReading).Cast<object>()))
+        {
+            return;
+        }
+        PacketWriter w = BeginWorld();
+        w.WriteByte(OpGizmo);
+        w.WriteInt32(owner.ID);
+        w.WriteInt32(index);
+        w.WriteUInt64(signature);
+        w.WriteInt32(selection.Count);
+        foreach (WorldObject o in selection)
+        {
+            w.WriteInt32(o.ID);
+        }
+        SendWorld(w);
+        TestAutomation.Note($"world: gizmo {index} of {owner.def.defName} {owner.ID} sent");
+    }
+
+    private static WorldObject? FindWorldObject(int id)
+    {
+        List<WorldObject> all = Find.WorldObjects.AllWorldObjects;
+        for (int i = 0; i < all.Count; i++)
+        {
+            if (all[i].ID == id)
+            {
+                return all[i];
+            }
+        }
+        return null;
+    }
+
+    private static void ExecuteWorldGizmo(ref PacketReader r)
+    {
+        WorldObject? owner = FindWorldObject(r.ReadInt32());
+        int index = r.ReadInt32();
+        ulong signature = r.ReadUInt64();
+        int count = r.ReadCount(256, 4);
+        List<WorldObject> authorSelection = new List<WorldObject>(count);
+        for (int i = 0; i < count; i++)
+        {
+            WorldObject? o = FindWorldObject(r.ReadInt32());
+            if (o != null)
+            {
+                authorSelection.Add(o);
+            }
+        }
+        if (owner == null)
+        {
+            TestAutomation.Note("world: gizmo owner is gone, dropped");
+            return;
+        }
+        if (RWMLWC.Client.Maps.SquadRules.RejectAtExecution(
+                RWMLWC.Client.Maps.SquadRules.ForbiddenAny(authorSelection.Append(owner).OfType<Caravan>().SelectMany(c => c.PawnsListForReading).Cast<object>(), CommandBus.CurrentPlayerId),
+                CommandBus.CurrentSeq))
+        {
+            return;
+        }
+        // Выделение на карте мира — как у автора, пока исполняется кнопка.
+        List<WorldObject> selection = Find.WorldSelector.SelectedObjects;
+        List<WorldObject> saved = new List<WorldObject>(selection);
+        selection.Clear();
+        selection.AddRange(authorSelection);
+        if (!selection.Contains(owner))
+        {
+            selection.Add(owner);
+        }
+        // Объекты мира живут в глобальном состоянии: Rand и номера новых вещей — глобальные, не карты 0.
+        MapRandContext.Enter(null);
+        try
+        {
+            Gizmo? target = null;
+            Gizmo? bySignature = null;
+            int sameSignature = 0;
+            int i = 0;
+            foreach (Gizmo g in owner.GetGizmos())
+            {
+                ulong sig = GizmoCommands.Signature(g);
+                if (i == index && sig == signature)
+                {
+                    target = g;
+                    break;
+                }
+                if (sig == signature)
+                {
+                    sameSignature++;
+                    bySignature = g;
+                }
+                i++;
+            }
+            if (target == null && sameSignature == 1)
+            {
+                target = bySignature;
+            }
+            if (target == null)
+            {
+                TestAutomation.Note($"world: gizmo {index} of {owner.def.defName} {owner.ID} not found, dropped");
+                return;
+            }
+            if (target.Disabled)
+            {
+                TestAutomation.Note($"world: gizmo {index} of {owner.def.defName} {owner.ID} disabled at execution");
+                return;
+            }
+            target.ProcessInput(GizmoCommands.ReplayEvent());
+            TestAutomation.Note($"world: gizmo {index} ({(target as Command)?.defaultLabel}) of {owner.def.defName} {owner.ID} pressed by player {CommandBus.CurrentPlayerId}");
+        }
+        finally
+        {
+            selection.Clear();
+            foreach (WorldObject o in saved)
+            {
+                if (o.Spawned)
+                {
+                    selection.Add(o);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// «Разделить караван»: кнопка «Принять» окна делит караван прямо в интерфейсе. Вместо этого — команда
+    /// с выбранными пешками и вещами; у всех исполняется тот же <c>TrySplitCaravan</c> окна, собранного заново.
+    /// </summary>
+    internal static bool CaptureSplit(Dialog_SplitCaravan dialog, ref bool result)
+    {
+        Caravan caravan = (Caravan)SplitCaravanField.GetValue(dialog)!;
+        List<TransferableOneWay> transferables = (List<TransferableOneWay>)SplitTransferablesField.GetValue(dialog)!;
+        List<Pawn> pawns = TransferableUtility.GetPawnsFromTransferables(transferables);
+        if (!(bool)SplitCheckMethod.Invoke(dialog, new object[] { pawns })!)
+        {
+            result = false;
+            return false;
+        }
+        if (!RWMLWC.Client.Maps.SquadRules.LocalMay(caravan.PawnsListForReading.Cast<object>()))
+        {
+            result = false;
+            return false;
+        }
+        PacketWriter w = BeginWorld();
+        w.WriteByte(OpSplit);
+        w.WriteInt32(caravan.ID);
+        List<TransferableOneWay> moving = transferables.Where(t => t.CountToTransfer > 0 && t.HasAnyThing).ToList();
+        w.WriteInt32(moving.Count);
+        foreach (TransferableOneWay t in moving)
+        {
+            w.WriteInt32(t.CountToTransfer);
+            w.WriteInt32(t.things.Count);
+            foreach (Thing thing in t.things)
+            {
+                w.WriteInt32(thing.thingIDNumber);
+            }
+        }
+        SendWorld(w);
+        TestAutomation.Note($"world: split sent, caravan {caravan.ID}, pawns {pawns.Count}, groups {moving.Count}");
+        result = true; // окно закрывается; караван разделится, когда команда вернётся в общем порядке
+        return false;
+    }
+
+    private static void ExecuteSplit(Caravan? caravan, ref PacketReader r)
+    {
+        // Сколько переводить в новый караван — по номеру вещи из каждой выбранной группы.
+        int groups = r.ReadCount(MaxItems, 8);
+        List<(int count, List<int> ids)> sent = new List<(int, List<int>)>(groups);
+        for (int i = 0; i < groups; i++)
+        {
+            int count = r.ReadInt32();
+            int things = r.ReadCount(MaxItems, 4);
+            List<int> ids = new List<int>(things);
+            for (int k = 0; k < things; k++)
+            {
+                ids.Add(r.ReadInt32());
+            }
+            sent.Add((count, ids));
+        }
+        if (caravan == null)
+        {
+            TestAutomation.Note("world: split: caravan is gone, dropped");
+            return;
+        }
+        if (RWMLWC.Client.Maps.SquadRules.RejectAtExecution(
+                RWMLWC.Client.Maps.SquadRules.ForbiddenAny(caravan.PawnsListForReading.Cast<object>(), CommandBus.CurrentPlayerId), CommandBus.CurrentSeq))
+        {
+            return;
+        }
+        MapRandContext.Enter(null);
+        // Окно собирает полный список (кто уходит и кто остаётся — проверка «в исходном караване остался колонист»
+        // смотрит на весь список), как у игрока; затем проставляются выбранные количества.
+        Dialog_SplitCaravan dialog = new Dialog_SplitCaravan(caravan);
+        SplitRecacheMethod.Invoke(dialog, null);
+        List<TransferableOneWay> transferables = (List<TransferableOneWay>)SplitTransferablesField.GetValue(dialog)!;
+        foreach ((int count, List<int> ids) in sent)
+        {
+            TransferableOneWay? t = transferables.FirstOrDefault(x => x.things.Any(th => ids.Contains(th.thingIDNumber)));
+            t?.AdjustTo(Math.Min(count, t.MaxCount));
+        }
+        bool ok = (bool)SplitMethod.Invoke(dialog, null)!;
+        if (ok)
+        {
+            SharedWindows.CloseMatching(w => w is Dialog_SplitCaravan d && ReferenceEquals(SplitCaravanField.GetValue(d), caravan));
+        }
+        TestAutomation.Note($"world: split by player {CommandBus.CurrentPlayerId}, caravan {caravan.ID}: {(ok ? "done" : "rejected")}");
+    }
+
+    /// <summary>
+    /// «Переформировать караван» (с временной карты: лагерь, место задания): окно создаёт караван сразу, прямо
+    /// в интерфейсе, и раскладывает вещи по случайным пешкам. Вместо этого — команда (операция 5) с выбранными
+    /// пешками и вещами и целью; у всех окно собирается заново и вызывается тот же <c>TryReformCaravan</c>.
+    /// </summary>
+    internal static bool CaptureReform(Dialog_FormCaravan dialog, ref bool result)
+    {
+        Map map = (Map)FormMapField.GetValue(dialog)!;
+        List<Pawn> pawns = TransferableUtility.GetPawnsFromTransferables(dialog.transferables);
+        if (!RWMLWC.Client.Maps.SquadRules.LocalMay(pawns.Cast<object>()))
+        {
+            result = false;
+            return false;
+        }
+        PacketWriter w = BeginWorld();
+        w.WriteByte(OpReform);
+        w.WriteInt32(map.uniqueID);
+        w.WriteBool((bool)FormAboutToBeRemovedField.GetValue(dialog)!);
+        WriteTile(w, (PlanetTile)FormDestinationField.GetValue(dialog)!);
+        WriteGroups(w, dialog.transferables);
+        SendWorld(w);
+        TestAutomation.Note($"world: reform sent, map {map.uniqueID}, pawns {pawns.Count}");
+        result = true; // окно закрывается; караван появится, когда команда вернётся в общем порядке
+        return false;
+    }
+
+    private static void WriteGroups(PacketWriter w, List<TransferableOneWay> transferables)
+    {
+        List<TransferableOneWay> moving = transferables.Where(t => t.CountToTransfer > 0 && t.HasAnyThing).ToList();
+        w.WriteInt32(moving.Count);
+        foreach (TransferableOneWay t in moving)
+        {
+            w.WriteInt32(t.CountToTransfer);
+            w.WriteInt32(t.things.Count);
+            foreach (Thing thing in t.things)
+            {
+                w.WriteInt32(thing.thingIDNumber);
+            }
+        }
+    }
+
+    private static List<(int count, List<int> ids)> ReadGroups(ref PacketReader r)
+    {
+        int groups = r.ReadCount(MaxItems, 8);
+        List<(int, List<int>)> sent = new List<(int, List<int>)>(groups);
+        for (int i = 0; i < groups; i++)
+        {
+            int count = r.ReadInt32();
+            int things = r.ReadCount(MaxItems, 4);
+            List<int> ids = new List<int>(things);
+            for (int k = 0; k < things; k++)
+            {
+                ids.Add(r.ReadInt32());
+            }
+            sent.Add((count, ids));
+        }
+        return sent;
+    }
+
+    private static void ApplyGroups(List<TransferableOneWay> transferables, List<(int count, List<int> ids)> sent)
+    {
+        foreach ((int count, List<int> ids) in sent)
+        {
+            TransferableOneWay? t = transferables.FirstOrDefault(x => x.things.Any(th => ids.Contains(th.thingIDNumber)));
+            t?.AdjustTo(Math.Min(count, t.MaxCount));
+        }
+    }
+
+    private static void ExecuteReform(ref PacketReader r)
+    {
+        int mapId = r.ReadInt32();
+        bool aboutToBeRemoved = r.ReadBool();
+        PlanetTile dest = ReadTile(ref r);
+        List<(int count, List<int> ids)> sent = ReadGroups(ref r);
+        Map? map = Find.Maps.FirstOrDefault(m => m.uniqueID == mapId);
+        if (map == null)
+        {
+            TestAutomation.Note($"world: reform: map {mapId} is gone, dropped");
+            return;
+        }
+        MapRandContext.Enter(map);
+        Dialog_FormCaravan dialog = new Dialog_FormCaravan(map, reform: true, mapAboutToBeRemoved: aboutToBeRemoved);
+        FormRecacheMethod.Invoke(dialog, null);
+        ApplyGroups(dialog.transferables, sent);
+        List<Pawn> pawns = TransferableUtility.GetPawnsFromTransferables(dialog.transferables);
+        if (RWMLWC.Client.Maps.SquadRules.RejectAtExecution(
+                RWMLWC.Client.Maps.SquadRules.ForbiddenAny(pawns.Cast<object>(), CommandBus.CurrentPlayerId), CommandBus.CurrentSeq))
+        {
+            return;
+        }
+        FormDestinationField.SetValue(dialog, dest);
+        bool ok = (bool)ReformMethod.Invoke(dialog, null)!;
+        if (ok)
+        {
+            SharedWindows.CloseMatching(w => w is Dialog_FormCaravan d && ReferenceEquals(FormMapField.GetValue(d), map));
+        }
+        TestAutomation.Note($"world: reform by player {CommandBus.CurrentPlayerId}, map {mapId}, pawns {pawns.Count}: {(ok ? "done" : "rejected")}");
+    }
+
+    // ---------- колонии игроков ----------
+
+    /// <summary>Поселения игрока без владельца — автору команды (первая колония — хоста).</summary>
+    public static void SendColonyClaim()
+    {
+        PacketWriter w = BeginWorld();
+        w.WriteByte(OpColonyClaim);
+        SendWorld(w);
+    }
+
+    /// <summary>Присоединиться к колонии соавтором.</summary>
+    public static void SendColonyJoin(Settlement settlement)
+    {
+        PacketWriter w = BeginWorld();
+        w.WriteByte(OpColonyJoin);
+        w.WriteInt32(settlement.ID);
+        SendWorld(w);
+    }
+
+    /// <summary>Своя колония: новая стартовая группа основывает поселение на клетке.</summary>
+    public static void SendColonyNew(PlanetTile tile)
+    {
+        PacketWriter w = BeginWorld();
+        w.WriteByte(OpColonyNew);
+        WriteTile(w, tile);
+        SendWorld(w);
+    }
+
+    /// <summary>Тест: игрок «не был в сети 10 лет» — следующая суточная проверка покинет его колонию.</summary>
+    public static void SendColonyTestAbsent(int player)
+    {
+        PacketWriter w = BeginWorld();
+        w.WriteByte(OpColonyTestAbsent);
+        w.WriteInt32(player);
+        SendWorld(w);
+    }
+
+    /// <summary>Тест стазиса: игрок «не в сети» / «снова в сети» в состоянии игры.</summary>
+    public static void SendTestPresence(int player, bool online)
+    {
+        PacketWriter w = BeginWorld();
+        w.WriteByte(OpTestPresence);
+        w.WriteInt32(player);
+        w.WriteBool(online);
+        SendWorld(w);
+    }
+
+    /// <summary>Тест адаптации по поселению: погиб колонист на карте поселения.</summary>
+    public static void SendTestKill(int mapId)
+    {
+        PacketWriter w = BeginWorld();
+        w.WriteByte(OpTestKill);
+        w.WriteInt32(mapId);
+        SendWorld(w);
+    }
+
+    /// <summary>Тест часов пешки: перевести колониста с карты from на карту to (как караваном, но сразу).</summary>
+    public static void SendTestTransfer(int fromMap, int toMap)
+    {
+        PacketWriter w = BeginWorld();
+        w.WriteByte(OpTestTransfer);
+        w.WriteInt32(fromMap);
+        w.WriteInt32(toMap);
+        SendWorld(w);
+    }
+
+    public static void SendTestOp(byte op, int a, int b)
+    {
+        PacketWriter w = BeginWorld();
+        w.WriteByte(op);
+        w.WriteInt32(a);
+        w.WriteInt32(b);
+        SendWorld(w);
+    }
+
+    public const byte TestTraderOp = OpTestTrader;
+    public const byte TestGoTradeOp = OpTestGoTrade;
+
+    private static void ExecuteColony(byte op, ref PacketReader r)
+    {
+        RWMLWC.Client.World.ColoniesComponent? colonies = RWMLWC.Client.World.Colonies.Component;
+        int player = CommandBus.CurrentPlayerId;
+        if (colonies == null)
+        {
+            return;
+        }
+        MapRandContext.Enter(null);
+        switch (op)
+        {
+            case OpColonyClaim:
+                if (colonies.AnyOwner)
+                {
+                    TestAutomation.Note($"colonies: claim by player {player} ignored — owners already set");
+                    return;
+                }
+                TestAutomation.Note($"colonies: player {player} is the host, settlements claimed: {colonies.ClaimUnowned(player)}");
+                break;
+            case OpColonyJoin:
+                {
+                    int id = r.ReadInt32();
+                    Settlement? s = Find.WorldObjects.Settlements.FirstOrDefault(x => x.ID == id && x.Faction == Faction.OfPlayer);
+                    if (s == null || colonies.OwnsColony(player))
+                    {
+                        TestAutomation.Note($"colonies: join {id} by player {player} rejected");
+                        return;
+                    }
+                    colonies.SetMember(player, s);
+                    TestAutomation.Note($"colonies: player {player} joined settlement {id} (owner {colonies.OwnerOf(s)})");
+                    break;
+                }
+            case OpTestTrader:
+            case OpTestGoTrade:
+                {
+                    int a = r.ReadInt32();
+                    int b = r.ReadInt32();
+                    if (!RWMLWC.Client.World.CaravanSelfTest.ArmKey("tradetest=1"))
+                    {
+                        return;
+                    }
+                    Map? map = Find.Maps.FirstOrDefault(m => m.uniqueID == a);
+                    if (map == null) return;
+                    MapRandContext.Enter(map);
+                    if (op == OpTestTrader)
+                    {
+                        IncidentParms parms = StorytellerUtility.DefaultParmsNow(IncidentCategoryDefOf.Misc, map);
+                        parms.forced = true;
+                        bool ok = IncidentDefOf.TraderCaravanArrival.Worker.TryExecute(parms);
+                        TestAutomation.Note($"trade test: trader caravan on map {a}: {ok}");
+                    }
+                    else
+                    {
+                        Pawn? trader = map.mapPawns.AllPawnsSpawned.Where(p => p.trader != null && p.CanTradeNow).OrderBy(p => p.thingIDNumber).FirstOrDefault();
+                        Pawn? colonist = map.mapPawns.FreeColonistsSpawned.Where(p => !p.Downed).OrderBy(p => p.thingIDNumber).FirstOrDefault();
+                        if (trader == null || colonist == null)
+                        {
+                            TestAutomation.Note($"trade test: no trader ({trader != null}) or colonist ({colonist != null}) on map {a}");
+                            return;
+                        }
+                        colonist.jobs.TryTakeOrderedJob(Verse.JobMaker.MakeJob(JobDefOf.TradeWithPawn, trader), Verse.AI.JobTag.Misc);
+                        TestAutomation.Note($"trade test: colonist {colonist.thingIDNumber} goes to trade with {trader.thingIDNumber}, ordered by player {CommandBus.CurrentPlayerId}");
+                    }
+                    break;
+                }
+            case OpTestTransfer:
+                {
+                    int fromId = r.ReadInt32();
+                    int toId = r.ReadInt32();
+                    if (!RWMLWC.Client.World.CaravanSelfTest.ArmKey("clocktest=1"))
+                    {
+                        return;
+                    }
+                    Map? from = Find.Maps.FirstOrDefault(m => m.uniqueID == fromId);
+                    Map? to = Find.Maps.FirstOrDefault(m => m.uniqueID == toId);
+                    Pawn? pawn = from?.mapPawns.FreeColonistsSpawned.Where(p => p.mindState.lastIngestTick > 0).OrderBy(p => p.thingIDNumber).FirstOrDefault();
+                    if (pawn == null || to == null)
+                    {
+                        TestAutomation.Note($"clock test: nobody to move {fromId} -> {toId}");
+                        return;
+                    }
+                    MapRandContext.Enter(from);
+                    int agoBefore = Find.TickManager.TicksGame - pawn.mindState.lastIngestTick;
+                    pawn.DeSpawn();
+                    MapRandContext.Enter(to);
+                    IntVec3 cell = CellFinder.RandomClosewalkCellNear(to.Center, to, 20);
+                    GenSpawn.Spawn(pawn, cell, to);
+                    int agoAfter = Find.TickManager.TicksGame - pawn.mindState.lastIngestTick;
+                    TestAutomation.Note($"clock test: pawn {pawn.thingIDNumber} {fromId}->{toId}: ate {agoBefore} ticks ago before, {agoAfter} after");
+                    break;
+                }
+            case OpTestKill:
+                {
+                    int mapId = r.ReadInt32();
+                    if (!RWMLWC.Client.World.CaravanSelfTest.ArmKey("adapttest=1"))
+                    {
+                        return;
+                    }
+                    Map? map = Find.Maps.FirstOrDefault(m => m.uniqueID == mapId);
+                    Pawn? victim = map?.mapPawns.FreeColonistsSpawned.OrderBy(p => p.thingIDNumber).FirstOrDefault();
+                    if (victim == null)
+                    {
+                        return;
+                    }
+                    MapRandContext.Enter(map);
+                    RWMLWC.Client.World.TestSafety.AllowNextKill = true; // намеренная гибель — мимо защиты nodeath
+                    victim.Kill(null);
+                    TestAutomation.Note($"adapt test: colonist {victim.thingIDNumber} of map {mapId} killed");
+                    break;
+                }
+            case OpTestPresence:
+                {
+                    int target = r.ReadInt32();
+                    bool online = r.ReadBool();
+                    if (!RWMLWC.Client.World.CaravanSelfTest.ArmKey("stasistest=1"))
+                    {
+                        return;
+                    }
+                    RWMLWC.Client.Maps.PlayerPresence.Component?.Apply(target, online);
+                    TestAutomation.Note($"stasis test: player {target} {(online ? "online" : "offline")}");
+                    break;
+                }
+            case OpColonyTestAbsent:
+                {
+                    int target = r.ReadInt32();
+                    if (!RWMLWC.Client.World.CaravanSelfTest.AbandonTestArmed)
+                    {
+                        return; // вне тестового прогона команда ничего не делает
+                    }
+                    colonies.DebugSetLastActive(target, Find.TickManager.TicksGame - RWMLWC.Client.World.ColoniesComponent.AbandonAfterTicks - 1);
+                    RWMLWC.Client.Maps.PlayerPresence.Component?.Apply(target, false);
+                    TestAutomation.Note($"colonies: test — player {target} marked absent for 10 years");
+                    break;
+                }
+            case OpColonyNew:
+                {
+                    PlanetTile tile = ReadTile(ref r);
+                    if (colonies.OwnsColony(player) || !TileFinder.IsValidTileForNewSettlement(tile))
+                    {
+                        TestAutomation.Note($"colonies: new colony at {tile} by player {player} rejected");
+                        return;
+                    }
+                    RWMLWC.Client.World.NewColony.Found(tile, player);
+                    break;
+                }
+        }
     }
 
     public static void ExecuteWorldAction(ref PacketReader r)
     {
         byte op = r.ReadByte();
+        if (op == OpGizmo)
+        {
+            ExecuteWorldGizmo(ref r);
+            return;
+        }
+        if (op == RWMLWC.Client.World.TradeCommands.OpTrade)
+        {
+            RWMLWC.Client.World.TradeCommands.Execute(ref r);
+            return;
+        }
+        if (op >= SharedWindows.OpCount && op <= SharedWindows.OpSlider)
+        {
+            SharedWindows.Execute(op, ref r);
+            return;
+        }
+        if (op == OpColonyClaim || op == OpColonyJoin || op == OpColonyNew || op == OpColonyTestAbsent || op == OpTestPresence || op == OpTestKill || op == OpTestTransfer || op == OpTestTrader || op == OpTestGoTrade)
+        {
+            ExecuteColony(op, ref r);
+            return;
+        }
+        if (op == OpReform)
+        {
+            ExecuteReform(ref r);
+            return;
+        }
+        if (op == OpSplit)
+        {
+            ExecuteSplit(FindCaravan(r.ReadInt32()), ref r);
+            return;
+        }
         Caravan? caravan = FindCaravan(r.ReadInt32());
         switch (op)
         {
@@ -230,6 +903,11 @@ public static class WorldCommands
                 {
                     return;
                 }
+                if (RWMLWC.Client.World.Colonies.Component?.OwnsColony(CommandBus.CurrentPlayerId) == true)
+                {
+                    TestAutomation.Note($"world: settle by player {CommandBus.CurrentPlayerId} rejected — already owns a colony");
+                    return;
+                }
                 SettleInEmptyTileUtility.Settle(caravan);
                 TestAutomation.Note($"world: settled by player {CommandBus.CurrentPlayerId}, caravan {caravan.ID}");
                 break;
@@ -238,7 +916,8 @@ public static class WorldCommands
                     PlanetTile dest = ReadTile(ref r);
                     bool repath = r.ReadBool();
                     bool reset = r.ReadBool();
-                    if (caravan == null)
+                    CaravanArrivalAction? arrival = ReadArrival(ref r, out bool arrivalFailed);
+                    if (caravan == null || arrivalFailed)
                     {
                         return;
                     }
@@ -247,7 +926,11 @@ public static class WorldCommands
                     {
                         return;
                     }
-                    caravan.pather.StartPath(dest, null, repath, reset);
+                    caravan.pather.StartPath(dest, arrival, repath, reset);
+                    if (arrival != null)
+                    {
+                        TestAutomation.Note($"world: route of caravan {caravan.ID} to {dest} with {arrival.GetType().Name} by player {CommandBus.CurrentPlayerId}");
+                    }
                     break;
                 }
             default:
@@ -287,5 +970,23 @@ internal static class Patch_Caravan_PathFollower_StartPath
         }
         __result = true; // у автора путь появится, когда команда вернётся в общем порядке
         return WorldCommands.CaptureRoute(___caravan, destTile, arrivalAction, repathImmediately, resetPauseStatus);
+    }
+}
+
+[HarmonyPatch(typeof(Dialog_SplitCaravan), "TrySplitCaravan")]
+internal static class Patch_Dialog_SplitCaravan_TrySplitCaravan
+{
+    private static bool Prefix(Dialog_SplitCaravan __instance, ref bool __result)
+    {
+        return !CommandBus.CaptureActive || WorldCommands.CaptureSplit(__instance, ref __result);
+    }
+}
+
+[HarmonyPatch(typeof(Dialog_FormCaravan), "TryReformCaravan")]
+internal static class Patch_Dialog_FormCaravan_TryReformCaravan
+{
+    private static bool Prefix(Dialog_FormCaravan __instance, ref bool __result)
+    {
+        return !CommandBus.CaptureActive || WorldCommands.CaptureReform(__instance, ref __result);
     }
 }

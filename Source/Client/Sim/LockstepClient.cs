@@ -532,6 +532,7 @@ public static class LockstepClient
         resyncClock.Restart();
         ResyncsStarted++;
         TestAutomation.Note("lockstep: desync reported, the server orders a common snapshot");
+        RWMLWC.Client.World.CaravanSelfTest.OnDesyncNotice();
         if (Current.ProgramState == ProgramState.Playing)
         {
             Messages.Message("RWMLWC: игра разошлась между игроками — перезагружаем общий снимок", MessageTypeDefOf.CautionInput, false);
@@ -564,6 +565,10 @@ public static class LockstepClient
         TickManager tickManager = Find.TickManager;
         expectedSnapshotId = SnapshotIdFor(request);
         snapshotRequestSeen = true;
+        // Надпись для тех, кто перезагрузку не вызывал (SyncCurtain): кто входит — или лечение расхождения.
+        curtainText = request.PlayerId > 0 && request.PlayerId != PlayerId
+            ? $"{RWMLWC.Client.SessionView.SessionUi.NameOf(request.PlayerId)} подключается — синхронизация мира…"
+            : "Синхронизация мира…";
         // На время перезагрузки просим паузу; после загрузки каждый вернёт скорость, что была в мире на момент снимка.
         RequestSpeed(0);
         state = State.WaitingSnapshot;
@@ -581,10 +586,10 @@ public static class LockstepClient
         byte[] packed = GameSnapshot.Take(out GameSnapshot.Stats stats);
         int count = SendWorldChunks(expectedSnapshotId, packed, tickManager.TicksGame);
         TestAutomation.Note($"lockstep: snapshot for player {request.PlayerId} at tick {tickManager.TicksGame}: {stats}, {count} chunks sent; reloading it here too");
-        // Отправитель загружает тот же снимок, что и остальные.
+        // Отправитель загружает тот же снимок, что и остальные — под застывшим кадром (SyncCurtain).
         state = State.Loading;
         gameLoadedPending = false;
-        GameSnapshot.Apply(packed);
+        RWMLWC.Client.SessionView.SyncCurtain.BeforeReload(true, curtainText, () => GameSnapshot.Apply(packed));
     }
 
     /// <summary>
@@ -660,6 +665,8 @@ public static class LockstepClient
         TryLoadExpectedSnapshot();
     }
 
+    private static string curtainText = "Синхронизация мира…";
+
     private static void TryLoadExpectedSnapshot()
     {
         if (state != State.WaitingSnapshot || expectedSnapshotId < 0
@@ -697,21 +704,27 @@ public static class LockstepClient
         TestAutomation.Note($"lockstep: snapshot {expectedSnapshotId} received, {data.Length} bytes; loading");
         state = State.Loading;
         gameLoadedPending = false;
-        try
+        // Игрок, уже бывший в игре, видит застывший кадр; входящий из меню — обычный экран загрузки.
+        bool inGame = Current.Game != null && Current.ProgramState == ProgramState.Playing;
+        RWMLWC.Client.SessionView.SyncCurtain.BeforeReload(inGame, curtainText, () =>
         {
-            GameSnapshot.Apply(packed);
-        }
-        catch (Exception ex)
-        {
-            TestAutomation.Note("lockstep: snapshot load FAILED: " + ex);
-            Disconnect("снимок не загрузился");
-        }
+            try
+            {
+                GameSnapshot.Apply(packed);
+            }
+            catch (Exception ex)
+            {
+                TestAutomation.Note("lockstep: snapshot load FAILED: " + ex);
+                Disconnect("снимок не загрузился");
+            }
+        });
     }
 
     // Первый кадр после загрузки снимка: все GameComponent.LoadedGame уже отработали.
     private static void FinishSnapshotLoad(TickManager tickManager)
     {
         gameLoadedPending = false;
+        RWMLWC.Client.SessionView.SyncCurtain.AfterReload();
         SimSession.Begin(sessionSeed);
         VirtualUi.Reset();
         state = State.InSession;
@@ -719,8 +732,21 @@ public static class LockstepClient
         connection?.Send(new SnapshotAppliedMessage { SnapshotId = expectedSnapshotId, Tick = tickManager.TicksGame });
         TestAutomation.Note($"lockstep: snapshot loaded, tick {tickManager.TicksGame}, serverTick={tickUpTo}, perMapSim={PerMapSim.Enabled}");
         // Скорость — та, что была в мире на момент снимка; на паузе остаёмся на паузе, пока кто-то её не снимет.
+        // Но паузу, которую держало окно (принудительная пауза: «Разделить караван», торговля…), загрузка не
+        // наследует: окна старой игры больше нет, а пауза осталась бы у всех, пока кто-то не снимет её руками
+        // (найдено владельцем в прогоне tstad7). Тогда просим скорость, что была до окна.
         sentSpeed = -1;
-        RequestSpeed((int)tickManager.CurTimeSpeed);
+        int restore = (int)tickManager.CurTimeSpeed;
+        if (forcePauseActive)
+        {
+            if (restore == 0 && speedBeforeForcePause > 0)
+            {
+                restore = speedBeforeForcePause;
+            }
+            forcePauseActive = false;
+            TestAutomation.Note($"lockstep: window pause dropped after reload, speed {restore}");
+        }
+        RequestSpeed(restore);
         applyingServerSpeed = true;
         try
         {
@@ -789,6 +815,8 @@ public static class LockstepClient
             message.Parts.Add(new HashPart("rand", hash.rand));
             conn.Send(message);
         }
+        // Уровень мира (T-073): карта, которая есть только у одного игрока, ни с чем выше не сравнится.
+        conn.Send(new MapHashMessage { MapId = ProtocolIds.WorldMapId, Tick = tick, Total = WorldStateHasher.Compute() });
     }
 
     /// <summary>Причина последнего отказа сервера (текст для игрока); пусто — отказа не было. Сбрасывается в <c>Connect</c>.</summary>
