@@ -329,6 +329,13 @@ public static class CaravanSelfTest
             ExchangeFrame(tick);
         }
 
+        // renttest (T-053): игрок 1 одалживает игроку 2 двух колонистов (на 1 и на 5 дней); оба пробуют призвать
+        // первого — пройти должна только команда игрока 2; второго игрок 1 отзывает; первый возвращается по сроку.
+        if (ArmKey("renttest=1"))
+        {
+            RentFrame(tick);
+        }
+
         // sostest (T-051): игрок 1 нажимает «SOS» один раз — письмо должно прийти всем.
         if (ArmKey("sostest=1") && LockstepClient.PlayerId == 1 && !_sosSent && tick >= _startTick + 600)
         {
@@ -925,6 +932,81 @@ public static class CaravanSelfTest
         }
     }
 
+    private static int _rentStep;
+    private static int _rentTick;
+    private static int _rentA = -1;
+    private static int _rentB = -1;
+
+    private static void RentFrame(int tick)
+    {
+        Map? home = Colonies.Component?.OwnedBy(1)?.Map;
+        if (home == null || Colonies.Component?.OwnedBy(2) == null) return;
+        if (_rentA < 0)
+        {
+            List<Pawn> cols = home.mapPawns.FreeColonistsSpawned.OrderBy(p => p.thingIDNumber).ToList();
+            if (cols.Count < 2) return;
+            _rentA = cols[0].thingIDNumber;
+            _rentB = cols[1].thingIDNumber;
+        }
+        Pawn? a = RWMLWC.Client.Input.ValueCodec.FindPawnAnywhere(_rentA);
+        Pawn? b = RWMLWC.Client.Input.ValueCodec.FindPawnAnywhere(_rentB);
+        if (a == null || b == null || ArmKey("save=")) return;
+        int me = LockstepClient.PlayerId;
+        if (_rentStep == 0 && tick >= _startTick + 600)
+        {
+            _rentStep = 1;
+            _rentTick = tick;
+            if (me == 1)
+            {
+                Rentals.SendLend(a, 2, 1);
+                Rentals.SendLend(b, 2, 5);
+                TestAutomation.Note($"rent: lend sent, pawns {_rentA} (1 day), {_rentB} (5 days)");
+            }
+        }
+        else if (_rentStep == 1 && tick >= _rentTick + 900)
+        {
+            _rentStep = 2;
+            // Призвать пешку A: у игрока 1 — должна быть пропущена у всех (чужой отряд), у игрока 2 — пройти.
+            // Игрок 2 — на 300 тиков позже, чтобы было видно, чья команда что сделала.
+            if (me == 1)
+            {
+                bool sent = DraftClick(a);
+                TestAutomation.Note($"rent: player 1 draft click on {_rentA} sent {sent}, rejected so far {RWMLWC.Client.Maps.SquadRules.Rejected}");
+            }
+        }
+        else if (_rentStep == 2 && tick >= _rentTick + 1200)
+        {
+            _rentStep = 3;
+            TestAutomation.Note($"rent: after player 1 draft — drafted {a.Drafted}, rejected {RWMLWC.Client.Maps.SquadRules.Rejected}");
+            if (me == 2)
+            {
+                bool sent = DraftClick(a);
+                TestAutomation.Note($"rent: player 2 draft click on {_rentA} sent {sent}");
+            }
+        }
+        else if (_rentStep == 3 && tick >= _rentTick + 1500)
+        {
+            _rentStep = 4;
+            TestAutomation.Note($"rent: after player 2 draft — drafted {a.Drafted}, rejected {RWMLWC.Client.Maps.SquadRules.Rejected}");
+            if (me == 1)
+            {
+                Rentals.SendRecall(_rentB);
+                TestAutomation.Note($"rent: recall of {_rentB} sent");
+            }
+        }
+    }
+
+    /// <summary>Как игрок: камера на карте пешки, пешка выделена, нажата кнопка «Призвать» (проверка отрядов — по выделению).</summary>
+    private static bool DraftClick(Pawn pawn)
+    {
+        if (Find.CurrentMap != pawn.Map) Current.Game.CurrentMap = pawn.Map;
+        Find.Selector.ClearSelection();
+        Find.Selector.Select(pawn, playSound: false, forceDesignatorDeselect: false);
+        bool sent = RWMLWC.Client.Input.GizmoCommands.SendClick(pawn.Map, pawn, g => g is Command_Toggle t && t.icon == TexCommand.Draft);
+        TestAutomation.Note($"rent: selected {string.Join(",", Find.Selector.SelectedObjects.OfType<Pawn>().Select(p => p.thingIDNumber))}");
+        return sent;
+    }
+
     private static int _podLogTick;
 
     /// <summary>podtest (T-053): тот же груз, но капсулой — окно загрузки, погрузка, запуск с посадкой в колонию игрока 2.</summary>
@@ -1042,6 +1124,6 @@ public static class CaravanSelfTest
         Caravan? c = Find.WorldObjects.Caravans.FirstOrDefault(x => x.Faction == Faction.OfPlayer);
         string colonists = string.Join("/", Find.Maps.Select(m => m.mapPawns.FreeColonistsSpawnedCount));
         string where = c == null ? "" : $", caravan at {c.Tile}{(c.pather.Moving ? " moving to " + c.pather.Destination : "")}";
-        return $"tick {Find.TickManager.TicksGame}, forming lords {forming}, caravans {caravans}, player settlements {settlements}, maps {maps}, colonists by map {colonists}{where}, colonies {Colonies.Component?.Summary()}, adapt {SettlementThreats.Component?.Summary()}, factors {SettlementThreats.Component?.Factors()}, perf {TakePerf()}, stasis [{string.Join(",", Find.Maps.Select(m => m.uniqueID + ":" + (MapSimState.For(m)?.frozen == true ? "F" : "-") + (MapSimState.For(m)?.stasisTicks ?? 0)))}] (game: d{GenDate.DaysPassedSinceSettle}×a{Find.StoryWatcher.watcherAdaptation.AdaptDays:F2}){ExchangeCounts()}, guests [{RWMLWC.Client.Maps.GuestsComponent.Component?.Digest()}]";
+        return $"tick {Find.TickManager.TicksGame}, forming lords {forming}, caravans {caravans}, player settlements {settlements}, maps {maps}, colonists by map {colonists}{where}, colonies {Colonies.Component?.Summary()}, adapt {SettlementThreats.Component?.Summary()}, factors {SettlementThreats.Component?.Factors()}, perf {TakePerf()}, stasis [{string.Join(",", Find.Maps.Select(m => m.uniqueID + ":" + (MapSimState.For(m)?.frozen == true ? "F" : "-") + (MapSimState.For(m)?.stasisTicks ?? 0)))}] (game: d{GenDate.DaysPassedSinceSettle}×a{Find.StoryWatcher.watcherAdaptation.AdaptDays:F2}){ExchangeCounts()}, guests [{RWMLWC.Client.Maps.GuestsComponent.Component?.Digest()}], rentals [{Rentals.Component?.Digest()}], squads [{RWMLWC.Client.Maps.Squads.Component?.Digest()}]";
     }
 }
