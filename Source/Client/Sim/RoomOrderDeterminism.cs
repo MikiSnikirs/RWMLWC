@@ -18,7 +18,36 @@ namespace RWMLWC.Client.Sim;
 /// После каждой перестройки сортируем список по минимальному индексу клетки комнаты — ключ не
 /// зависит от порядка обхода районов/регионов и одинаков у клиентов с одинаковым миром.
 /// Вне сессии — ванильный порядок.
+///
+/// Третий механизм (m2): <c>Map.MapUpdate</c> (кадр) перестраивает регионы у всех карт; при разном
+/// темпе кадров клиенты перестраивают в разные моменты → комнаты пересоздаются в разные тики →
+/// сброс температуры комнат в разное время → расхождение (кэши крыш identical, температура
+/// 13.556/13.555). Поэтому в сессии перестройка разрешена только в контексте симуляции
+/// (тик — BeforeTick идёт после BeginTick, команда, долгое событие) и при первой загрузке;
+/// кадровые перестройки пропускаются — регионы обновятся в BeforeTick следующего тика, одинаково
+/// у всех. Отрисовка читает чуть устаревшие регионы — это косметика, ваниль так же делает между
+/// перестройками.
 /// </summary>
+[HarmonyPatch(typeof(RegionAndRoomUpdater), nameof(RegionAndRoomUpdater.TryRebuildDirtyRegionsAndRooms))]
+internal static class Patch_RegionAndRoomUpdater_SessionRebuildSync
+{
+    private static readonly AccessTools.FieldRef<RegionAndRoomUpdater, bool> Initialized =
+        AccessTools.FieldRefAccess<RegionAndRoomUpdater, bool>("initialized");
+
+    private static bool Prefix(RegionAndRoomUpdater __instance)
+    {
+        if (!LockstepClient.InSession)
+        {
+            return true;
+        }
+        if (MapRandContext.InTick || RWMLWC.Client.Input.CommandBus.Executing)
+        {
+            return true;
+        }
+        return !Initialized(__instance); // первая перестройка при загрузке карты
+    }
+}
+
 [HarmonyPatch(typeof(RegionAndRoomUpdater), nameof(RegionAndRoomUpdater.TryRebuildDirtyRegionsAndRooms))]
 internal static class Patch_RegionAndRoomUpdater_RoomOrder
 {
