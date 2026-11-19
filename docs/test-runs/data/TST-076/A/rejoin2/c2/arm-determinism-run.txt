@@ -1,0 +1,17 @@
+armed=1
+save=
+scenarios=none
+ticks=8000
+trace=0
+quit=1
+server=127.0.0.1:56644
+thumbprint=141E0A4A87DBCE3D99535C5AD126DEAC1728C7020055EED89CE0BDB4E330AF5D
+name=c2
+holdsec=0
+issuer=0
+camera=0
+connectdelay=5
+colonychoice=new
+nodeath=1
+roomdump=1
+ringdump=1

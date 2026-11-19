@@ -256,7 +256,9 @@ public sealed class HashRecorder : GameComponent
         }
         int tick = Find.TickManager.TicksGame;
         int elapsed = tick - startTick;
-        if ((elapsed >= denseFrom && elapsed <= denseTo) || elapsed % Interval == 0)
+        // Замеры по абсолютным тикам: сетки клиентов совпадают даже когда прогоны начались
+        // в разные тики (вход в сессию, возвращение после отсутствия) — сервер может сравнивать.
+        if ((elapsed >= denseFrom && elapsed <= denseTo) || tick % Interval == 0)
         {
             WriteSample();
         }

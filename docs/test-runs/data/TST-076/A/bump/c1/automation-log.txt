@@ -1,0 +1,28 @@
+2026-11-19 03:55:18 autoload: loading save 'tst014'
+2026-11-19 03:55:25 lockstep: connecting to 127.0.0.1:60891 as 'c1'
+2026-11-19 03:55:25 regionids: after load room=18 district=24 region=483
+2026-11-19 03:55:27 lockstep: connected to quic:127.0.0.1:60891, Hello sent
+2026-11-19 03:55:27 lockstep: Welcome, playerId=1, serverTick=14998, seed=7
+2026-11-19 03:55:27 presence: player 1 online
+2026-11-19 03:55:27 presence: player 2 online
+2026-11-19 03:56:27 lockstep: hold is over, requesting speed 3
+2026-11-19 03:56:27 regionids: run start room=18 district=24 region=483
+2026-11-19 03:56:27 run started: #0, tick=14998, scenario=raid, ticks=6000, trace=False, quit=True, file=hash-c1-20261119-035627.txt
+2026-11-19 03:56:28 scenario raid: executed=True, faction=Полмм
+2026-11-19 03:56:29 colonies: claim sent (lowest online player)
+2026-11-19 03:56:30 colonies: player 1 is the host, settlements claimed: 1
+2026-11-19 03:56:44 threats: map 0 adaptation 0.0 → -6.0 (Downed, Ross)
+2026-11-19 03:56:45 threats: map 0 adaptation -6.0 → -12.0 (Downed, Oleg)
+2026-11-19 03:56:45 threats: map 0 adaptation -12.0 → -42.0 (Died, Ross)
+2026-11-19 03:56:46 threats: map 0 adaptation -42.0 → -48.0 (Downed, Rika)
+2026-11-19 03:56:47 summary: map0 drafted=0 forbidden=59 plants=[]
+2026-11-19 03:56:47 summary: map0 jobs=[234:Wait_Downed@(133, 0, 155),239:Wait_Downed@(141, 0, 208),41794:TendPatient@(9, 0, 48)]
+2026-11-19 03:56:47 summary: map0 settings=FD541FBFAE482E0A
+2026-11-19 03:56:47 summary: maps=1 player settlements=1 caravans=0
+2026-11-19 03:56:47 summary: absence= offline=[]
+2026-11-19 03:56:47 summary: squads= rejected=0 drafted=[]
+2026-11-19 03:56:47 summary: map0 designations=0 blueprints=0 zones=0; commands sent=1 executed=1 failed=0
+2026-11-19 03:56:47 run finished: file=hash-c1-20261119-035627.txt
+2026-11-19 03:56:47 queue: finished
+2026-11-19 03:56:47 lockstep: disconnect: прогон завершён
+2026-11-19 03:56:47 quitting game

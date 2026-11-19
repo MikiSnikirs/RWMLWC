@@ -533,6 +533,7 @@ public static class LockstepClient
         ResyncsStarted++;
         TestAutomation.Note("lockstep: desync reported, the server orders a common snapshot");
         RWMLWC.Client.World.CaravanSelfTest.OnDesyncNotice();
+        RoomStateProbe.OnDesyncNotice();
         if (Current.ProgramState == ProgramState.Playing)
         {
             Messages.Message("RWMLWC: игра разошлась между игроками — перезагружаем общий снимок", MessageTypeDefOf.CautionInput, false);

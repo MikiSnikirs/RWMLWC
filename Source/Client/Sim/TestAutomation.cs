@@ -63,6 +63,8 @@ public static class TestAutomation
         public bool hostSession;
         /// <summary>Ключ steamhost=auto: из главного меню войти через Steam к другу, который сейчас держит сессию RWMLWC.</summary>
         public bool steamAuto;
+        /// <summary>Ключ bumpids=N (диагностика T-076): сдвиг счётчиков ID комнат/регионов у c2 при загрузке.</summary>
+        public int bumpIds;
     }
 
     private static Config? activeConfig;
@@ -246,6 +248,15 @@ public static class TestAutomation
                 case "tracelong":
                     SessionLongEvents.TraceLong = value == "1";
                     break;
+                case "bumpids":
+                    if (int.TryParse(value, out int bump) && bump > 0)
+                    {
+                        cfg.bumpIds = bump;
+                    }
+                    break;
+                case "roomdump":
+                    RoomStateProbe.On = value == "1";
+                    break;
                 case "trace":
                     cfg.trace = value != "0";
                     break;
@@ -309,6 +320,7 @@ public static class TestAutomation
             Find.TickManager.CurTimeSpeed = TimeSpeed.Superfast;
         }
         activeConfig = cfg;
+        Note("regionids: run start " + DeterministicRegionIds.Digest());
         sessionSteps.Clear();
         stepGates.Clear();
         cameraHeld = false;
@@ -1725,6 +1737,12 @@ public static class TestAutomationBoot
         try
         {
             TestAutomation.Config cfg = TestAutomation.Read();
+            if (cfg.bumpIds > 0 && cfg.playerName == "c2")
+            {
+                // Диагностика T-076: только у c2, чтобы ID комнат разошлись с c1 с первой загрузки.
+                DeterministicRegionIds.TestBump = cfg.bumpIds;
+                TestAutomation.Note("regionids: test bump " + cfg.bumpIds + " enabled for this client");
+            }
             if (cfg.armed && cfg.save == null && (cfg.serverHost != null || cfg.steamAuto))
             {
                 TestAutomation.ScheduleEntryConnect(cfg);
