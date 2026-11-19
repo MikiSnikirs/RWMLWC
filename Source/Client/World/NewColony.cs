@@ -77,7 +77,7 @@ public static class NewColony
             {
                 try
                 {
-                    int n = (int)AccessTools.PropertyGetter(config.GetType(), "TotalPawnCount").Invoke(config, null);
+                    int n = (int)AccessTools.PropertyGetter(config.GetType(), "TotalPawnCount").Invoke(config, null)!;
                     if (n > 0)
                     {
                         return Math.Min(n, 10);
@@ -151,7 +151,10 @@ public static class ColonyChoice
             _choiceSent = true;
             if (auto == "new")
             {
-                PlanetTile tile = TileFinder.RandomSettlementTileFor(Faction.OfPlayer);
+                // exchangetest: колония рядом с колонией хоста — караван дойдёт за пару игровых часов.
+                PlanetTile near = CaravanSelfTest.ArmKey("exchangetest=1") && colonies.OwnedBy(1) is Settlement host
+                    ? CaravanSelfTest.TileTwoAway(host.Tile, PlanetTile.Invalid) : PlanetTile.Invalid;
+                PlanetTile tile = near.Valid ? near : TileFinder.RandomSettlementTileFor(Faction.OfPlayer);
                 TestAutomation.Note("colonies: auto choice — new colony at " + tile);
                 WorldCommands.SendColonyNew(tile);
             }

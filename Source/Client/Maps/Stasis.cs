@@ -188,13 +188,16 @@ namespace RWMLWC.Client.Maps
         public static bool GuestsPresent(Map map)
         {
             SquadsComponent? squads = Squads.Component;
-            if (squads == null)
-            {
-                return false;
-            }
+            GuestsComponent? guests = GuestsComponent.Component;
             foreach (Pawn p in map.mapPawns.FreeColonistsSpawned)
             {
-                Squad? squad = squads.SquadOf(p.thingIDNumber);
+                // Гость: его караван отправил игрок не из этой колонии (Guests.cs).
+                int guestOf = guests?.GuestPlayer(p) ?? 0;
+                if (guestOf != 0 && PlayerPresence.IsOnline(guestOf))
+                {
+                    return true;
+                }
+                Squad? squad = squads?.SquadOf(p.thingIDNumber);
                 if (squad != null && squad.players.Any(PlayerPresence.IsOnline))
                 {
                     return true;
