@@ -1,0 +1,58 @@
+2026-11-20 01:53:28 autoload: loading save 'tst014'
+2026-11-20 01:53:38 lockstep: connecting to 127.0.0.1:59712 as 'c2'
+2026-11-20 01:53:40 lockstep: connected to quic:127.0.0.1:59712, Hello sent
+2026-11-20 01:53:40 lockstep: Welcome, playerId=2, serverTick=14998, seed=7
+2026-11-20 01:53:40 presence: player 2 online
+2026-11-20 01:54:40 lockstep: hold is over, requesting speed 3
+2026-11-20 01:54:40 run started: #0, tick=14998, scenario=none, ticks=8000, trace=False, quit=True, file=hash-c2-20261120-015440.txt
+2026-11-20 01:54:45 colonies: player 1 is the host, settlements claimed: 1
+2026-11-20 01:54:45 colonies: auto choice — new colony at 87791,0
+2026-11-20 01:54:47 colonies: new colony for player 2 at 87791,0: 3 colonists, 10 item stacks
+2026-11-20 01:54:47 colonies: settlement 253 belongs to player 2
+2026-11-20 01:54:47 world: caravan form sent, pawns 1+0, item groups 1
+2026-11-20 01:54:47 caravan: form — отправка принята, колонист 231, цель 240934,0
+2026-11-20 01:54:51 caravan: map 1 generated at tick 15300: 35666 things, 55 pawns, global rand 0000081EFB25C5A1
+2026-11-20 01:54:52 caravan: new map 1 dumped at tick 15300: 35666 things, 55 pawns
+2026-11-20 01:54:53 world: caravan forming started by player 2, pawns 1+0, item groups 1
+2026-11-20 01:54:53 caravan summary: tick 15500, forming lords 1, caravans 0, player settlements 2, maps 2, colonists by map 3/3, colonies owners=[251:1,253:2] members=[], adapt 0:0.00/0,1:0.00/0, factors 0:d0×0.70×a0.80,1:d0×0.70×a0.80, perf 12009 us/tick, stasis [0:-0,1:-0] (game: d0×a0.00), guests []
+2026-11-20 01:54:53 world: caravan form sent, pawns 2+0, item groups 2
+2026-11-20 01:54:53 caravan: form 2 — отправка принята, колонист 234, цель 82924,0
+2026-11-20 01:54:53 sos: from player 1, map 1, cell (135, 0, 114), tile -1,0, letters 1
+2026-11-20 01:54:53 world: caravan forming started by player 2, pawns 2+0, item groups 2
+2026-11-20 01:54:54 caravan summary: tick 16005, forming lords 2, caravans 0, player settlements 2, maps 2, colonists by map 3/3, colonies owners=[251:1,253:2] members=[], adapt 0:0.00/0,1:0.00/0, factors 0:d0×0.70×a0.80,1:d0×0.70×a0.80, perf 1035 us/tick, stasis [0:-0,1:-0] (game: d0×a0.00), guests []
+2026-11-20 01:54:56 caravan summary: tick 16518, forming lords 2, caravans 0, player settlements 2, maps 2, colonists by map 3/3, colonies owners=[251:1,253:2] members=[], adapt 0:0.00/0,1:0.00/0, factors 0:d0×0.70×a0.80,1:d0×0.70×a0.80, perf 894 us/tick, stasis [0:-0,1:-0] (game: d0×a0.00), guests []
+2026-11-20 01:54:57 caravan summary: tick 17021, forming lords 2, caravans 0, player settlements 2, maps 2, colonists by map 3/3, colonies owners=[251:1,253:2] members=[], adapt 0:0.00/0,1:0.00/0, factors 0:d0×0.70×a0.80,1:d0×0.70×a0.80, perf 714 us/tick, stasis [0:-0,1:-0] (game: d0×a0.00), guests []
+2026-11-20 01:54:58 caravan summary: tick 17537, forming lords 2, caravans 0, player settlements 2, maps 2, colonists by map 3/3, colonies owners=[251:1,253:2] members=[], adapt 0:0.00/0,1:0.00/0, factors 0:d0×0.70×a0.80,1:d0×0.70×a0.80, perf 720 us/tick, stasis [0:-0,1:-0] (game: d0×a0.00), guests []
+2026-11-20 01:55:00 caravan summary: tick 18039, forming lords 1, caravans 1, player settlements 2, maps 2, colonists by map 2/3, caravan at 240937,0 moving to 240934,0, colonies owners=[251:1,253:2] members=[], adapt 0:0.00/0,1:0.00/0, factors 0:d0×0.70×a0.80,1:d0×0.70×a0.80, perf 789 us/tick, stasis [0:-0,1:-0] (game: d0×a0.00), guests []
+2026-11-20 01:55:01 caravan summary: tick 18541, forming lords 1, caravans 1, player settlements 2, maps 2, colonists by map 2/3, caravan at 240937,0 moving to 240934,0, colonies owners=[251:1,253:2] members=[], adapt 0:0.00/0,1:0.00/0, factors 0:d0×0.70×a0.80,1:d0×0.70×a0.80, perf 731 us/tick, stasis [0:-0,1:-0] (game: d0×a0.00), guests []
+2026-11-20 01:55:03 caravan summary: tick 19052, forming lords 0, caravans 2, player settlements 2, maps 2, colonists by map 0/3, caravan at 240936,0 moving to 240934,0, colonies owners=[251:1,253:2] members=[], adapt 0:0.00/0,1:0.00/0, factors 0:d0×0.70×a0.80,1:d0×0.70×a0.80, perf 853 us/tick, stasis [0:-0,1:-0] (game: d0×a0.00), guests []
+2026-11-20 01:55:04 caravan summary: tick 19555, forming lords 0, caravans 2, player settlements 2, maps 2, colonists by map 0/3, caravan at 240936,0 moving to 240934,0, colonies owners=[251:1,253:2] members=[], adapt 0:0.00/0,1:0.00/0, factors 0:d0×0.70×a0.80,1:d0×0.70×a0.80, perf 805 us/tick, stasis [0:-0,1:-0] (game: d0×a0.00), guests []
+2026-11-20 01:55:05 caravan summary: tick 20056, forming lords 0, caravans 2, player settlements 2, maps 2, colonists by map 0/3, caravan at 240936,0 moving to 240934,0, colonies owners=[251:1,253:2] members=[], adapt 0:0.00/0,1:0.00/0, factors 0:d0×0.70×a0.80,1:d0×0.70×a0.80, perf 821 us/tick, stasis [0:-0,1:-0] (game: d0×a0.00), guests []
+2026-11-20 01:55:07 caravan summary: tick 20559, forming lords 0, caravans 2, player settlements 2, maps 2, colonists by map 0/3, caravan at 240936,0 moving to 240934,0, colonies owners=[251:1,253:2] members=[], adapt 0:0.00/0,1:0.00/0, factors 0:d0×0.70×a0.80,1:d0×0.70×a0.80, perf 778 us/tick, stasis [0:-0,1:-0] (game: d0×a0.00), guests []
+2026-11-20 01:55:08 caravan: settle — кнопка выключена: у игрока уже есть своя колония
+2026-11-20 01:55:08 caravan summary: tick 21071, forming lords 0, caravans 2, player settlements 2, maps 2, colonists by map 0/3, caravan at 240934,0, colonies owners=[251:1,253:2] members=[], adapt 0:0.00/0,1:0.00/0, factors 0:d0×0.70×a0.80,1:d0×0.70×a0.80, perf 741 us/tick, stasis [0:-0,1:-0] (game: d0×a0.00), guests []
+2026-11-20 01:55:10 caravan summary: tick 21576, forming lords 0, caravans 2, player settlements 2, maps 2, colonists by map 0/3, caravan at 240934,0, colonies owners=[251:1,253:2] members=[], adapt 0:0.00/0,1:0.00/0, factors 0:d0×0.70×a0.80,1:d0×0.70×a0.80, perf 692 us/tick, stasis [0:-0,1:-0] (game: d0×a0.00), guests []
+2026-11-20 01:55:11 caravan summary: tick 22078, forming lords 0, caravans 2, player settlements 2, maps 2, colonists by map 0/3, caravan at 240934,0, colonies owners=[251:1,253:2] members=[], adapt 0:0.00/0,1:0.00/0, factors 0:d0×0.70×a0.80,1:d0×0.70×a0.80, perf 672 us/tick, stasis [0:-0,1:-0] (game: d0×a0.00), guests []
+2026-11-20 01:55:12 world: gizmo 3 of Caravan 255 sent
+2026-11-20 01:55:12 caravan: split window — кнопка 3 (Разделиться) отправлена, караван 255, выделено 1
+2026-11-20 01:55:12 shared window: Разделить караван #2.1 opened by player 2 (here)
+2026-11-20 01:55:12 world: gizmo 3 (Разделиться) of Caravan 255 pressed by player 2
+2026-11-20 01:55:12 caravan summary: tick 22581, forming lords 0, caravans 2, player settlements 2, maps 2, colonists by map 0/3, caravan at 240934,0, colonies owners=[251:1,253:2] members=[], adapt 0:0.00/0,1:0.00/0, factors 0:d0×0.70×a0.80,1:d0×0.70×a0.80, perf 774 us/tick, stasis [0:-0,1:-0] (game: d0×a0.00), guests []
+2026-11-20 01:55:14 summary: map0 drafted=0 forbidden=56 plants=[]
+2026-11-20 01:55:14 summary: map0 jobs=[]
+2026-11-20 01:55:14 camera: this client moved its camera 52 times during the run
+2026-11-20 01:55:14 summary: map0 settings=994F76653E2A3951
+2026-11-20 01:55:14 summary: absence= offline=[]
+2026-11-20 01:55:14 summary: squads= rejected=0 drafted=[]
+2026-11-20 01:55:14 summary: map0 designations=0 blueprints=0 zones=0; commands sent=4 executed=7 failed=0
+2026-11-20 01:55:14 summary: map1 drafted=0 forbidden=0 plants=[]
+2026-11-20 01:55:14 summary: map1 jobs=[41747:GotoWander@(142, 0, 103),41750:GotoWander@(143, 0, 105),41754:GotoWander@(137, 0, 98)]
+2026-11-20 01:55:14 camera: this client moved its camera 52 times during the run
+2026-11-20 01:55:14 summary: map1 settings=D62D5E0F567A1A66
+2026-11-20 01:55:14 summary: absence= offline=[]
+2026-11-20 01:55:14 summary: squads= rejected=0 drafted=[]
+2026-11-20 01:55:14 summary: map1 designations=0 blueprints=0 zones=0; commands sent=4 executed=7 failed=0
+2026-11-20 01:55:14 run finished: file=hash-c2-20261120-015440.txt
+2026-11-20 01:55:14 queue: finished
+2026-11-20 01:55:14 lockstep: disconnect: прогон завершён
+2026-11-20 01:55:14 quitting game
