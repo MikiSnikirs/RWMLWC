@@ -27,7 +27,7 @@ namespace RWMLWC.Client.Sim;
 /// </summary>
 internal static class RoofCountIsolation
 {
-    /// <summary>Ключ uiprobe=1: имитация чтения комнат интерфейсом вне тика (диагностика T-076).</summary>
+    /// <summary>Ключ uiprobe=1: имитация чтения комнат интерфейсом вне тика — только у c1 (диагностика T-076).</summary>
     public static bool UiProbe;
 
     /// <summary>Ключ noroofiso=1: выключить изоляцию (контрольный прогон A/B).</summary>

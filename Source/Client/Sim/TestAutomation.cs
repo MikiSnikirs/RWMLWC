@@ -67,6 +67,8 @@ public static class TestAutomation
         public int bumpIds;
         /// <summary>Ключ breakwall=T (диагностика T-076): на T-м тике прогона все клиенты ломают одну стену (обрушение крыши).</summary>
         public int breakWallAt;
+        /// <summary>Ключ uiprobe=1: зонд чтения комнат вне тика — только у c1 (имитация рисующего клиента).</summary>
+        public bool uiProbe;
     }
 
     private static Config? activeConfig;
@@ -260,7 +262,7 @@ public static class TestAutomation
                     RoomStateProbe.On = value == "1";
                     break;
                 case "uiprobe":
-                    RoofCountIsolation.UiProbe = value == "1";
+                    cfg.uiProbe = value == "1";
                     break;
                 case "noroofiso":
                     RoofCountIsolation.Disabled = value == "1";
@@ -294,6 +296,9 @@ public static class TestAutomation
             }
         }
         TicksPerFrameCap = cfg.armed ? cfg.ticksPerFrame : 0;
+        // T-076: UI-зонд асимметричен — только c1 имитирует рисующий клиент. Настоящий баг:
+        // комнаты из кадра читает только тот клиент, который рисует карту; у второго кэш иной.
+        RoofCountIsolation.UiProbe = cfg.uiProbe && cfg.playerName == "c1";
         if (cfg.queue != null)
         {
             cfg.queueIndex = ReadProgress();
