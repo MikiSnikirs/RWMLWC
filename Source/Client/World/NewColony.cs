@@ -102,6 +102,7 @@ public static class ColonyChoice
     private static bool _claimSent;
     private static bool _shown;
     private static bool _choiceSent;
+    private static bool _diagNote;
     private static string? _auto;
     private static bool _autoRead;
     private static int _firstTick = -1;
@@ -118,6 +119,11 @@ public static class ColonyChoice
         if (me <= 0)
         {
             return;
+        }
+        if (!_diagNote)
+        {
+            _diagNote = true;
+            TestAutomation.Note($"colonies diag: me={me}, tick={Find.TickManager.TicksGame}, anyOwner={colonies.AnyOwner}, lowestOnline={IsLowestOnline(me)}");
         }
         if (!ReferenceEquals(_game, Current.Game))
         {

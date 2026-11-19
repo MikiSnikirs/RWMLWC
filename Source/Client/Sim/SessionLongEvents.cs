@@ -112,6 +112,17 @@ internal static class Patch_LongEventHandler_QueueLongEvent_Session
     }
 }
 
+// Ванильное автосохранение раз в игровые сутки ставит долгое событие с окном загрузки и ждёт его
+// отрисовки (ShouldWaitUntilDisplayed). В сессии это лишнее: сервер сам периодически получает копию
+// мира (SaveWorldSnapshotKind). А ожидание отрисовки в тихом тестовом окне не заканчивается никогда
+// (repaint не приходит) — игра замирает на сутки от старта (найдено в T-076: заморозка на тике 74998).
+// В одиночной игре автосохранение ванильное.
+[HarmonyPatch(typeof(RimWorld.Autosaver), nameof(RimWorld.Autosaver.AutosaverTick))]
+internal static class Patch_Autosaver_AutosaverTick_Session
+{
+    private static bool Prefix() => !LockstepClient.InSession;
+}
+
 // Прыжок камеры и выделение — только у того, чья команда (после основания поселения игра переводит камеру на пешку).
 [HarmonyPatch(typeof(CameraJumper), nameof(CameraJumper.TryJump), new[] { typeof(GlobalTargetInfo), typeof(CameraJumper.MovementMode) })]
 internal static class Patch_CameraJumper_TryJump_Remote

@@ -361,8 +361,15 @@ internal static class Patch_PlaySettings_SessionButton
 [HarmonyPatch(typeof(MapInterface), nameof(MapInterface.MapInterfaceOnGUI_AfterMainTabs))]
 internal static class Patch_MapInterface_SessionStatus
 {
+    private static bool _aliveNote;
+
     private static void Postfix()
     {
+        if (!_aliveNote)
+        {
+            _aliveNote = true;
+            RWMLWC.Client.Sim.TestAutomation.Note("mapinterface postfix: alive (diag T-076)");
+        }
         ChatSelfTest.Frame();
         RWMLWC.Client.Absence.IdleAlarm.Frame();
         RWMLWC.Client.Net.Reconnect.Frame();
