@@ -135,7 +135,7 @@ public static class IdleAlarm
     [DllImport("user32.dll")]
     private static extern bool FlashWindowEx(ref FLASHWINFO pwfi);
 
-    private static void FlashWindow()
+    internal static void FlashWindow()
     {
         try
         {

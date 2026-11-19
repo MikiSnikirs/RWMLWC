@@ -85,6 +85,7 @@ public static class CaravanSelfTest
     }
 
     private static int _stasisStep;
+    private static bool _sosSent;
     private static bool _killSent;
     private static int _tradeStep;
     private static int _tradeTick;
@@ -326,6 +327,14 @@ public static class CaravanSelfTest
         if (ArmKey("exchangetest=1"))
         {
             ExchangeFrame(tick);
+        }
+
+        // sostest (T-051): игрок 1 нажимает «SOS» один раз — письмо должно прийти всем.
+        if (ArmKey("sostest=1") && LockstepClient.PlayerId == 1 && !_sosSent && tick >= _startTick + 600)
+        {
+            _sosSent = true;
+            RWMLWC.Client.Absence.Sos.Send();
+            TestAutomation.Note("sos: pressed");
         }
 
         // stasistest: хост объявляет игрока 2 (у него своя колония) «не в сети», через 6000 тиков — «снова в сети».

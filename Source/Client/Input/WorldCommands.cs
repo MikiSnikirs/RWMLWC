@@ -34,7 +34,8 @@ public static class WorldCommands
     private const byte OpTestGoTrade = 19;      // только тестовые прогоны (ключ tradetest=1): колонист идёт торговать
     private const byte OpTestHomeArea = 20;     // только тестовые прогоны (ключ exchangetest=1): домашняя зона под вещами карты
     // 21, 22 — капсулы (TransportPods)
-    private const byte OpTestPodKit = 23;       // только тестовые прогоны (ключ podtest=1): пусковая площадка с капсулой и топливом
+    private const byte OpTestPodKit = 23;
+    // 24 — SOS (Absence/Sos.cs)       // только тестовые прогоны (ключ podtest=1): пусковая площадка с капсулой и топливом
 
     private static readonly FieldInfo FormMapField = AccessTools.Field(typeof(Dialog_FormCaravan), "map");
     private static readonly FieldInfo FormReformField = AccessTools.Field(typeof(Dialog_FormCaravan), "reform");
@@ -945,6 +946,11 @@ public static class WorldCommands
         if (op == RWMLWC.Client.World.TradeCommands.OpTrade)
         {
             RWMLWC.Client.World.TradeCommands.Execute(ref r);
+            return;
+        }
+        if (op == RWMLWC.Client.Absence.Sos.OpSos)
+        {
+            RWMLWC.Client.Absence.Sos.Execute(ref r);
             return;
         }
         if (op == RWMLWC.Client.World.TransportPods.OpLoad || op == RWMLWC.Client.World.TransportPods.OpLaunch)
