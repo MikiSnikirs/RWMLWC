@@ -65,6 +65,8 @@ public static class TestAutomation
         public bool steamAuto;
         /// <summary>Ключ bumpids=N (диагностика T-076): сдвиг счётчиков ID комнат/регионов у c2 при загрузке.</summary>
         public int bumpIds;
+        /// <summary>Ключ breakwall=T (диагностика T-076): на T-м тике прогона все клиенты ломают одну стену (обрушение крыши).</summary>
+        public int breakWallAt;
     }
 
     private static Config? activeConfig;
@@ -262,6 +264,12 @@ public static class TestAutomation
                     break;
                 case "noroofiso":
                     RoofCountIsolation.Disabled = value == "1";
+                    break;
+                case "breakwall":
+                    if (int.TryParse(value, out int bw) && bw > 0)
+                    {
+                        cfg.breakWallAt = bw;
+                    }
                     break;
                 case "trace":
                     cfg.trace = value != "0";
@@ -1428,6 +1436,10 @@ public static class TestAutomation
     public static void BeforeTickDuringRun(HashRecorder recorder, int elapsedTicks)
     {
         Config? cfg = activeConfig;
+        if (cfg != null && cfg.breakWallAt > 0 && elapsedTicks == cfg.breakWallAt && Find.Maps.Count > 0)
+        {
+            BreakWallForProbe(Find.Maps[0]);
+        }
         if (cfg == null || snapshotDone || elapsedTicks != cfg.snapAt)
         {
             return;
@@ -1455,6 +1467,29 @@ public static class TestAutomation
             Note("snapshot FAILED: " + ex);
             Log.Error("[RWMLWC] снимок не удался: " + ex);
         }
+    }
+
+    /// <summary>
+    /// Диагностика T-076 (ключ breakwall=T): детерминированный снос стены — все клиенты на одном
+    /// тике прогона ломают первую по номеру стену игрока, держащую крышу. Обрушение крыши в тике
+    /// теряется уведомление о сбросе кэша района (регион ещё невалиден) — механизм расхождения.
+    /// </summary>
+    private static void BreakWallForProbe(Map map)
+    {
+        Thing? wall = map.listerThings.AllThings
+            .Where(t => t.Faction == Faction.OfPlayer && t.def.holdsRoof && t.def.category == ThingCategory.Building && !t.Destroyed)
+            .OrderBy(t => t.thingIDNumber)
+            .FirstOrDefault();
+        if (wall == null)
+        {
+            Note("breakwall: no roof holder found");
+            return;
+        }
+        string def = wall.def.defName;
+        int id = wall.thingIDNumber;
+        IntVec3 pos = wall.Position;
+        wall.Destroy();
+        Note($"breakwall: destroyed {def} #{id} at {pos} (T-076 roof collapse probe)");
     }
 
     // --- вход без мира (T-045): подключение из главного меню ---
