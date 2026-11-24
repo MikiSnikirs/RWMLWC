@@ -137,6 +137,10 @@ public static class GizmoCommands
         {
             if (ReferenceEquals(entry.owner, owner) && entry.source == SourceOwn && pick(entry.gizmo))
             {
+                if (!RWMLWC.Client.Maps.SquadRules.LocalMay(new object[] { owner }))
+                {
+                    return false; // отряды (T-061): кнопка чужой пешки — не отправляем
+                }
                 PacketWriter w = CommandBus.Begin(map);
                 ValueCodec.Write(w, entry.owner);
                 w.WriteByte(entry.source);
@@ -229,6 +233,15 @@ public static class GizmoCommands
         if (owner == null)
         {
             TestAutomation.Note("gizmo: owner is gone, command dropped");
+            return;
+        }
+        // Отряды (T-061): CommandBus проверил выделение автора, но кнопка может принадлежать объекту
+        // вне выделения (команда без выделения от изменённого клиента — замечание B 20.11 00:16, tstr1).
+        // Проверяем и пешку-владельца кнопки — у всех клиентов одинаково.
+        if (RWMLWC.Client.Maps.SquadRules.RejectAtExecution(
+                RWMLWC.Client.Maps.SquadRules.Forbidden(RWMLWC.Client.Maps.SquadRules.ControllingPawn(owner), CommandBus.CurrentPlayerId),
+                CommandBus.CurrentSeq))
+        {
             return;
         }
 
