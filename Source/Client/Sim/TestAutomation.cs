@@ -515,6 +515,24 @@ public static class TestAutomation
             sessionSteps.Enqueue((startTick + 500, "blueprints: propose walls", () => { if (!IAmOwner()) BlueprintsPropose(BpMap()); }));
             stepGates["blueprints: approve own proposal"] = () => Pending() > 0;
             sessionSteps.Enqueue((startTick + 900, "blueprints: approve own proposal", () => { if (!IAmOwner()) BlueprintsDecide(BpMap(), 1, true); }));
+            // Глазами (TST-052): выделить первый неутверждённый чертёж, камера на него — кнопки «Утвердить»/«Отклонить»
+            // и строка в описании видны внизу; снимок игрой (папка Screenshots данных клиента).
+            sessionSteps.Enqueue((startTick + 2700, "blueprints: select pending", () =>
+            {
+                Blueprint? bp = BpMap().listerThings.ThingsInGroup(ThingRequestGroup.Blueprint).OfType<Blueprint>()
+                    .Where(RWMLWC.Client.Maps.BlueprintApproval.IsPending).OrderBy(b => b.thingIDNumber).FirstOrDefault();
+                if (bp != null)
+                {
+                    SelectOnly(bp);
+                    Find.CameraDriver.SetRootPosAndSize(bp.Position.ToVector3Shifted(), 18f);
+                    Note($"blueprints: selected {bp.thingIDNumber} for the screenshot, owner view={IAmOwner()}");
+                }
+            }));
+            sessionSteps.Enqueue((startTick + 2800, "blueprints: screenshot", () =>
+            {
+                ScreenshotTaker.TakeNonSteamShot(IAmOwner() ? "blueprints-owner" : "blueprints-author");
+                Note("blueprints: screenshot saved to " + GenFilePaths.ScreenshotFolderPath);
+            }));
             sessionSteps.Enqueue((startTick + 2900, "blueprints: state before approval", () => BlueprintsState(BpMap())));
             sessionSteps.Enqueue((startTick + 3000, "blueprints: approve", () => { if (IAmOwner()) BlueprintsDecide(BpMap(), 6, true); }));
             sessionSteps.Enqueue((startTick + 3100, "blueprints: reject", () => { if (IAmOwner()) BlueprintsDecide(BpMap(), 1, false); }));
