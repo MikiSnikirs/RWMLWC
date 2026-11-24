@@ -109,6 +109,7 @@ internal static class RoomStateProbe
                   .Append(" dirty=").Append(RoomDirty(r) ? 1 : 0)
                   .Append(" role=").Append(RoomRole(r)?.defName ?? "-")
                   .Append(" temp=").Append(r.Temperature.ToString("F3"))
+                  .Append(' ').Append(RoomRecreationDeterminism.EqDigest(map, r.TempTracker))
                   .AppendLine();
             }
             foreach (District d in DistrictsOf(map.regionGrid).OrderBy(d => FirstCell(map, d.Cells)))

@@ -264,6 +264,9 @@ public static class TestAutomation
                 case "uiprobe":
                     cfg.uiProbe = value == "1";
                     break;
+                case "noeqregen":
+                    RoomRecreationDeterminism.EqRegenDisabled = value == "1";
+                    break;
                 case "noroofiso":
                     RoofCountIsolation.Disabled = value == "1";
                     break;
