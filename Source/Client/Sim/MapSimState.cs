@@ -21,6 +21,13 @@ public sealed class MapSimState : MapComponent
     /// <summary>Мировой абсолютный тик, когда карта последний раз вошла в стазис (для предупреждения о сезоне).</summary>
     public long stasisSinceAbs;
 
+    /// <summary>
+    /// Богатство карты для рассказчика, запомненное в момент ухода владельца (T-072), или -1. Пока владельца
+    /// нет, очки угроз карты считаются от него (Maps/AbsentThreatPoints.cs): в автопилоте богатство растёт,
+    /// а рассказчик не должен «отыграться» после возвращения.
+    /// </summary>
+    public float absentWealth = -1f;
+
     /// <summary>Собственное состояние Rand этой карты (seed в младших 32 битах, счётчик в старших).</summary>
     public ulong randState;
 
@@ -92,6 +99,7 @@ public sealed class MapSimState : MapComponent
         Scribe_Values.Look(ref randState, "rwmlwc_randState", 0UL);
         Scribe_Values.Look(ref randInitialized, "rwmlwc_randInitialized", false);
         Scribe_Values.Look(ref nextThingId, "rwmlwc_nextThingId", 0);
+        Scribe_Values.Look(ref absentWealth, "rwmlwc_absentWealth", -1f);
     }
 
     public override void MapRemoved()

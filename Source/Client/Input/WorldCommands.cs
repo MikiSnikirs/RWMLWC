@@ -691,6 +691,16 @@ public static class WorldCommands
     }
 
     /// <summary>Тест часов пешки: перевести колониста с карты from на карту to (как караваном, но сразу).</summary>
+    /// <summary>Тест часов пешки (clocktest): поле-отметка времени в <c>mindState</c> со значением &gt; 0, lastIngestTick в приоритете, затем по имени.</summary>
+    private static System.Reflection.FieldInfo? ClockTestField(Pawn p)
+    {
+        if (p.mindState == null) return null;
+        return p.mindState.GetType().GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic)
+            .Where(f => f.FieldType == typeof(int) && f.Name.EndsWith("Tick", System.StringComparison.Ordinal) && (int)f.GetValue(p.mindState)! > 0)
+            .OrderBy(f => f.Name == "lastIngestTick" ? 0 : 1).ThenBy(f => f.Name, System.StringComparer.Ordinal)
+            .FirstOrDefault();
+    }
+
     public static void SendTestTransfer(int fromMap, int toMap)
     {
         PacketWriter w = BeginWorld();
@@ -862,20 +872,24 @@ public static class WorldCommands
                     }
                     Map? from = Find.Maps.FirstOrDefault(m => m.uniqueID == fromId);
                     Map? to = Find.Maps.FirstOrDefault(m => m.uniqueID == toId);
-                    Pawn? pawn = from?.mapPawns.FreeColonistsSpawned.Where(p => p.mindState.lastIngestTick > 0).OrderBy(p => p.thingIDNumber).FirstOrDefault();
-                    if (pawn == null || to == null)
+                    // Сначала колонист, который уже ел; если такого нет (стартовые колонисты карты, замёрзшей рано,
+                    // ещё не ели) — любой колонист с отметкой времени в mindState. Сравнивается «сколько тиков назад».
+                    Pawn? pawn = from?.mapPawns.FreeColonistsSpawned.Where(p => p.mindState.lastIngestTick > 0).OrderBy(p => p.thingIDNumber).FirstOrDefault()
+                        ?? from?.mapPawns.FreeColonistsSpawned.Where(p => ClockTestField(p) != null).OrderBy(p => p.thingIDNumber).FirstOrDefault();
+                    System.Reflection.FieldInfo? field = pawn == null ? null : ClockTestField(pawn);
+                    if (pawn == null || to == null || field == null)
                     {
                         TestAutomation.Note($"clock test: nobody to move {fromId} -> {toId}");
                         return;
                     }
                     MapRandContext.Enter(from);
-                    int agoBefore = Find.TickManager.TicksGame - pawn.mindState.lastIngestTick;
+                    int agoBefore = Find.TickManager.TicksGame - (int)field.GetValue(pawn.mindState)!;
                     pawn.DeSpawn();
                     MapRandContext.Enter(to);
                     IntVec3 cell = CellFinder.RandomClosewalkCellNear(to.Center, to, 20);
                     GenSpawn.Spawn(pawn, cell, to);
-                    int agoAfter = Find.TickManager.TicksGame - pawn.mindState.lastIngestTick;
-                    TestAutomation.Note($"clock test: pawn {pawn.thingIDNumber} {fromId}->{toId}: ate {agoBefore} ticks ago before, {agoAfter} after");
+                    int agoAfter = Find.TickManager.TicksGame - (int)field.GetValue(pawn.mindState)!;
+                    TestAutomation.Note($"clock test: pawn {pawn.thingIDNumber} {fromId}->{toId}: {field.Name} {agoBefore} ticks ago before, {agoAfter} after");
                     break;
                 }
             case OpTestKill:
