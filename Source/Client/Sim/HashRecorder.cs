@@ -147,6 +147,7 @@ public sealed class HashRecorder : GameComponent
                 resuming.ResumeAfterSnapshotReload(info);
                 TestAutomation.Note("resumed after snapshot reload at tick " + Find.TickManager.TicksGame
                     + ", perMapSim=" + PerMapSim.Enabled);
+                TestAutomation.OnResumedAfterReload();
             }
             return;
         }
