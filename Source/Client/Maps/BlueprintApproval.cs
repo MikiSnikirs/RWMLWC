@@ -180,14 +180,14 @@ internal static class Patch_Blueprint_Gizmos_Approval
         {
             defaultLabel = "Утвердить",
             defaultDesc = $"Чертёж предложил игрок {BlueprintApprovalComponent.Component?.AuthorOf(bp)}. После утверждения колонисты начнут его строить. Утверждает владелец или соавтор колонии.",
-            icon = TexCommand.ForbidOff,
+            icon = Widgets.CheckboxOnTex, // не рука «Разрешить»: на снимке t052-bp6 их было легко спутать
             action = () => BlueprintApproval.Decide(bp, true),
         };
         var reject = new Command_Action
         {
             defaultLabel = "Отклонить",
             defaultDesc = "Убрать предложенный чертёж. Отклоняет владелец или соавтор колонии.",
-            icon = TexCommand.ForbidOn,
+            icon = Widgets.CheckboxOffTex,
             action = () => BlueprintApproval.Decide(bp, false),
         };
         yield return approve;
