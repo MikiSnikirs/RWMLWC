@@ -1544,6 +1544,11 @@ public static class TestAutomation
         {
             BreakWallForProbe(Find.Maps[0]);
         }
+        if (cfg != null && cfg.scenario == "map-splice")
+        {
+            MapSpliceStep(recorder, cfg, elapsedTicks);
+            return;
+        }
         if (cfg == null || snapshotDone || elapsedTicks != cfg.snapAt)
         {
             return;
@@ -1570,6 +1575,99 @@ public static class TestAutomation
         {
             Note("snapshot FAILED: " + ex);
             Log.Error("[RWMLWC] снимок не удался: " + ex);
+        }
+    }
+
+    // T-030 этап 2 (сценарий map-splice, без сервера): на snapAt — снимок A и хеш карты 0; через 1000 тиков —
+    // снимок B, в него вшивается карта 0 из A, загрузка. После загрузки хеш карты 0 должен совпасть с хешем A.
+    private static string? spliceMapXml;
+    private static string? spliceExpected;
+    private static string? spliceExpectedThings;
+
+    // Вещи карты без номеров (как DumpThings) и множество номеров. Камни, руды и обломки игра хранит сжатой сеткой
+    // и при любой загрузке создаёт заново с новыми номерами (t030-splice2) — номера сравниваются отдельно.
+    private static HashSet<int>? spliceIdsA;
+
+    private static string SpliceThingsKey(Map map)
+    {
+        System.Text.StringBuilder sb = new System.Text.StringBuilder();
+        MapStateHasher.DumpThings(map, sb);
+        List<string> lines = sb.ToString().Split((char)10).Where(l => l.Length > 0).Select(l => l.Substring(l.IndexOf(';') + 1)).ToList();
+        lines.Sort(StringComparer.Ordinal);
+        return string.Join("|", lines);
+    }
+
+    private static HashSet<int> SpliceIds(Map map) => new HashSet<int>(map.listerThings.AllThings.Select(t => t.thingIDNumber));
+
+    private static void MapSpliceStep(HashRecorder recorder, Config cfg, int elapsedTicks)
+    {
+        if (snapshotDone || Find.Maps.Count == 0)
+        {
+            return;
+        }
+        try
+        {
+            Map map = Find.Maps[0];
+            if (elapsedTicks == cfg.snapAt)
+            {
+                byte[] raw = Maps.GameSnapshot.Unpack(Maps.GameSnapshot.Take(out Maps.GameSnapshot.Stats stats));
+                spliceMapXml = Maps.MapSnapshot.ExtractMap(raw, map.uniqueID);
+                spliceExpected = MapStateHasher.Compute(map).ToString();
+                DumpSpliceThings(map, "A");
+                spliceExpectedThings = SpliceThingsKey(map);
+                spliceIdsA = SpliceIds(map);
+                Note($"map-splice: snapshot A at tick {Find.TickManager.TicksGame}: {stats}, map {map.uniqueID} xml {spliceMapXml?.Length ?? -1} chars, hash {spliceExpected}");
+            }
+            else if (elapsedTicks == cfg.snapAt + 1000 && spliceMapXml != null)
+            {
+                snapshotDone = true;
+                Note($"map-splice: before splice at tick {Find.TickManager.TicksGame}, map hash now {MapStateHasher.Compute(map)}");
+                byte[] raw = Maps.GameSnapshot.Unpack(Maps.GameSnapshot.Take(out Maps.GameSnapshot.Stats stats));
+                System.Diagnostics.Stopwatch sw = System.Diagnostics.Stopwatch.StartNew();
+                byte[]? composed = Maps.MapSnapshot.Splice(raw, map.uniqueID, spliceMapXml);
+                Note($"map-splice: snapshot B {stats}, splice {(composed == null ? "FAILED" : composed.Length + " bytes")} in {sw.ElapsedMilliseconds} ms");
+                if (composed != null)
+                {
+                    recorder.SuspendForSnapshotReload();
+                    snapshotToApply = Maps.GameSnapshot.Pack(composed);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Note("map-splice FAILED: " + ex);
+        }
+    }
+
+    private static void DumpSpliceThings(Map map, string tag)
+    {
+        try
+        {
+            System.Text.StringBuilder sb = new System.Text.StringBuilder();
+            MapStateHasher.DumpThings(map, sb);
+            string dir = Path.Combine(GenFilePaths.SaveDataFolderPath, "RWMLWC");
+            File.WriteAllText(Path.Combine(dir, $"splice-{tag}-map{map.uniqueID}.txt"), sb.ToString());
+        }
+        catch (Exception ex)
+        {
+            Note("map-splice: dump failed: " + ex.Message);
+        }
+    }
+
+    /// <summary>Сразу после загрузки снимка, до первого тика (HashRecorder).</summary>
+    public static void OnResumedAfterReload()
+    {
+        if (spliceExpected != null && Find.Maps.Count > 0)
+        {
+            string now = MapStateHasher.Compute(Find.Maps[0]).ToString();
+            Note($"map-splice: after load at tick {Find.TickManager.TicksGame}, map hash {now}; equals snapshot A: {now == spliceExpected}");
+            DumpSpliceThings(Find.Maps[0], "loaded");
+            string things = SpliceThingsKey(Find.Maps[0]);
+            MapStateHash h = MapStateHasher.Compute(Find.Maps[0]);
+            string renumbered = string.Join(",", Find.Maps[0].listerThings.AllThings.Where(t => spliceIdsA != null && !spliceIdsA.Contains(t.thingIDNumber))
+                .GroupBy(t => t.def.defName).OrderBy(g => g.Key, StringComparer.Ordinal).Select(g => g.Key + "x" + g.Count()));
+            Note($"map-splice: things without ids equal to snapshot A: {things == spliceExpectedThings}; pawns/rand equal: {spliceExpected!.Contains("pawns=" + h.pawns.ToString("X16"))}/{spliceExpected.Contains("rand=" + h.rand.ToString("X16"))}; renumbered: {renumbered}");
+            spliceExpected = null;
         }
     }
 
