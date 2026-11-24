@@ -522,6 +522,7 @@ public static class TestAutomation
             };
             sessionSteps.Enqueue((startTick + 1300, "squads: draft foreign via UI", () => SquadDraft(0, false)));
             sessionSteps.Enqueue((startTick + 1400, "squads: draft foreign bypassing UI", () => SquadDraft(0, true)));
+            sessionSteps.Enqueue((startTick + 1500, "squads: draft foreign without selection bypassing UI", () => SquadDraft(0, true, select: false)));
             sessionSteps.Enqueue((startTick + 1600, "squads: draft common pawn", () => SquadDraft(2, false)));
             sessionSteps.Enqueue((startTick + 1800, "squads: work of foreign bypassing UI", SquadForeignWork));
             // T-062: имя и цвет своего отряда меняются, чужого — нет (c1 — участник «Альфы», не «Беты»).
@@ -1119,7 +1120,7 @@ public static class TestAutomation
         Find.Selector.Select(obj, false, false);
     }
 
-    private static void SquadDraft(int colonistIndex, bool bypass)
+    private static void SquadDraft(int colonistIndex, bool bypass, bool select = true)
     {
         Map map = Find.CurrentMap ?? Find.Maps[0];
         Pawn? pawn = map.mapPawns.FreeColonistsSpawned.OrderBy(p => p.thingIDNumber).Skip(colonistIndex).FirstOrDefault();
@@ -1128,13 +1129,20 @@ public static class TestAutomation
             Note("squads: draft: no colonist #" + colonistIndex);
             return;
         }
-        SelectOnly(pawn);
+        if (select)
+        {
+            SelectOnly(pawn);
+        }
+        else
+        {
+            Find.Selector.ClearSelection(); // кнопка чужой пешки без выделения (замечание B 20.11 00:16)
+        }
         RWMLWC.Client.Maps.SquadRules.BypassLocalCheck = bypass;
         int before = LockstepClient.PlayerCommandsSent;
         try
         {
             bool sent = GizmoCommands.SendClick(map, pawn, g => g is Command_Toggle toggle && toggle.hotKey == KeyBindingDefOf.Command_ColonistDraft);
-            Note($"squads: draft {pawn.LabelShort} (id {pawn.thingIDNumber}, bypass={bypass}): click={sent}, commands sent={LockstepClient.PlayerCommandsSent - before}");
+            Note($"squads: draft {pawn.LabelShort} (id {pawn.thingIDNumber}, bypass={bypass}, selected={select}): click={sent}, commands sent={LockstepClient.PlayerCommandsSent - before}");
         }
         finally
         {

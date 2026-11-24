@@ -56,6 +56,36 @@ public static class SquadRules
         return field?.GetValue(obj) as Pawn;
     }
 
+    /// <summary>
+    /// Пешка, которой принадлежит владелец кнопки: сама пешка, её часть (<see cref="PawnOf"/>) или пешка,
+    /// которая держит вещь (одежда, оружие, инвентарь — по цепочке <c>ParentHolder</c>).
+    /// </summary>
+    public static Pawn? ControllingPawn(object? obj)
+    {
+        Pawn? pawn = PawnOf(obj);
+        if (pawn != null || obj is not Thing thing)
+        {
+            return pawn;
+        }
+        IThingHolder? holder = thing.ParentHolder;
+        for (int depth = 0; holder != null && depth < 8; depth++)
+        {
+            switch (holder)
+            {
+                case Pawn p:
+                    return p;
+                case Pawn_ApparelTracker apparel:
+                    return apparel.pawn;
+                case Pawn_EquipmentTracker equipment:
+                    return equipment.pawn;
+                case Pawn_InventoryTracker inventory:
+                    return inventory.pawn;
+            }
+            holder = holder.ParentHolder;
+        }
+        return null;
+    }
+
     /// <summary>Почему игрок не может приказывать этой пешке; null — может.</summary>
     public static string? Forbidden(Pawn? pawn, int playerId)
     {
