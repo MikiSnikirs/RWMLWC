@@ -1,0 +1,12 @@
+2026-11-19 04:44:27 autoload: loading save 'tst014'
+2026-11-19 04:44:33 lockstep: connecting to 127.0.0.1:54528 as 'c2'
+2026-11-19 04:44:33 regionids: after load room=18 district=24 region=483
+2026-11-19 04:44:34 lockstep: connected to quic:127.0.0.1:54528, Hello sent
+2026-11-19 04:44:34 lockstep: Welcome, playerId=1, serverTick=14998, seed=7
+2026-11-19 04:44:34 presence: player 1 online
+2026-11-19 04:44:34 presence: player 2 online
+2026-11-19 04:44:36 watchdog: no tick advance for 300 frames at tick 14998: speed=Paused, paused=True, topWindow=-, windows=0
+2026-11-19 04:45:34 lockstep: hold is over, requesting speed 3
+2026-11-19 04:45:35 regionids: run start room=18 district=24 region=483
+2026-11-19 04:45:35 run started: #0, tick=14998, scenario=none, ticks=76000, trace=False, quit=True, file=hash-c2-20261119-044535.txt
+2026-11-19 04:48:25 watchdog: no tick advance for 300 frames at tick 74998: speed=Superfast, paused=True, topWindow=-, windows=0

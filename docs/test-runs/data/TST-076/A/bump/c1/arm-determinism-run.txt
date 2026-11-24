@@ -1,0 +1,13 @@
+armed=1
+save=tst014
+scenarios=raid
+ticks=6000
+trace=0
+quit=1
+server=127.0.0.1:60891
+thumbprint=4FD7B79B818E66C3CF354F087CE31851A5B01F7C74C19265CDB449C735036AD0
+name=c1
+holdsec=60
+issuer=1
+camera=0
+bumpids=1000

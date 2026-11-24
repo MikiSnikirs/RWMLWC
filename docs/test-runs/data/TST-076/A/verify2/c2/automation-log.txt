@@ -1,0 +1,71 @@
+2026-11-19 05:06:03 autoload: loading save 'tst014'
+2026-11-19 05:06:09 lockstep: connecting to 127.0.0.1:53589 as 'c2'
+2026-11-19 05:06:09 regionids: after load room=18 district=24 region=483
+2026-11-19 05:06:10 lockstep: connected to quic:127.0.0.1:53589, Hello sent
+2026-11-19 05:06:10 lockstep: Welcome, playerId=2, serverTick=14998, seed=7
+2026-11-19 05:06:10 presence: player 2 online
+2026-11-19 05:06:10 colonies diag: me=2, tick=14998, anyOwner=False, lowestOnline=False
+2026-11-19 05:06:12 watchdog: no tick advance for 300 frames at tick 14998: speed=Paused, paused=True, topWindow=-, windows=0
+2026-11-19 05:07:10 lockstep: hold is over, requesting speed 3
+2026-11-19 05:07:10 regionids: run start room=18 district=24 region=483
+2026-11-19 05:07:10 run started: #0, tick=14998, scenario=none, ticks=3000, trace=False, quit=True, file=hash-c2-20261119-050710.txt
+2026-11-19 05:07:12 colonies: player 1 is the host, settlements claimed: 1
+2026-11-19 05:07:12 colonies: auto choice — new colony at 32323,0
+2026-11-19 05:07:14 colonies: new colony for player 2 at 32323,0: 3 colonists, 10 item stacks
+2026-11-19 05:07:14 colonies: settlement 253 belongs to player 2
+2026-11-19 05:07:14 long event 'GeneratingMap' start, maps 1
+2026-11-19 05:07:17 long event 'GeneratingMap' done, maps 2
+2026-11-19 05:07:17 map 1 after 'GeneratingMap': Pawn=81,Item=1253,Building=1881,Plant=36649,Filth=3486; pawns Chinchilla#86838@(185, 0, 62),Cassowary#86839@(81, 0, 141),Tortoise#86840@(207, 0, 10),GuineaPig#86841@(62, 0, 72),GuineaPig#86842@(59, 0, 69),GuineaPig#86843@(62, 0, 72),GuineaPig#86844@(59, 0, 69),GuineaPig#86845@(61, 0, 69),GuineaPig#86846@(59, 0, 69),Peacock#86847@(156, 0, 191),Chinchilla#86848@(221, 0, 242),Cassowary#86849@(29, 0, 55),Cassowary#86850@(180, 0, 44),Tortoise#86851@(226, 0, 46),Cassowary#86852@(195, 0, 196),Cassowary#86853@(239, 0, 99),Rat#86854@(55, 0, 206),Cassowary#86855@(82, 0, 132),Rat#86856@(248, 0, 41),Chinchilla#86857@(240, 0, 191),Capybara#86858@(220, 0, 83),Capybara#86859@(217, 0, 85),Capybara#86860@(215, 0, 85),Capybara#86861@(219, 0, 83),Capybara#86862@(215, 0, 85),Capybara#86863@(215, 0, 85),Capybara#86864@(218, 0, 87),Chinchilla#86865@(146, 0, 103),Tortoise#86866@(207, 0, 188),Tortoise#86867@(197, 0, 59),Chinchilla#86868@(103, 0, 193),Chinchilla#86869@(122, 0, 217),Cassowary#86870@(83, 0, 151),Cassowary#86871@(19, 0, 53),Rat#86872@(202, 0, 211),Alpaca#86873@(174, 0, 226),Alpaca#86874@(173, 0, 228),Panther#86875@(193, 0, 111),Cobra#86876@(80, 0, 191),Monkey#86877@(207, 0, 80),Monkey#86878@(209, 0, 81),Monkey#86879@(211, 0, 80),Monkey#86880@(208, 0, 78),Monkey#86881@(207, 0, 78),Monkey#86882@(210, 0, 78),GuineaPig#86883@(88, 0, 204),GuineaPig#86884@(90, 0, 203),GuineaPig#86885@(86, 0, 199),GuineaPig#86886@(88, 0, 204),GuineaPig#86887@(88, 0, 202),GuineaPig#86888@(90, 0, 200),GuineaPig#86889@(85, 0, 201),Chinchilla#86890@(219, 0, 231),Tortoise#86891@(13, 0, 208),Monkey#86892@(107, 0, 211),Monkey#86893@(112, 0, 212),Monkey#86894@(110, 0, 210),Monkey#86895@(107, 0, 211),Monkey#86896@(107, 0, 211),Monkey#86897@(109, 0, 212),Peacock#86898@(247, 0, 132),Cassowary#86899@(122, 0, 76),Rat#86900@(147, 0, 218),Boomalope#86901@(153, 0, 147),Boomalope#86902@(151, 0, 143),Boomalope#86903@(150, 0, 143),Capybara#86904@(117, 0, 34),Capybara#86905@(120, 0, 37),Capybara#86906@(120, 0, 37),Capybara#86907@(120, 0, 37),Capybara#86908@(120, 0, 37),Capybara#86909@(119, 0, 35),Capybara#86910@(120, 0, 37),Chinchilla#86911@(210, 0, 193),Rat#86912@(240, 0, 180),Rat#86913@(165, 0, 80),Rat#86914@(229, 0, 226),Rhinoceros#86915@(236, 0, 140),Rhinoceros#86916@(238, 0, 139),Rhinoceros#86917@(235, 0, 139),Rhinoceros#86918@(235, 0, 140); rand 0000081EFB25C5A1
+2026-11-19 05:07:18 long event 'SpawningColonists' start, maps 2
+2026-11-19 05:07:18 long event 'SpawningColonists' done, maps 2
+2026-11-19 05:07:18 map 1 after 'SpawningColonists': Pawn=85,Item=1270,Building=1881,Plant=36649,Filth=3486; pawns Human#41747@(134, 0, 132),Human#41750@(131, 0, 131),Human#41754@(131, 0, 130),Cat#41767@(135, 0, 130),Chinchilla#86838@(185, 0, 62),Cassowary#86839@(81, 0, 141),Tortoise#86840@(207, 0, 10),GuineaPig#86841@(62, 0, 72),GuineaPig#86842@(59, 0, 69),GuineaPig#86843@(62, 0, 72),GuineaPig#86844@(59, 0, 69),GuineaPig#86845@(61, 0, 69),GuineaPig#86846@(59, 0, 69),Peacock#86847@(156, 0, 191),Chinchilla#86848@(221, 0, 242),Cassowary#86849@(29, 0, 55),Cassowary#86850@(180, 0, 44),Tortoise#86851@(226, 0, 46),Cassowary#86852@(195, 0, 196),Cassowary#86853@(239, 0, 99),Rat#86854@(55, 0, 206),Cassowary#86855@(82, 0, 132),Rat#86856@(248, 0, 41),Chinchilla#86857@(240, 0, 191),Capybara#86858@(220, 0, 83),Capybara#86859@(217, 0, 85),Capybara#86860@(215, 0, 85),Capybara#86861@(219, 0, 83),Capybara#86862@(215, 0, 85),Capybara#86863@(215, 0, 85),Capybara#86864@(218, 0, 87),Chinchilla#86865@(146, 0, 103),Tortoise#86866@(207, 0, 188),Tortoise#86867@(197, 0, 59),Chinchilla#86868@(103, 0, 193),Chinchilla#86869@(122, 0, 217),Cassowary#86870@(83, 0, 151),Cassowary#86871@(19, 0, 53),Rat#86872@(202, 0, 211),Alpaca#86873@(174, 0, 226),Alpaca#86874@(173, 0, 228),Panther#86875@(193, 0, 111),Cobra#86876@(80, 0, 191),Monkey#86877@(207, 0, 80),Monkey#86878@(209, 0, 81),Monkey#86879@(211, 0, 80),Monkey#86880@(208, 0, 78),Monkey#86881@(207, 0, 78),Monkey#86882@(210, 0, 78),GuineaPig#86883@(88, 0, 204),GuineaPig#86884@(90, 0, 203),GuineaPig#86885@(86, 0, 199),GuineaPig#86886@(88, 0, 204),GuineaPig#86887@(88, 0, 202),GuineaPig#86888@(90, 0, 200),GuineaPig#86889@(85, 0, 201),Chinchilla#86890@(219, 0, 231),Tortoise#86891@(13, 0, 208),Monkey#86892@(107, 0, 211),Monkey#86893@(112, 0, 212),Monkey#86894@(110, 0, 210),Monkey#86895@(107, 0, 211),Monkey#86896@(107, 0, 211),Monkey#86897@(109, 0, 212),Peacock#86898@(247, 0, 132),Cassowary#86899@(122, 0, 76),Rat#86900@(147, 0, 218),Boomalope#86901@(153, 0, 147),Boomalope#86902@(151, 0, 143),Boomalope#86903@(150, 0, 143),Capybara#86904@(117, 0, 34),Capybara#86905@(120, 0, 37),Capybara#86906@(120, 0, 37),Capybara#86907@(120, 0, 37),Capybara#86908@(120, 0, 37),Capybara#86909@(119, 0, 35),Capybara#86910@(120, 0, 37),Chinchilla#86911@(210, 0, 193),Rat#86912@(240, 0, 180),Rat#86913@(165, 0, 80),Rat#86914@(229, 0, 226),Rhinoceros#86915@(236, 0, 140),Rhinoceros#86916@(238, 0, 139),Rhinoceros#86917@(235, 0, 139),Rhinoceros#86918@(235, 0, 140); rand 000008E2FB25C5A1
+2026-11-19 05:07:25 summary: map0 drafted=0 forbidden=56 plants=[]
+2026-11-19 05:07:25 summary: map0 jobs=[231:GotoWander@(128, 0, 141),234:GotoWander@(131, 0, 139),239:GotoWander@(131, 0, 136)]
+2026-11-19 05:07:25 camera: this client moved its camera 20 times during the run
+2026-11-19 05:07:25 summary: map0 settings=29B89D30A34E3B1A
+2026-11-19 05:07:25 summary: maps=2 player settlements=2 caravans=0
+2026-11-19 05:07:25 summary: absence= offline=[]
+2026-11-19 05:07:25 summary: squads= rejected=0 drafted=[]
+2026-11-19 05:07:25 summary: map0 designations=0 blueprints=0 zones=0; commands sent=1 executed=2 failed=0
+2026-11-19 05:07:25 summary: map1 drafted=0 forbidden=0 plants=[]
+2026-11-19 05:07:25 summary: map1 jobs=[41747:Wait_Wander@(122, 0, 135),41750:GotoWander@(117, 0, 133),41754:GotoWander@(123, 0, 131)]
+2026-11-19 05:07:25 camera: this client moved its camera 20 times during the run
+2026-11-19 05:07:25 summary: map1 settings=D62D5E0F567A1A66
+2026-11-19 05:07:25 summary: maps=2 player settlements=2 caravans=0
+2026-11-19 05:07:25 summary: absence= offline=[]
+2026-11-19 05:07:25 summary: squads= rejected=0 drafted=[]
+2026-11-19 05:07:25 summary: map1 designations=0 blueprints=0 zones=0; commands sent=1 executed=2 failed=0
+2026-11-19 05:07:25 run finished: file=hash-c2-20261119-050710.txt
+2026-11-19 05:07:25 queue: finished
+2026-11-19 05:07:25 lockstep: disconnect: прогон завершён
+2026-11-19 05:07:25 quitting game
+2026-11-19 05:12:37 entry: will connect to 127.0.0.1:53589 in 5 s without a loaded game
+2026-11-19 05:12:42 lockstep: connecting to 127.0.0.1:53589 as 'c2'
+2026-11-19 05:12:42 lockstep: connected to quic:127.0.0.1:53589, Hello sent
+2026-11-19 05:12:42 lockstep: Welcome, playerId=2, serverTick=131858, game=none: requesting world snapshot
+2026-11-19 05:12:43 lockstep: snapshot 9 received, 3589886 bytes; loading
+2026-11-19 05:12:50 regionids: after load room=36 district=48 region=975
+2026-11-19 05:12:51 curtain: view restored — map -1, world view False
+2026-11-19 05:12:51 lockstep: snapshot loaded, tick 131858, serverTick=131858, perMapSim=True
+2026-11-19 05:12:51 colonies diag: me=2, tick=131858, anyOwner=True, lowestOnline=False
+2026-11-19 05:12:51 regionids: run start room=36 district=48 region=975
+2026-11-19 05:12:51 run started: #0, tick=131858, scenario=none, ticks=8000, trace=False, quit=True, file=hash-c2-20261119-051251.txt
+2026-11-19 05:12:52 stasis: map 1 thawed at tick 131880, stasis ticks 113820
+2026-11-19 05:13:19 summary: map0 drafted=0 forbidden=58 plants=[]
+2026-11-19 05:13:19 summary: map0 jobs=[231:Wait_Downed@(161, 0, 158),234:Wait_Wander@(162, 0, 161),239:GotoWander@(163, 0, 160)]
+2026-11-19 05:13:19 summary: map0 settings=29B89D30A34E3B1A
+2026-11-19 05:13:19 summary: maps=2 player settlements=2 caravans=0
+2026-11-19 05:13:19 summary: absence= offline=[]
+2026-11-19 05:13:19 summary: squads= rejected=0 drafted=[]
+2026-11-19 05:13:19 summary: map0 designations=0 blueprints=0 zones=0; commands sent=1 executed=0 failed=0
+2026-11-19 05:13:19 summary: map1 drafted=0 forbidden=0 plants=[]
+2026-11-19 05:13:19 summary: map1 jobs=[41747:GotoWander@(125, 0, 145),41750:GotoWander@(115, 0, 132),41754:GotoWander@(131, 0, 147)]
+2026-11-19 05:13:19 summary: map1 settings=D62D5E0F567A1A66
+2026-11-19 05:13:19 summary: maps=2 player settlements=2 caravans=0
+2026-11-19 05:13:19 summary: absence= offline=[]
+2026-11-19 05:13:19 summary: squads= rejected=0 drafted=[]
+2026-11-19 05:13:19 summary: map1 designations=0 blueprints=0 zones=0; commands sent=1 executed=0 failed=0
+2026-11-19 05:13:19 run finished: file=hash-c2-20261119-051251.txt
+2026-11-19 05:13:19 queue: finished
+2026-11-19 05:13:19 lockstep: disconnect: прогон завершён
+2026-11-19 05:13:19 quitting game

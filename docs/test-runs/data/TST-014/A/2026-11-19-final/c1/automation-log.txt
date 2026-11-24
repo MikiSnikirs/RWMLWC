@@ -1,0 +1,26 @@
+2026-11-19 11:00:10 autoload: loading save 'tst014'
+2026-11-19 11:00:17 lockstep: connecting to 127.0.0.1:50211 as 'c1'
+2026-11-19 11:00:17 regionids: after load room=18 district=24 region=483
+2026-11-19 11:00:18 lockstep: connected to quic:127.0.0.1:50211, Hello sent
+2026-11-19 11:00:19 mapinterface postfix: alive (diag T-076)
+2026-11-19 11:00:19 lockstep: Welcome, playerId=1, serverTick=14998, seed=7
+2026-11-19 11:00:19 presence: player 1 online
+2026-11-19 11:00:19 presence: player 2 online
+2026-11-19 11:00:19 colonies diag: me=1, tick=14998, anyOwner=False, lowestOnline=True
+2026-11-19 11:00:21 watchdog: no tick advance for 300 frames at tick 14998: speed=Paused, paused=True, topWindow=ImmediateWindow, windows=3
+2026-11-19 11:01:19 lockstep: hold is over, requesting speed 3
+2026-11-19 11:01:19 regionids: run start room=18 district=24 region=483
+2026-11-19 11:01:19 run started: #0, tick=14998, scenario=none, ticks=3000, trace=False, quit=True, file=hash-c1-20261119-110119.txt
+2026-11-19 11:01:20 colonies: claim sent (lowest online player)
+2026-11-19 11:01:21 colonies: player 1 is the host, settlements claimed: 1
+2026-11-19 11:01:30 summary: map0 drafted=0 forbidden=56 plants=[]
+2026-11-19 11:01:30 summary: map0 jobs=[231:GotoWander@(128, 0, 141),234:GotoWander@(131, 0, 139),239:GotoWander@(131, 0, 136)]
+2026-11-19 11:01:30 summary: map0 settings=29B89D30A34E3B1A
+2026-11-19 11:01:30 summary: maps=1 player settlements=1 caravans=0
+2026-11-19 11:01:30 summary: absence= offline=[]
+2026-11-19 11:01:30 summary: squads= rejected=0 drafted=[]
+2026-11-19 11:01:30 summary: map0 designations=0 blueprints=0 zones=0; commands sent=1 executed=1 failed=0
+2026-11-19 11:01:30 run finished: file=hash-c1-20261119-110119.txt
+2026-11-19 11:01:30 queue: finished
+2026-11-19 11:01:30 lockstep: disconnect: прогон завершён
+2026-11-19 11:01:30 quitting game

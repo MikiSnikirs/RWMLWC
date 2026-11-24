@@ -63,6 +63,12 @@ public static class TestAutomation
         public bool hostSession;
         /// <summary>Ключ steamhost=auto: из главного меню войти через Steam к другу, который сейчас держит сессию RWMLWC.</summary>
         public bool steamAuto;
+        /// <summary>Ключ bumpids=N (диагностика T-076): сдвиг счётчиков ID комнат/регионов у c2 при загрузке.</summary>
+        public int bumpIds;
+        /// <summary>Ключ breakwall=T (диагностика T-076): на T-м тике прогона все клиенты ломают одну стену (обрушение крыши).</summary>
+        public int breakWallAt;
+        /// <summary>Ключ uiprobe=1: зонд чтения комнат вне тика — только у c1 (имитация рисующего клиента).</summary>
+        public bool uiProbe;
     }
 
     private static Config? activeConfig;
@@ -243,6 +249,33 @@ public static class TestAutomation
                         cfg.traceFrames = frames;
                     }
                     break;
+                case "tracelong":
+                    SessionLongEvents.TraceLong = value == "1";
+                    break;
+                case "bumpids":
+                    if (int.TryParse(value, out int bump) && bump > 0)
+                    {
+                        cfg.bumpIds = bump;
+                    }
+                    break;
+                case "roomdump":
+                    RoomStateProbe.On = value == "1";
+                    break;
+                case "uiprobe":
+                    cfg.uiProbe = value == "1";
+                    break;
+                case "noeqregen":
+                    RoomRecreationDeterminism.EqRegenDisabled = value == "1";
+                    break;
+                case "noroofiso":
+                    RoofCountIsolation.Disabled = value == "1";
+                    break;
+                case "breakwall":
+                    if (int.TryParse(value, out int bw) && bw > 0)
+                    {
+                        cfg.breakWallAt = bw;
+                    }
+                    break;
                 case "trace":
                     cfg.trace = value != "0";
                     break;
@@ -266,6 +299,9 @@ public static class TestAutomation
             }
         }
         TicksPerFrameCap = cfg.armed ? cfg.ticksPerFrame : 0;
+        // T-076: UI-зонд асимметричен — только c1 имитирует рисующий клиент. Настоящий баг:
+        // комнаты из кадра читает только тот клиент, который рисует карту; у второго кэш иной.
+        RoofCountIsolation.UiProbe = cfg.uiProbe && cfg.playerName == "c1";
         if (cfg.queue != null)
         {
             cfg.queueIndex = ReadProgress();
@@ -306,6 +342,7 @@ public static class TestAutomation
             Find.TickManager.CurTimeSpeed = TimeSpeed.Superfast;
         }
         activeConfig = cfg;
+        Note("regionids: run start " + DeterministicRegionIds.Digest());
         sessionSteps.Clear();
         stepGates.Clear();
         cameraHeld = false;
@@ -414,6 +451,20 @@ public static class TestAutomation
                 RWMLWC.Client.SessionView.SessionUi.ChooseColor(RWMLWC.Client.Maps.Squads.Palette[index]);
                 Find.WindowStack.TryRemove(typeof(RWMLWC.Client.SessionView.Dialog_ChooseColor));
                 Note($"color: chose {RWMLWC.Client.Maps.Squads.Palette[index]:X6} at tick {Find.TickManager.TicksGame}");
+            }));
+        }
+        if (cfg.issuer && cfg.scenario == "settle")
+        {
+            // T-073: путь игрока целиком, командами: караван → маршрут на подходящую соседнюю клетку → основать поселение.
+            sessionSteps.Enqueue((startTick + 300, "settle: form caravan", SettleFormCaravan));
+            stepGates["settle: route"] = () => PlayerCaravan() != null;
+            sessionSteps.Enqueue((startTick + 600, "settle: route", SettleRoute));
+            stepGates["settle: settle"] = () => PlayerCaravan() is RimWorld.Planet.Caravan c && settleTarget.Valid && c.Tile == settleTarget && !c.pather.Moving;
+            sessionSteps.Enqueue((startTick + 900, "settle: settle", () =>
+            {
+                RimWorld.Planet.Caravan c = PlayerCaravan()!;
+                RimWorld.Planet.SettleInEmptyTileUtility.Settle(c);
+                Note($"settle: settle pressed at tile {c.Tile.tileId}");
             }));
         }
         if (cfg.scenario == "cursors")
@@ -580,6 +631,12 @@ public static class TestAutomation
                 case "absence-raid":
                     ScenarioAbsenceRaid();
                     break;
+                case "settle-adjacent":
+                    ScenarioSettle(adjacent: true);
+                    break;
+                case "settle-valid":
+                    ScenarioSettle(adjacent: false);
+                    break;
                 case "ui":
                 case "access":
                 case "tabs":
@@ -588,6 +645,7 @@ public static class TestAutomation
                 case "gizmo":
                 case "rightclick":
                 case "squads":
+                case "settle":
                 case "cursors":
                 case "color":
                     break; // срабатывают позже, из кадра (SessionFrame): приказы идут как ввод игрока
@@ -1321,6 +1379,9 @@ public static class TestAutomation
                 Note($"camera: this client moved its camera {cameraJumps} times during the run");
             }
             Note($"summary: map{map.uniqueID} settings={SettingsDigest(map)}");
+            RimWorld.Planet.Caravan? car = PlayerCaravan();
+            Note($"summary: maps={Find.Maps.Count} player settlements={Find.WorldObjects.Settlements.Count(s => s.Faction == Faction.OfPlayer)} caravans={Find.WorldObjects.Caravans.Count(c => c.Faction == Faction.OfPlayer)}"
+                + (car != null ? $" caravan at {car.Tile.tileId} moving={car.pather.Moving} dest={car.pather.Destination.tileId}" : ""));
             Note("summary: absence=" + (RWMLWC.Client.Maps.AbsenceModes.Component?.Digest() ?? "-") + " offline=[" + (RWMLWC.Client.Maps.PlayerPresence.Component?.Digest() ?? "-") + "]");
             Note("summary: squads=" + (RWMLWC.Client.Maps.Squads.Component?.Digest() ?? "-") + " rejected=" + RWMLWC.Client.Maps.SquadRules.Rejected
                 + " drafted=[" + string.Join(",", map.mapPawns.FreeColonistsSpawned.Where(p => p.Drafted).Select(p => p.thingIDNumber).OrderBy(i => i)) + "]");
@@ -1383,6 +1444,10 @@ public static class TestAutomation
     public static void BeforeTickDuringRun(HashRecorder recorder, int elapsedTicks)
     {
         Config? cfg = activeConfig;
+        if (cfg != null && cfg.breakWallAt > 0 && elapsedTicks == cfg.breakWallAt && Find.Maps.Count > 0)
+        {
+            BreakWallForProbe(Find.Maps[0]);
+        }
         if (cfg == null || snapshotDone || elapsedTicks != cfg.snapAt)
         {
             return;
@@ -1410,6 +1475,29 @@ public static class TestAutomation
             Note("snapshot FAILED: " + ex);
             Log.Error("[RWMLWC] снимок не удался: " + ex);
         }
+    }
+
+    /// <summary>
+    /// Диагностика T-076 (ключ breakwall=T): детерминированный снос стены — все клиенты на одном
+    /// тике прогона ломают первую по номеру стену игрока, держащую крышу. Обрушение крыши в тике
+    /// теряется уведомление о сбросе кэша района (регион ещё невалиден) — механизм расхождения.
+    /// </summary>
+    private static void BreakWallForProbe(Map map)
+    {
+        Thing? wall = map.listerThings.AllThings
+            .Where(t => t.Faction == Faction.OfPlayer && t.def.holdsRoof && t.def.category == ThingCategory.Building && !t.Destroyed)
+            .OrderBy(t => t.thingIDNumber)
+            .FirstOrDefault();
+        if (wall == null)
+        {
+            Note("breakwall: no roof holder found");
+            return;
+        }
+        string def = wall.def.defName;
+        int id = wall.thingIDNumber;
+        IntVec3 pos = wall.Position;
+        wall.Destroy();
+        Note($"breakwall: destroyed {def} #{id} at {pos} (T-076 roof collapse probe)");
     }
 
     // --- вход без мира (T-045): подключение из главного меню ---
@@ -1542,6 +1630,37 @@ public static class TestAutomation
         {
             Find.TickManager.CurTimeSpeed = TimeSpeed.Superfast;
         }
+        WatchFreeze();
+    }
+
+    private static int watchTick = -1;
+    private static int watchStill;
+    private static bool watchNoteWritten;
+
+    /// <summary>Сторож заморозки (T-076): тики не идут 300 кадров подряд — записать состояние.</summary>
+    private static void WatchFreeze()
+    {
+        if (!automationActive || Current.Game == null || !LockstepClient.InSession)
+        {
+            return;
+        }
+        int t = Find.TickManager.TicksGame;
+        if (t == watchTick)
+        {
+            watchStill++;
+        }
+        else
+        {
+            watchStill = 0;
+            watchTick = t;
+            watchNoteWritten = false;
+        }
+        if (watchStill == 300 && !watchNoteWritten)
+        {
+            watchNoteWritten = true;
+            string top = Find.WindowStack.Windows.Count > 0 ? Find.WindowStack.Windows[Find.WindowStack.Windows.Count - 1].GetType().Name : "-";
+            Note($"watchdog: no tick advance for 300 frames at tick {t}: speed={Find.TickManager.CurTimeSpeed}, paused={Find.TickManager.Paused}, topWindow={top}, windows={Find.WindowStack.Windows.Count}");
+        }
     }
 
     // Вражеский рейд на первую карту: бой, генерация пешек, выстрелы.
@@ -1566,6 +1685,73 @@ public static class TestAutomation
         Note("absence-raid: offline owner, quest-style raid executed=" + FireRaidDirect(map));
         RWMLWC.Client.Maps.PlayerPresence.Component?.Apply(7, true);
         Note("absence-raid: owner back, raid fired=" + FireRaidViaStoryteller(map));
+    }
+
+    // T-073: «основать поселение» караваном из одного колониста — на соседней с колонией клетке (как самопроверка B)
+    // или на клетке, которую игра считает подходящей для поселения. Без сервера — поведение самой игры.
+    private static void ScenarioSettle(bool adjacent)
+    {
+        Map home = Find.Maps[0];
+        Pawn? pawn = home.mapPawns.FreeColonistsSpawned.OrderBy(p => p.thingIDNumber).FirstOrDefault();
+        if (pawn == null)
+        {
+            Note("settle: no colonist");
+            return;
+        }
+        RimWorld.Planet.PlanetTile tile = RimWorld.Planet.PlanetTile.Invalid;
+        if (adjacent)
+        {
+            List<RimWorld.Planet.PlanetTile> neighbors = new List<RimWorld.Planet.PlanetTile>();
+            Find.WorldGrid.GetTileNeighbors(home.Tile, neighbors);
+            tile = neighbors.OrderBy(t => t.tileId).FirstOrDefault(t => !Find.WorldObjects.AnyWorldObjectAt(t));
+        }
+        else
+        {
+            tile = RimWorld.Planet.TileFinder.RandomSettlementTileFor(Faction.OfPlayer);
+        }
+        string valid = tile.Valid ? RimWorld.Planet.TileFinder.IsValidTileForNewSettlement(tile).ToString() : "-";
+        pawn.DeSpawn();
+        RimWorld.Planet.Caravan caravan = RimWorld.Planet.CaravanMaker.MakeCaravan(new[] { pawn }, Faction.OfPlayer, tile, true);
+        Note($"settle: caravan {caravan.ID} at tile {tile.tileId}, valid for settlement={valid}, adjacent={adjacent}");
+        RimWorld.Planet.SettleInEmptyTileUtility.Settle(caravan);
+        LongEventHandler.ExecuteWhenFinished(() =>
+            Note($"settle: after long events: maps {Find.Maps.Count}, player settlements {Find.WorldObjects.Settlements.Count(s => s.Faction == Faction.OfPlayer)}, caravan alive={Find.WorldObjects.Caravans.Contains(caravan)}"));
+    }
+
+    private static RimWorld.Planet.PlanetTile settleTarget = RimWorld.Planet.PlanetTile.Invalid;
+
+    private static RimWorld.Planet.Caravan? PlayerCaravan() =>
+        Find.WorldObjects.Caravans.Where(c => c.Faction == Faction.OfPlayer).OrderBy(c => c.ID).FirstOrDefault();
+
+    private static void SettleFormCaravan()
+    {
+        Map map = Find.Maps[0];
+        Pawn? pawn = map.mapPawns.FreeColonistsSpawned.OrderBy(p => p.thingIDNumber).FirstOrDefault();
+        if (pawn == null || !RCellFinder.TryFindClosestEdgeCellTo(pawn.Position, map, out IntVec3 exit))
+        {
+            Note("settle: no colonist or exit spot");
+            return;
+        }
+        TransferableOneWay t = new TransferableOneWay();
+        t.things.Add(pawn);
+        t.AdjustTo(1);
+        CaravanFormingUtility.StartFormingCaravan(new List<Pawn> { pawn }, new List<Pawn>(), Faction.OfPlayer, new List<TransferableOneWay> { t },
+            pawn.Position, exit, map.Tile, RimWorld.Planet.PlanetTile.Invalid);
+        Note($"settle: form caravan with {pawn.LabelShort}, sent={LockstepClient.PlayerCommandsSent}");
+    }
+
+    private static void SettleRoute()
+    {
+        RimWorld.Planet.Caravan c = PlayerCaravan()!;
+        // Поселения нельзя ставить вплотную к колонии: ближайшая подходящая клетка в 4–8 переходах.
+        if (!RimWorld.Planet.TileFinder.TryFindPassableTileWithTraversalDistance(c.Tile, 4, 8, out settleTarget,
+                x => RimWorld.Planet.TileFinder.IsValidTileForNewSettlement(x)))
+        {
+            Note("settle: no valid tile within 8 steps");
+            return;
+        }
+        c.pather.StartPath(settleTarget, null, true);
+        Note($"settle: route caravan {c.ID} to tile {settleTarget.tileId}");
     }
 
     private static bool FireRaidDirect(Map map)
@@ -1631,6 +1817,12 @@ public static class TestAutomationBoot
         try
         {
             TestAutomation.Config cfg = TestAutomation.Read();
+            if (cfg.bumpIds > 0 && cfg.playerName == "c2")
+            {
+                // Диагностика T-076: только у c2, чтобы ID комнат разошлись с c1 с первой загрузки.
+                DeterministicRegionIds.TestBump = cfg.bumpIds;
+                TestAutomation.Note("regionids: test bump " + cfg.bumpIds + " enabled for this client");
+            }
             if (cfg.armed && cfg.save == null && (cfg.serverHost != null || cfg.steamAuto))
             {
                 TestAutomation.ScheduleEntryConnect(cfg);

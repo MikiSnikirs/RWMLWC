@@ -361,15 +361,17 @@ internal static class Patch_PlaySettings_SessionButton
 [HarmonyPatch(typeof(MapInterface), nameof(MapInterface.MapInterfaceOnGUI_AfterMainTabs))]
 internal static class Patch_MapInterface_SessionStatus
 {
+    private static bool _aliveNote;
+
     private static void Postfix()
     {
-        ChatSelfTest.Frame();
-        RWMLWC.Client.Absence.IdleAlarm.Frame();
-        RWMLWC.Client.Net.Reconnect.Frame();
-        RWMLWC.Client.World.CaravanSelfTest.Frame();
-        RWMLWC.Client.World.ColonyChoice.Frame();
-        RWMLWC.Client.Input.SharedWindows.Frame();
-        RWMLWC.Client.Net.NetworkGameMenu.Frame();
+        if (!_aliveNote)
+        {
+            _aliveNote = true;
+            RWMLWC.Client.Sim.TestAutomation.Note("mapinterface postfix: alive (diag T-076)");
+        }
+        // Кадровые хуки сессии перенесены в SessionFrameHooks (GameComponentUpdate):
+        // они не должны зависеть от отрисовки интерфейса карты (T-076, заморозка и тихие окна).
         StasisBanner.OnGUI();
         StatusLineView.OnGUI();
     }

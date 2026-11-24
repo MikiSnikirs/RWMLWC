@@ -57,6 +57,15 @@ public static class RandTracer
         active = true;
     }
 
+    /// <summary>Писать вызовы Rand с этого момента до <see cref="Stop"/> (долгое событие в сессии, ключ tracelong).</summary>
+    public static void StartNow(string path)
+    {
+        Start(path, -1, int.MaxValue);
+        currentTick = Find.TickManager.TicksGame;
+    }
+
+    public static bool Running => active;
+
     public static void Stop()
     {
         if (!active && buffer.Length == 0)

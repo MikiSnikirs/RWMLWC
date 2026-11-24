@@ -1,0 +1,47 @@
+2026-11-19 10:51:20 autoload: loading save 'tst014'
+2026-11-19 10:51:27 lockstep: connecting to 127.0.0.1:57464 as 'c1'
+2026-11-19 10:51:27 regionids: after load room=18 district=24 region=483
+2026-11-19 10:51:28 lockstep: connected to quic:127.0.0.1:57464, Hello sent
+2026-11-19 10:51:29 mapinterface postfix: alive (diag T-076)
+2026-11-19 10:51:29 lockstep: Welcome, playerId=1, serverTick=14998, seed=7
+2026-11-19 10:51:29 presence: player 1 online
+2026-11-19 10:51:29 presence: player 2 online
+2026-11-19 10:51:29 colonies diag: me=1, tick=14998, anyOwner=False, lowestOnline=True
+2026-11-19 10:51:31 watchdog: no tick advance for 300 frames at tick 14998: speed=Paused, paused=True, topWindow=ImmediateWindow, windows=3
+2026-11-19 10:52:29 lockstep: hold is over, requesting speed 3
+2026-11-19 10:52:29 regionids: run start room=18 district=24 region=483
+2026-11-19 10:52:29 run started: #0, tick=14998, scenario=raid, ticks=12000, trace=False, quit=True, file=hash-c1-20261119-105229.txt
+2026-11-19 10:52:29 scenario raid: executed=True, faction=Полмм
+2026-11-19 10:52:30 colonies: claim sent (lowest online player)
+2026-11-19 10:52:32 colonies: player 1 is the host, settlements claimed: 1
+2026-11-19 10:52:40 breakwall: no roof holder found
+2026-11-19 10:52:46 threats: map 0 adaptation 0.0 → -6.0 (Downed, Ross)
+2026-11-19 10:52:46 threats: map 0 adaptation -6.0 → -12.0 (Downed, Oleg)
+2026-11-19 10:52:47 threats: map 0 adaptation -12.0 → -42.0 (Died, Ross)
+2026-11-19 10:52:48 threats: map 0 adaptation -42.0 → -48.0 (Downed, Rika)
+2026-11-19 10:52:51 lockstep: notice 3: карта 0 тик 21960: игрок 1 ≠ игрок 2
+2026-11-19 10:52:51 lockstep: desync reported, the server orders a common snapshot
+2026-11-19 10:52:51 roomdump: written 30 snapshots
+2026-11-19 10:52:51 snapshot: SaveGame start (RWMLWC-snapshot-out)
+2026-11-19 10:52:52 snapshot: SaveGame done in 850 ms
+2026-11-19 10:52:52 lockstep: snapshot for player 0 at tick 21967: raw=16153442 bytes, packed=2622780 bytes (16.2%), save=851 ms, pack=17 ms, 14 chunks sent; reloading it here too
+2026-11-19 10:52:52 curtain: shown (Синхронизация мира…), map 0, world view False
+2026-11-19 10:52:53 regionids: reset at load, bump=0
+2026-11-19 10:52:56 regionids: after load room=18 district=24 region=483
+2026-11-19 10:52:57 curtain: view restored — map 0, world view False
+2026-11-19 10:52:57 lockstep: snapshot loaded, tick 21967, serverTick=21978, perMapSim=True
+2026-11-19 10:52:57 resumed after snapshot reload at tick 21967, perMapSim=True
+2026-11-19 10:52:58 watchdog: no tick advance for 300 frames at tick 21978: speed=Paused, paused=True, topWindow=ImmediateWindow, windows=4
+2026-11-19 10:53:57 lockstep: hold is over, requesting speed 3
+2026-11-19 10:54:00 threats: map 0 adaptation -48.0 → -60.0 (Kidnapped, Rika)
+2026-11-19 10:54:11 summary: map0 drafted=0 forbidden=60 plants=[]
+2026-11-19 10:54:11 summary: map0 jobs=[234:Wait_Downed@(133, 0, 155),41794:GotoWander@(92, 0, 124)]
+2026-11-19 10:54:11 summary: map0 settings=3BBE8EE84EF5819F
+2026-11-19 10:54:11 summary: maps=1 player settlements=1 caravans=0
+2026-11-19 10:54:11 summary: absence= offline=[]
+2026-11-19 10:54:11 summary: squads= rejected=0 drafted=[]
+2026-11-19 10:54:11 summary: map0 designations=0 blueprints=0 zones=0; commands sent=1 executed=1 failed=0
+2026-11-19 10:54:11 run finished: file=hash-c1-20261119-105229.txt
+2026-11-19 10:54:11 queue: finished
+2026-11-19 10:54:11 lockstep: disconnect: прогон завершён
+2026-11-19 10:54:11 quitting game

@@ -1,0 +1,11 @@
+2026-11-19 04:14:36 autoload: loading save 'tst014'
+2026-11-19 04:14:43 lockstep: connecting to 127.0.0.1:58759 as 'c1'
+2026-11-19 04:14:43 regionids: after load room=18 district=24 region=483
+2026-11-19 04:14:44 lockstep: connected to quic:127.0.0.1:58759, Hello sent
+2026-11-19 04:14:44 lockstep: Welcome, playerId=2, serverTick=14998, seed=7
+2026-11-19 04:14:44 presence: player 2 online
+2026-11-19 04:15:44 lockstep: hold is over, requesting speed 3
+2026-11-19 04:15:44 regionids: run start room=18 district=24 region=483
+2026-11-19 04:15:44 run started: #0, tick=14998, scenario=none, ticks=400000, trace=False, quit=True, file=hash-c1-20261119-041544.txt
+2026-11-19 04:15:55 presence: player 1 offline
+2026-11-19 04:15:56 lockstep: autosave #4 at tick 18005: raw=15756952 bytes, packed=2597590 bytes (16.5%), save=810 ms, pack=15 ms, 13 chunks sent to the server

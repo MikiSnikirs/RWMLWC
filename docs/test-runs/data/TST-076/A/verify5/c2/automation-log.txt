@@ -1,0 +1,73 @@
+2026-11-19 10:19:24 autoload: loading save 'tst014'
+2026-11-19 10:19:31 lockstep: connecting to 127.0.0.1:53728 as 'c2'
+2026-11-19 10:19:31 regionids: after load room=18 district=24 region=483
+2026-11-19 10:19:33 lockstep: connected to quic:127.0.0.1:53728, Hello sent
+2026-11-19 10:19:33 mapinterface postfix: alive (diag T-076)
+2026-11-19 10:19:33 lockstep: Welcome, playerId=2, serverTick=14998, seed=7
+2026-11-19 10:19:33 presence: player 2 online
+2026-11-19 10:19:33 colonies diag: me=2, tick=14998, anyOwner=False, lowestOnline=False
+2026-11-19 10:19:35 watchdog: no tick advance for 300 frames at tick 14998: speed=Paused, paused=True, topWindow=ImmediateWindow, windows=3
+2026-11-19 10:20:33 lockstep: hold is over, requesting speed 3
+2026-11-19 10:20:33 regionids: run start room=18 district=24 region=483
+2026-11-19 10:20:33 run started: #0, tick=14998, scenario=none, ticks=3000, trace=False, quit=True, file=hash-c2-20261119-102033.txt
+2026-11-19 10:20:36 colonies: player 1 is the host, settlements claimed: 1
+2026-11-19 10:20:36 colonies: auto choice — new colony at 51715,0
+2026-11-19 10:20:37 colonies: new colony for player 2 at 51715,0: 3 colonists, 10 item stacks
+2026-11-19 10:20:37 colonies: settlement 253 belongs to player 2
+2026-11-19 10:20:37 long event 'GeneratingMap' start, maps 1
+2026-11-19 10:20:40 long event 'GeneratingMap' done, maps 2
+2026-11-19 10:20:40 map 1 after 'GeneratingMap': Pawn=12,Item=1041,Building=6723,Plant=3907,Filth=3931,Ethereal=3; pawns Mech_Militor#46923@(24, 0, 117),Human#47945@(-1000, -1000, -1000),Mech_Pikeman#47955@(197, 0, 215),Boomrat#59216@(218, 0, 45),Raccoon#59217@(186, 0, 123),Rat#59218@(190, 0, 195),Rat#59219@(1, 0, 246),Rat#59220@(60, 0, 249),Boomalope#59221@(97, 0, 193),Boomalope#59222@(94, 0, 193),Boomalope#59223@(95, 0, 198),Boomalope#59224@(96, 0, 193),Boomalope#59225@(93, 0, 197); rand 0000081EFB25C5A1
+2026-11-19 10:20:41 long event 'SpawningColonists' start, maps 2
+2026-11-19 10:20:41 long event 'SpawningColonists' done, maps 2
+2026-11-19 10:20:41 map 1 after 'SpawningColonists': Pawn=16,Item=1058,Building=6723,Plant=3907,Filth=3931,Ethereal=3; pawns Human#41747@(135, 0, 114),Human#41750@(131, 0, 114),Human#41754@(133, 0, 115),Cat#41767@(132, 0, 116),Mech_Militor#46923@(24, 0, 117),Human#47945@(-1000, -1000, -1000),Mech_Pikeman#47955@(197, 0, 215),Boomrat#59216@(218, 0, 45),Raccoon#59217@(186, 0, 123),Rat#59218@(190, 0, 195),Rat#59219@(1, 0, 246),Rat#59220@(60, 0, 249),Boomalope#59221@(97, 0, 193),Boomalope#59222@(94, 0, 193),Boomalope#59223@(95, 0, 198),Boomalope#59224@(96, 0, 193),Boomalope#59225@(93, 0, 197); rand 000008D3FB25C5A1
+2026-11-19 10:20:48 summary: map0 drafted=0 forbidden=56 plants=[]
+2026-11-19 10:20:48 summary: map0 jobs=[231:GotoWander@(128, 0, 141),234:GotoWander@(131, 0, 139),239:GotoWander@(131, 0, 136)]
+2026-11-19 10:20:48 camera: this client moved its camera 20 times during the run
+2026-11-19 10:20:48 summary: map0 settings=29B89D30A34E3B1A
+2026-11-19 10:20:48 summary: maps=2 player settlements=2 caravans=0
+2026-11-19 10:20:48 summary: absence= offline=[]
+2026-11-19 10:20:48 summary: squads= rejected=0 drafted=[]
+2026-11-19 10:20:48 summary: map0 designations=0 blueprints=0 zones=0; commands sent=1 executed=2 failed=0
+2026-11-19 10:20:48 summary: map1 drafted=0 forbidden=10 plants=[]
+2026-11-19 10:20:48 summary: map1 jobs=[41747:Wait_Wander@(125, 0, 111),41750:GotoWander@(121, 0, 109),41754:GotoWander@(116, 0, 113)]
+2026-11-19 10:20:48 camera: this client moved its camera 20 times during the run
+2026-11-19 10:20:48 summary: map1 settings=D62D5E0F567A1A66
+2026-11-19 10:20:48 summary: maps=2 player settlements=2 caravans=0
+2026-11-19 10:20:48 summary: absence= offline=[]
+2026-11-19 10:20:48 summary: squads= rejected=0 drafted=[]
+2026-11-19 10:20:48 summary: map1 designations=0 blueprints=0 zones=0; commands sent=1 executed=2 failed=0
+2026-11-19 10:20:48 run finished: file=hash-c2-20261119-102033.txt
+2026-11-19 10:20:48 queue: finished
+2026-11-19 10:20:48 lockstep: disconnect: прогон завершён
+2026-11-19 10:20:48 quitting game
+2026-11-19 10:26:03 entry: will connect to 127.0.0.1:53728 in 5 s without a loaded game
+2026-11-19 10:26:08 lockstep: connecting to 127.0.0.1:53728 as 'c2'
+2026-11-19 10:26:08 lockstep: connected to quic:127.0.0.1:53728, Hello sent
+2026-11-19 10:26:08 lockstep: Welcome, playerId=2, serverTick=132756, game=none: requesting world snapshot
+2026-11-19 10:26:08 lockstep: snapshot 9 received, 2971653 bytes; loading
+2026-11-19 10:26:15 regionids: after load room=331 district=381 region=1475
+2026-11-19 10:26:17 curtain: view restored — map -1, world view False
+2026-11-19 10:26:17 lockstep: snapshot loaded, tick 132756, serverTick=132756, perMapSim=True
+2026-11-19 10:26:18 colonies diag: me=2, tick=132756, anyOwner=True, lowestOnline=False
+2026-11-19 10:26:18 mapinterface postfix: alive (diag T-076)
+2026-11-19 10:26:18 regionids: run start room=331 district=381 region=1475
+2026-11-19 10:26:18 run started: #0, tick=132756, scenario=none, ticks=8000, trace=False, quit=True, file=hash-c2-20261119-102618.txt
+2026-11-19 10:26:19 stasis: map 1 thawed at tick 132780, stasis ticks 114720
+2026-11-19 10:26:45 summary: map0 drafted=0 forbidden=55 plants=[]
+2026-11-19 10:26:45 summary: map0 jobs=[231:GotoWander@(174, 0, 131),234:GotoWander@(169, 0, 151),239:GotoWander@(180, 0, 149)]
+2026-11-19 10:26:45 summary: map0 settings=29B89D30A34E3B1A
+2026-11-19 10:26:45 summary: maps=2 player settlements=2 caravans=0
+2026-11-19 10:26:45 summary: absence= offline=[]
+2026-11-19 10:26:45 summary: squads= rejected=0 drafted=[]
+2026-11-19 10:26:45 summary: map0 designations=0 blueprints=0 zones=0; commands sent=1 executed=0 failed=0
+2026-11-19 10:26:45 summary: map1 drafted=0 forbidden=10 plants=[]
+2026-11-19 10:26:45 summary: map1 jobs=[41747:GotoWander@(142, 0, 112),41750:Wait_Wander@(142, 0, 99),41754:GotoWander@(144, 0, 112)]
+2026-11-19 10:26:45 summary: map1 settings=D62D5E0F567A1A66
+2026-11-19 10:26:45 summary: maps=2 player settlements=2 caravans=0
+2026-11-19 10:26:45 summary: absence= offline=[]
+2026-11-19 10:26:45 summary: squads= rejected=0 drafted=[]
+2026-11-19 10:26:45 summary: map1 designations=0 blueprints=0 zones=0; commands sent=1 executed=0 failed=0
+2026-11-19 10:26:45 run finished: file=hash-c2-20261119-102618.txt
+2026-11-19 10:26:45 queue: finished
+2026-11-19 10:26:45 lockstep: disconnect: прогон завершён
+2026-11-19 10:26:45 quitting game

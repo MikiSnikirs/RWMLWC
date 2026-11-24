@@ -256,7 +256,9 @@ public sealed class HashRecorder : GameComponent
         }
         int tick = Find.TickManager.TicksGame;
         int elapsed = tick - startTick;
-        if ((elapsed >= denseFrom && elapsed <= denseTo) || elapsed % Interval == 0)
+        // Замеры по абсолютным тикам: сетки клиентов совпадают даже когда прогоны начались
+        // в разные тики (вход в сессию, возвращение после отсутствия) — сервер может сравнивать.
+        if ((elapsed >= denseFrom && elapsed <= denseTo) || tick % Interval == 0)
         {
             WriteSample();
         }
@@ -288,10 +290,13 @@ public sealed class HashRecorder : GameComponent
         }
     }
 
+    private static readonly HarmonyLib.AccessTools.FieldRef<RimWorld.UniqueIDsManager, int> NextThingId =
+        HarmonyLib.AccessTools.FieldRefAccess<RimWorld.UniqueIDsManager, int>("nextThingID");
+
     private void WriteSample()
     {
         int tick = Find.TickManager.TicksGame;
-        buffer.AppendLine($"{tick};global;rand={MapRandContext.GlobalState:X16}");
+        buffer.AppendLine($"{tick};global;rand={MapRandContext.GlobalState:X16};ids={NextThingId(Find.UniqueIDsManager)}");
         List<Map> maps = Find.Maps;
         for (int i = 0; i < maps.Count; i++)
         {

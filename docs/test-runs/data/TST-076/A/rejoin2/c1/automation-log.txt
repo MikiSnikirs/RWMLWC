@@ -1,0 +1,35 @@
+2026-11-19 04:06:09 autoload: loading save 'tst014'
+2026-11-19 04:06:15 lockstep: connecting to 127.0.0.1:56644 as 'c1'
+2026-11-19 04:06:15 regionids: after load room=18 district=24 region=483
+2026-11-19 04:06:17 lockstep: connected to quic:127.0.0.1:56644, Hello sent
+2026-11-19 04:06:17 lockstep: Welcome, playerId=2, serverTick=14998, seed=7
+2026-11-19 04:06:17 presence: player 2 online
+2026-11-19 04:07:17 lockstep: hold is over, requesting speed 3
+2026-11-19 04:07:17 regionids: run start room=18 district=24 region=483
+2026-11-19 04:07:17 run started: #0, tick=14998, scenario=none, ticks=200000, trace=False, quit=True, file=hash-c1-20261119-040717.txt
+2026-11-19 04:07:20 colonies: player 1 is the host, settlements claimed: 1
+2026-11-19 04:07:20 colonies: auto choice — new colony at 205156,0
+2026-11-19 04:07:21 colonies: new colony for player 2 at 205156,0: 3 colonists, 10 item stacks
+2026-11-19 04:07:21 colonies: settlement 253 belongs to player 2
+2026-11-19 04:07:21 long event 'GeneratingMap' start, maps 1
+2026-11-19 04:07:23 long event 'GeneratingMap' done, maps 2
+2026-11-19 04:07:23 map 1 after 'GeneratingMap': Pawn=41,Item=1106,Building=2232,Plant=12960,Filth=3035,Ethereal=2; pawns Human#43941@(-1000, -1000, -1000),Human#43950@(-1000, -1000, -1000),Human#43961@(-1000, -1000, -1000),Cougar#62446@(0, 0, 34),Turkey#62447@(167, 0, 180),Rat#62448@(166, 0, 31),Rat#62449@(36, 0, 234),Warg#62450@(191, 0, 233),Turkey#62451@(56, 0, 68),Moose#62452@(11, 0, 21),Turkey#62453@(152, 0, 194),WildBoar#62454@(38, 0, 108),WildBoar#62455@(40, 0, 110),WildBoar#62456@(38, 0, 107),WildBoar#62457@(40, 0, 109),WildBoar#62458@(39, 0, 108),WildBoar#62459@(40, 0, 109),WildBoar#62460@(41, 0, 108),Hare#62461@(83, 0, 64),Hare#62462@(67, 0, 66),Squirrel#62463@(16, 0, 11),Turkey#62464@(185, 0, 173),Hare#62465@(40, 0, 9),Hare#62466@(71, 0, 131),Ibex#62467@(224, 0, 140),Ibex#62468@(224, 0, 140),Turkey#62469@(95, 0, 149),Ibex#62470@(185, 0, 229),Mink#62471@(95, 0, 179),Fox_Arctic#62472@(165, 0, 60),Badger#62473@(178, 0, 12),Rat#62474@(75, 0, 236),Squirrel#62475@(84, 0, 214),Caribou#62476@(120, 0, 213),Caribou#62477@(120, 0, 213),Caribou#62478@(120, 0, 211),Caribou#62479@(121, 0, 215),Caribou#62480@(120, 0, 215),Caribou#62481@(120, 0, 215),Caribou#62482@(117, 0, 213),Caribou#62483@(120, 0, 212),Caribou#62484@(121, 0, 215); rand 0000081EFB25C5A1
+2026-11-19 04:07:24 long event 'SpawningColonists' start, maps 2
+2026-11-19 04:07:24 long event 'SpawningColonists' done, maps 2
+2026-11-19 04:07:24 map 1 after 'SpawningColonists': Pawn=45,Item=1123,Building=2232,Plant=12960,Filth=3035,Ethereal=2; pawns Human#41747@(135, 0, 114),Human#41750@(131, 0, 114),Human#41754@(133, 0, 112),Cat#41767@(133, 0, 116),Human#43941@(-1000, -1000, -1000),Human#43950@(-1000, -1000, -1000),Human#43961@(-1000, -1000, -1000),Cougar#62446@(0, 0, 34),Turkey#62447@(167, 0, 180),Rat#62448@(166, 0, 31),Rat#62449@(36, 0, 234),Warg#62450@(191, 0, 233),Turkey#62451@(56, 0, 68),Moose#62452@(11, 0, 21),Turkey#62453@(152, 0, 194),WildBoar#62454@(38, 0, 108),WildBoar#62455@(40, 0, 110),WildBoar#62456@(38, 0, 107),WildBoar#62457@(40, 0, 109),WildBoar#62458@(39, 0, 108),WildBoar#62459@(40, 0, 109),WildBoar#62460@(41, 0, 108),Hare#62461@(83, 0, 64),Hare#62462@(67, 0, 66),Squirrel#62463@(16, 0, 11),Turkey#62464@(185, 0, 173),Hare#62465@(40, 0, 9),Hare#62466@(71, 0, 131),Ibex#62467@(224, 0, 140),Ibex#62468@(224, 0, 140),Turkey#62469@(95, 0, 149),Ibex#62470@(185, 0, 229),Mink#62471@(95, 0, 179),Fox_Arctic#62472@(165, 0, 60),Badger#62473@(178, 0, 12),Rat#62474@(75, 0, 236),Squirrel#62475@(84, 0, 214),Caribou#62476@(120, 0, 213),Caribou#62477@(120, 0, 213),Caribou#62478@(120, 0, 211),Caribou#62479@(121, 0, 215),Caribou#62480@(120, 0, 215),Caribou#62481@(120, 0, 215),Caribou#62482@(117, 0, 213),Caribou#62483@(120, 0, 212),Caribou#62484@(121, 0, 215); rand 00000977FB25C5A1
+2026-11-19 04:07:31 presence: player 1 offline
+2026-11-19 04:07:32 lockstep: autosave #6 at tick 18013: raw=23025556 bytes, packed=3004808 bytes (13.0%), save=1021 ms, pack=20 ms, 16 chunks sent to the server
+2026-11-19 04:07:32 stasis: map 0 frozen at tick 18060, stasis ticks 0
+2026-11-19 04:09:48 presence: player 1 online
+2026-11-19 04:09:49 lockstep: snapshot for player 1 at tick 67188: raw=23480252 bytes, packed=3056122 bytes (13.0%), save=467 ms, pack=20 ms, 16 chunks sent; reloading it here too
+2026-11-19 04:09:49 curtain: shown (c2 подключается — синхронизация мира…), map 1, world view False
+2026-11-19 04:09:49 regionids: reset at load, bump=0
+2026-11-19 04:09:52 regionids: after load room=40 district=51 region=976
+2026-11-19 04:09:52 curtain: view restored — map 1, world view False
+2026-11-19 04:09:52 lockstep: snapshot loaded, tick 67188, serverTick=67188, perMapSim=True
+2026-11-19 04:10:52 lockstep: hold is over, requesting speed 3
+2026-11-19 04:10:52 resumed after snapshot reload at tick 67188, perMapSim=True
+2026-11-19 04:10:52 stasis: map 0 thawed at tick 67200, stasis ticks 49140
+2026-11-19 04:11:18 presence: player 1 offline
+2026-11-19 04:11:18 lockstep: autosave #10 at tick 75194: raw=22573184 bytes, packed=3024762 bytes (13.4%), save=386 ms, pack=18 ms, 16 chunks sent to the server
+2026-11-19 04:11:18 stasis: map 0 frozen at tick 75240, stasis ticks 49140

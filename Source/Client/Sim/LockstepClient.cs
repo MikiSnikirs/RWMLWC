@@ -533,6 +533,7 @@ public static class LockstepClient
         ResyncsStarted++;
         TestAutomation.Note("lockstep: desync reported, the server orders a common snapshot");
         RWMLWC.Client.World.CaravanSelfTest.OnDesyncNotice();
+        RoomStateProbe.OnDesyncNotice();
         if (Current.ProgramState == ProgramState.Playing)
         {
             Messages.Message("RWMLWC: игра разошлась между игроками — перезагружаем общий снимок", MessageTypeDefOf.CautionInput, false);
@@ -644,7 +645,9 @@ public static class LockstepClient
             return;
         }
         int tick = Find.TickManager.TicksGame;
+        TestAutomation.Note($"lockstep: autosave #{command.Seq} at tick {tick}: taking world snapshot");
         byte[] packed = GameSnapshot.Take(out GameSnapshot.Stats stats);
+        TestAutomation.Note($"lockstep: autosave #{command.Seq}: snapshot taken, sending {packed.Length} bytes");
         int count = SendWorldChunks(WorldSnapshotOrder.SnapshotId(command.Seq), packed, tick);
         TestAutomation.Note($"lockstep: autosave #{command.Seq} at tick {tick}: {stats}, {count} chunks sent to the server");
     }

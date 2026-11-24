@@ -173,7 +173,7 @@ for ($c = 1; $c -le $Clients; $c++) {
         "camera=$(if ($c -eq 2 -and $Camera -ne 0) { 1 } else { 0 })"
     ) + $extra
     if ($Tpf.Count -ge $c) { $arm += "tpf=$($Tpf[$c - 1])" }
-    $arm += $ExtraArm
+    $arm += @($ExtraArm | ForEach-Object { $_ -split "," } | Where-Object { $_ })
     if ($DenseFrom -ge 0 -and $DenseTo -gt $DenseFrom) { $arm += "densefrom=$DenseFrom"; $arm += "denseto=$DenseTo" }
     [IO.File]::WriteAllLines((Join-Path $dir 'RWMLWC\arm-determinism-run.txt'), $arm)
     [IO.File]::WriteAllText((Join-Path $dir 'RWMLWC\automation-progress.txt'), '0')
@@ -195,7 +195,7 @@ if ($Scenario -eq 'rejoin' -and $Clients -ge 2) {
     while ((Get-Date) -lt $until -and -not $procs[0].HasExited) { Wait-GuardingFocus 2 }
     $dir2 = Join-Path $work 'c2'
     $arm2 = @('armed=1', 'save=', 'scenarios=none', "ticks=$RejoinTicks", 'trace=0', 'quit=1', "server=127.0.0.1:$port", "thumbprint=$thumb",
-              'name=c2', 'holdsec=0', 'issuer=0', 'camera=0', 'connectdelay=5') + $ExtraArm
+              'name=c2', 'holdsec=0', 'issuer=0', 'camera=0', 'connectdelay=5') + @($ExtraArm | ForEach-Object { $_ -split "," } | Where-Object { $_ })
     [IO.File]::WriteAllLines((Join-Path $dir2 'RWMLWC\arm-determinism-run.txt'), $arm2)
     [IO.File]::WriteAllText((Join-Path $dir2 'RWMLWC\automation-progress.txt'), '0')
     $procs[1] = Start-GameQuiet $exe "-savedatafolder=$dir2" $game

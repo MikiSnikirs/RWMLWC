@@ -1,0 +1,95 @@
+2026-11-19 11:31:28 autoload: loading save 'tst014'
+2026-11-19 11:31:35 lockstep: connecting to 127.0.0.1:55975 as 'c1'
+2026-11-19 11:31:35 regionids: after load room=18 district=24 region=483
+2026-11-19 11:31:37 lockstep: connected to quic:127.0.0.1:55975, Hello sent
+2026-11-19 11:31:37 mapinterface postfix: alive (diag T-076)
+2026-11-19 11:31:37 lockstep: Welcome, playerId=2, serverTick=14998, seed=7
+2026-11-19 11:31:37 presence: player 2 online
+2026-11-19 11:31:37 colonies diag: me=2, tick=14998, anyOwner=False, lowestOnline=False
+2026-11-19 11:31:39 watchdog: no tick advance for 300 frames at tick 14998: speed=Paused, paused=True, topWindow=ImmediateWindow, windows=3
+2026-11-19 11:32:37 lockstep: hold is over, requesting speed 3
+2026-11-19 11:32:37 regionids: run start room=18 district=24 region=483
+2026-11-19 11:32:37 run started: #0, tick=14998, scenario=raid, ticks=12000, trace=False, quit=True, file=hash-c1-20261119-113237.txt
+2026-11-19 11:32:37 scenario raid: executed=True, faction=Полмм
+2026-11-19 11:32:40 colonies: player 1 is the host, settlements claimed: 1
+2026-11-19 11:32:55 threats: map 0 adaptation 0.0 → -6.0 (Downed, Ross)
+2026-11-19 11:32:55 threats: map 0 adaptation -6.0 → -12.0 (Downed, Oleg)
+2026-11-19 11:32:55 threats: map 0 adaptation -12.0 → -42.0 (Died, Ross)
+2026-11-19 11:32:56 threats: map 0 adaptation -42.0 → -48.0 (Downed, Rika)
+2026-11-19 11:32:57 lockstep: notice 3: карта 0 тик 20880: игрок 1 ≠ игрок 2
+2026-11-19 11:32:57 lockstep: desync reported, the server orders a common snapshot
+2026-11-19 11:32:57 roomdump: written 30 snapshots
+2026-11-19 11:32:57 lockstep: player 0 asked for a snapshot at tick 20884; waiting for it
+2026-11-19 11:32:58 lockstep: snapshot 4 received, 2623541 bytes; loading
+2026-11-19 11:32:58 curtain: shown (Синхронизация мира…), map 0, world view False
+2026-11-19 11:32:58 regionids: reset at load, bump=0
+2026-11-19 11:33:01 regionids: after load room=18 district=24 region=483
+2026-11-19 11:33:02 curtain: view restored — map 0, world view False
+2026-11-19 11:33:02 lockstep: snapshot loaded, tick 20884, serverTick=20895, perMapSim=True
+2026-11-19 11:33:02 resumed after snapshot reload at tick 20884, perMapSim=True
+2026-11-19 11:33:04 watchdog: no tick advance for 300 frames at tick 20895: speed=Paused, paused=True, topWindow=ImmediateWindow, windows=4
+2026-11-19 11:34:04 lockstep: notice 3: карта 0 тик 21480: игрок 1 ≠ игрок 2
+2026-11-19 11:34:04 lockstep: desync reported, the server orders a common snapshot
+2026-11-19 11:34:04 roomdump: written 30 snapshots
+2026-11-19 11:34:04 lockstep: player 0 asked for a snapshot at tick 21485; waiting for it
+2026-11-19 11:34:04 lockstep: snapshot 5 received, 2598414 bytes; loading
+2026-11-19 11:34:04 curtain: shown (Синхронизация мира…), map 0, world view False
+2026-11-19 11:34:04 regionids: reset at load, bump=0
+2026-11-19 11:34:06 regionids: after load room=18 district=24 region=483
+2026-11-19 11:34:06 curtain: view restored — map 0, world view False
+2026-11-19 11:34:06 lockstep: snapshot loaded, tick 21485, serverTick=21496, perMapSim=True
+2026-11-19 11:34:06 resumed after snapshot reload at tick 21485, perMapSim=True
+2026-11-19 11:34:08 watchdog: no tick advance for 300 frames at tick 21496: speed=Paused, paused=True, topWindow=ImmediateWindow, windows=4
+2026-11-19 11:35:06 lockstep: hold is over, requesting speed 3
+2026-11-19 11:35:09 lockstep: notice 3: карта 0 тик 22320: игрок 1 ≠ игрок 2
+2026-11-19 11:35:09 lockstep: desync reported, the server orders a common snapshot
+2026-11-19 11:35:09 roomdump: written 30 snapshots
+2026-11-19 11:35:09 lockstep: player 0 asked for a snapshot at tick 22323; waiting for it
+2026-11-19 11:35:09 lockstep: snapshot 6 received, 2602147 bytes; loading
+2026-11-19 11:35:09 curtain: shown (Синхронизация мира…), map 0, world view False
+2026-11-19 11:35:10 regionids: reset at load, bump=0
+2026-11-19 11:35:11 regionids: after load room=18 district=24 region=483
+2026-11-19 11:35:12 curtain: view restored — map 0, world view False
+2026-11-19 11:35:12 lockstep: snapshot loaded, tick 22323, serverTick=22329, perMapSim=True
+2026-11-19 11:35:12 resumed after snapshot reload at tick 22323, perMapSim=True
+2026-11-19 11:35:13 watchdog: no tick advance for 300 frames at tick 22329: speed=Paused, paused=True, topWindow=ImmediateWindow, windows=4
+2026-11-19 11:36:12 lockstep: hold is over, requesting speed 3
+2026-11-19 11:36:14 lockstep: notice 3: карта 0 тик 23040: игрок 1 ≠ игрок 2
+2026-11-19 11:36:14 lockstep: desync reported, the server orders a common snapshot
+2026-11-19 11:36:14 roomdump: written 30 snapshots
+2026-11-19 11:36:14 lockstep: player 0 asked for a snapshot at tick 23040; waiting for it
+2026-11-19 11:36:14 lockstep: snapshot 8 received, 2604622 bytes; loading
+2026-11-19 11:36:14 curtain: shown (Синхронизация мира…), map 0, world view False
+2026-11-19 11:36:14 regionids: reset at load, bump=0
+2026-11-19 11:36:16 regionids: after load room=18 district=24 region=483
+2026-11-19 11:36:16 curtain: view restored — map 0, world view False
+2026-11-19 11:36:16 lockstep: snapshot loaded, tick 23040, serverTick=23046, perMapSim=True
+2026-11-19 11:36:16 resumed after snapshot reload at tick 23040, perMapSim=True
+2026-11-19 11:36:18 watchdog: no tick advance for 300 frames at tick 23046: speed=Paused, paused=True, topWindow=ImmediateWindow, windows=4
+2026-11-19 11:37:16 lockstep: hold is over, requesting speed 3
+2026-11-19 11:37:17 threats: map 0 adaptation -48.0 → -60.0 (Kidnapped, Rika)
+2026-11-19 11:37:18 lockstep: notice 3: карта 0 тик 23640: игрок 1 ≠ игрок 2
+2026-11-19 11:37:18 lockstep: desync reported, the server orders a common snapshot
+2026-11-19 11:37:18 roomdump: written 30 snapshots
+2026-11-19 11:37:18 lockstep: player 0 asked for a snapshot at tick 23641; waiting for it
+2026-11-19 11:37:18 lockstep: snapshot 9 received, 2601765 bytes; loading
+2026-11-19 11:37:18 curtain: shown (Синхронизация мира…), map 0, world view False
+2026-11-19 11:37:19 regionids: reset at load, bump=0
+2026-11-19 11:37:20 regionids: after load room=18 district=24 region=483
+2026-11-19 11:37:21 curtain: view restored — map 0, world view False
+2026-11-19 11:37:21 lockstep: snapshot loaded, tick 23641, serverTick=23646, perMapSim=True
+2026-11-19 11:37:21 resumed after snapshot reload at tick 23641, perMapSim=True
+2026-11-19 11:37:22 watchdog: no tick advance for 300 frames at tick 23646: speed=Paused, paused=True, topWindow=ImmediateWindow, windows=4
+2026-11-19 11:38:21 lockstep: hold is over, requesting speed 3
+2026-11-19 11:38:22 lockstep: notice 3: карта 0 тик 24240: игрок 1 ≠ игрок 2
+2026-11-19 11:38:22 lockstep: desync reported, the server orders a common snapshot
+2026-11-19 11:38:22 roomdump: written 30 snapshots
+2026-11-19 11:38:22 lockstep: player 0 asked for a snapshot at tick 24241; waiting for it
+2026-11-19 11:38:23 lockstep: snapshot 10 received, 2600853 bytes; loading
+2026-11-19 11:38:23 curtain: shown (Синхронизация мира…), map 0, world view False
+2026-11-19 11:38:23 regionids: reset at load, bump=0
+2026-11-19 11:38:25 regionids: after load room=18 district=24 region=483
+2026-11-19 11:38:25 curtain: view restored — map 0, world view False
+2026-11-19 11:38:25 lockstep: snapshot loaded, tick 24241, serverTick=24247, perMapSim=True
+2026-11-19 11:38:25 resumed after snapshot reload at tick 24241, perMapSim=True
+2026-11-19 11:38:27 watchdog: no tick advance for 300 frames at tick 24247: speed=Paused, paused=True, topWindow=ImmediateWindow, windows=4

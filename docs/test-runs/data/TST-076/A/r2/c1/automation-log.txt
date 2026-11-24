@@ -1,0 +1,53 @@
+2026-11-19 11:49:51 autoload: loading save 'tst014'
+2026-11-19 11:49:58 lockstep: connecting to 127.0.0.1:53544 as 'c1'
+2026-11-19 11:49:58 regionids: after load room=18 district=24 region=483
+2026-11-19 11:49:59 lockstep: connected to quic:127.0.0.1:53544, Hello sent
+2026-11-19 11:49:59 mapinterface postfix: alive (diag T-076)
+2026-11-19 11:50:00 lockstep: Welcome, playerId=2, serverTick=14998, seed=7
+2026-11-19 11:50:00 presence: player 2 online
+2026-11-19 11:50:00 colonies diag: me=2, tick=14998, anyOwner=False, lowestOnline=False
+2026-11-19 11:50:01 watchdog: no tick advance for 300 frames at tick 14998: speed=Paused, paused=True, topWindow=ImmediateWindow, windows=3
+2026-11-19 11:51:00 lockstep: hold is over, requesting speed 3
+2026-11-19 11:51:00 regionids: run start room=18 district=24 region=483
+2026-11-19 11:51:00 run started: #0, tick=14998, scenario=none, ticks=400000, trace=False, quit=True, file=hash-c1-20261119-115100.txt
+2026-11-19 11:51:02 colonies: player 1 is the host, settlements claimed: 1
+2026-11-19 11:51:02 colonies: auto choice — new colony at 175413,0
+2026-11-19 11:51:03 colonies: new colony for player 2 at 175413,0: 3 colonists, 10 item stacks
+2026-11-19 11:51:03 colonies: settlement 253 belongs to player 2
+2026-11-19 11:51:03 long event 'GeneratingMap' start, maps 1
+2026-11-19 11:51:06 long event 'GeneratingMap' done, maps 2
+2026-11-19 11:51:06 map 1 after 'GeneratingMap': Pawn=58,Item=1318,Building=3514,Plant=26468,Filth=3674; pawns Squirrel#78334@(218, 0, 19),Squirrel#78335@(39, 0, 62),Sparrow#78336@(243, 0, 52),Sparrow#78337@(238, 0, 53),Sparrow#78338@(239, 0, 50),Sparrow#78339@(238, 0, 51),Crow#78340@(29, 0, 163),Crow#78341@(29, 0, 164),Crow#78342@(30, 0, 163),Squirrel#78343@(65, 0, 68),Megasloth#78344@(28, 0, 2),Sparrow#78345@(191, 0, 131),Sparrow#78346@(192, 0, 133),Sparrow#78347@(192, 0, 133),Sparrow#78348@(192, 0, 133),Raccoon#78349@(194, 0, 58),Crow#78350@(179, 0, 52),Crow#78351@(181, 0, 53),Ibex#78352@(205, 0, 167),Ibex#78353@(205, 0, 169),Ibex#78354@(205, 0, 167),Tortoise#78355@(75, 0, 222),Boomrat#78356@(29, 0, 4),Rat#78357@(187, 0, 171),Boomrat#78358@(116, 0, 25),Rat#78359@(35, 0, 224),Alpaca#78360@(24, 0, 125),Alpaca#78361@(24, 0, 125),Alpaca#78362@(20, 0, 125),Alpaca#78363@(24, 0, 125),Bluebird#78364@(193, 0, 114),Bluebird#78365@(175, 0, 228),Rhinoceros#78366@(69, 0, 50),Squirrel#78367@(17, 0, 14),Boomrat#78368@(34, 0, 130),Raccoon#78369@(92, 0, 104),Bluebird#78370@(165, 0, 248),Turkey#78371@(228, 0, 108),Quail#78372@(164, 0, 212),Quail#78373@(164, 0, 212),Quail#78374@(164, 0, 213),Quail#78375@(163, 0, 213),Bluebird#78376@(17, 0, 122),Boomrat#78377@(211, 0, 23),Squirrel#78378@(239, 0, 205),Swan#78379@(91, 0, 199),Hare#78380@(156, 0, 18),Squirrel#78381@(142, 0, 81),Swan#78382@(148, 0, 38),Bluebird#78383@(202, 0, 128),Turkey#78384@(205, 0, 48),Bluebird#78385@(34, 0, 90),Megasloth#78386@(33, 0, 221),Squirrel#78387@(198, 0, 166),Megasloth#78388@(221, 0, 179),Hare#78389@(174, 0, 106),Boomrat#78390@(87, 0, 172),Squirrel#78391@(71, 0, 179); rand 0000081EFB25C5A1
+2026-11-19 11:51:07 long event 'SpawningColonists' start, maps 2
+2026-11-19 11:51:07 long event 'SpawningColonists' done, maps 2
+2026-11-19 11:51:07 map 1 after 'SpawningColonists': Pawn=62,Item=1335,Building=3514,Plant=26468,Filth=3674; pawns Human#41747@(135, 0, 114),Human#41750@(131, 0, 114),Human#41754@(133, 0, 115),Cat#41767@(132, 0, 116),Squirrel#78334@(218, 0, 19),Squirrel#78335@(39, 0, 62),Sparrow#78336@(243, 0, 52),Sparrow#78337@(238, 0, 53),Sparrow#78338@(239, 0, 50),Sparrow#78339@(238, 0, 51),Crow#78340@(29, 0, 163),Crow#78341@(29, 0, 164),Crow#78342@(30, 0, 163),Squirrel#78343@(65, 0, 68),Megasloth#78344@(28, 0, 2),Sparrow#78345@(191, 0, 131),Sparrow#78346@(192, 0, 133),Sparrow#78347@(192, 0, 133),Sparrow#78348@(192, 0, 133),Raccoon#78349@(194, 0, 58),Crow#78350@(179, 0, 52),Crow#78351@(181, 0, 53),Ibex#78352@(205, 0, 167),Ibex#78353@(205, 0, 169),Ibex#78354@(205, 0, 167),Tortoise#78355@(75, 0, 222),Boomrat#78356@(29, 0, 4),Rat#78357@(187, 0, 171),Boomrat#78358@(116, 0, 25),Rat#78359@(35, 0, 224),Alpaca#78360@(24, 0, 125),Alpaca#78361@(24, 0, 125),Alpaca#78362@(20, 0, 125),Alpaca#78363@(24, 0, 125),Bluebird#78364@(193, 0, 114),Bluebird#78365@(175, 0, 228),Rhinoceros#78366@(69, 0, 50),Squirrel#78367@(17, 0, 14),Boomrat#78368@(34, 0, 130),Raccoon#78369@(92, 0, 104),Bluebird#78370@(165, 0, 248),Turkey#78371@(228, 0, 108),Quail#78372@(164, 0, 212),Quail#78373@(164, 0, 212),Quail#78374@(164, 0, 213),Quail#78375@(163, 0, 213),Bluebird#78376@(17, 0, 122),Boomrat#78377@(211, 0, 23),Squirrel#78378@(239, 0, 205),Swan#78379@(91, 0, 199),Hare#78380@(156, 0, 18),Squirrel#78381@(142, 0, 81),Swan#78382@(148, 0, 38),Bluebird#78383@(202, 0, 128),Turkey#78384@(205, 0, 48),Bluebird#78385@(34, 0, 90),Megasloth#78386@(33, 0, 221),Squirrel#78387@(198, 0, 166),Megasloth#78388@(221, 0, 179),Hare#78389@(174, 0, 106),Boomrat#78390@(87, 0, 172),Squirrel#78391@(71, 0, 179); rand 000008D3FB25C5A1
+2026-11-19 11:51:14 presence: player 1 offline
+2026-11-19 11:51:14 lockstep: autosave #6 at tick 18012: taking world snapshot
+2026-11-19 11:51:14 snapshot: SaveGame start (RWMLWC-snapshot-out)
+2026-11-19 11:51:15 snapshot: SaveGame done in 1001 ms
+2026-11-19 11:51:15 lockstep: autosave #6: snapshot taken, sending 3336003 bytes
+2026-11-19 11:51:15 lockstep: autosave #6 at tick 18012: raw=28694515 bytes, packed=3336003 bytes (11.6%), save=1001 ms, pack=25 ms, 17 chunks sent to the server
+2026-11-19 11:51:15 stasis: map 0 frozen at tick 18060, stasis ticks 0
+2026-11-19 11:56:14 lockstep: autosave #7 at tick 125789: taking world snapshot
+2026-11-19 11:56:14 snapshot: SaveGame start (RWMLWC-snapshot-out)
+2026-11-19 11:56:15 snapshot: SaveGame done in 496 ms
+2026-11-19 11:56:15 lockstep: autosave #7: snapshot taken, sending 3389639 bytes
+2026-11-19 11:56:15 lockstep: autosave #7 at tick 125789: raw=28244336 bytes, packed=3389639 bytes (12.0%), save=496 ms, pack=23 ms, 17 chunks sent to the server
+2026-11-19 11:56:33 presence: player 1 online
+2026-11-19 11:56:33 snapshot: SaveGame start (RWMLWC-snapshot-out)
+2026-11-19 11:56:33 snapshot: SaveGame done in 462 ms
+2026-11-19 11:56:33 lockstep: snapshot for player 1 at tick 132345: raw=28212714 bytes, packed=3384236 bytes (12.0%), save=463 ms, pack=24 ms, 17 chunks sent; reloading it here too
+2026-11-19 11:56:33 curtain: shown (c2 подключается — синхронизация мира…), map 1, world view False
+2026-11-19 11:56:34 regionids: reset at load, bump=0
+2026-11-19 11:56:37 regionids: after load room=28 district=38 region=956
+2026-11-19 11:56:38 curtain: view restored — map 1, world view False
+2026-11-19 11:56:38 lockstep: snapshot loaded, tick 132345, serverTick=132345, perMapSim=True
+2026-11-19 11:56:40 watchdog: no tick advance for 300 frames at tick 132345: speed=Paused, paused=True, topWindow=ImmediateWindow, windows=3
+2026-11-19 11:56:42 resumed after snapshot reload at tick 132345, perMapSim=True
+2026-11-19 11:56:42 stasis: map 0 thawed at tick 132360, stasis ticks 114300
+2026-11-19 11:57:09 presence: player 1 offline
+2026-11-19 11:57:09 lockstep: autosave #11 at tick 140352: taking world snapshot
+2026-11-19 11:57:09 snapshot: SaveGame start (RWMLWC-snapshot-out)
+2026-11-19 11:57:10 snapshot: SaveGame done in 445 ms
+2026-11-19 11:57:10 lockstep: autosave #11: snapshot taken, sending 3331827 bytes
+2026-11-19 11:57:10 lockstep: autosave #11 at tick 140352: raw=27728786 bytes, packed=3331827 bytes (12.0%), save=445 ms, pack=23 ms, 17 chunks sent to the server
+2026-11-19 11:57:12 watchdog: no tick advance for 300 frames at tick 140352: speed=Paused, paused=True, topWindow=ImmediateWindow, windows=3

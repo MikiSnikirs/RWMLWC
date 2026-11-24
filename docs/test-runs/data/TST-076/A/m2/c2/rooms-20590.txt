@@ -1,0 +1,43 @@
+map 0 rand 000D054500000000
+r0 cc=59703/59703 ro=-1/59703 edge=1 out=1 dirty=1 role=None temp=20.463
+r111 cc=-1/34 ro=-1/34 edge=1 out=1 dirty=1 role=- temp=20.463
+r5418 cc=1/1 ro=1/1 edge=0 out=1 dirty=1 role=- temp=20.463
+r5665 cc=1/1 ro=1/1 edge=0 out=1 dirty=1 role=- temp=20.463
+r6667 cc=1/1 ro=1/1 edge=0 out=1 dirty=1 role=- temp=20.463
+r17804 cc=1/1 ro=1/1 edge=0 out=1 dirty=1 role=- temp=20.463
+r28610 cc=1/1 ro=1/1 edge=0 out=1 dirty=1 role=- temp=20.463
+r28859 cc=1/1 ro=1/1 edge=0 out=1 dirty=1 role=- temp=20.463
+r28863 cc=1/1 ro=1/1 edge=0 out=1 dirty=1 role=- temp=20.463
+r29590 cc=1/1 ro=1/1 edge=0 out=1 dirty=1 role=- temp=20.463
+r29596 cc=1/1 ro=1/1 edge=0 out=1 dirty=1 role=- temp=20.463
+r31380 cc=1/1 ro=1/1 edge=0 out=1 dirty=1 role=- temp=20.463
+r34380 cc=1/1 ro=1/1 edge=0 out=1 dirty=1 role=- temp=20.463
+r44101 cc=134/134 ro=0/0 edge=0 out=0 dirty=1 role=- temp=13.555
+r47878 cc=1/1 ro=1/1 edge=0 out=1 dirty=1 role=- temp=20.463
+r47886 cc=1/1 ro=1/1 edge=0 out=1 dirty=1 role=- temp=20.463
+r49890 cc=1/1 ro=1/1 edge=0 out=1 dirty=1 role=- temp=20.463
+r50879 cc=1/1 ro=1/1 edge=0 out=1 dirty=1 role=- temp=20.463
+d0 cc=59681 ro=300 part=1 edge=1
+d111 cc=-1 ro=-1 part=0 edge=1
+d4910 cc=12 ro=-1 part=0 edge=0
+d5418 cc=1 ro=1 part=0 edge=0
+d5665 cc=1 ro=1 part=0 edge=0
+d6667 cc=1 ro=1 part=0 edge=0
+d16064 cc=4 ro=-1 part=0 edge=0
+d16069 cc=1 ro=-1 part=0 edge=0
+d16071 cc=1 ro=-1 part=0 edge=0
+d16313 cc=2 ro=-1 part=0 edge=0
+d17063 cc=2 ro=-1 part=0 edge=0
+d17804 cc=1 ro=1 part=0 edge=0
+d28610 cc=1 ro=1 part=0 edge=0
+d28859 cc=1 ro=1 part=0 edge=0
+d28863 cc=1 ro=1 part=0 edge=0
+d29590 cc=1 ro=1 part=0 edge=0
+d29596 cc=1 ro=1 part=0 edge=0
+d31380 cc=1 ro=1 part=0 edge=0
+d34380 cc=1 ro=1 part=0 edge=0
+d44101 cc=134 ro=0 part=0 edge=0
+d47878 cc=1 ro=1 part=0 edge=0
+d47886 cc=1 ro=1 part=0 edge=0
+d49890 cc=1 ro=1 part=0 edge=0
+d50879 cc=1 ro=1 part=0 edge=0

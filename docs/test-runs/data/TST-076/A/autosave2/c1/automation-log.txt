@@ -1,0 +1,21 @@
+2026-11-19 04:53:56 autoload: loading save 'tst014'
+2026-11-19 04:54:02 lockstep: connecting to 127.0.0.1:53868 as 'c1'
+2026-11-19 04:54:02 regionids: after load room=18 district=24 region=483
+2026-11-19 04:54:03 lockstep: connected to quic:127.0.0.1:53868, Hello sent
+2026-11-19 04:54:04 lockstep: Welcome, playerId=1, serverTick=14998, seed=7
+2026-11-19 04:54:04 presence: player 1 online
+2026-11-19 04:54:04 presence: player 2 online
+2026-11-19 04:54:05 watchdog: no tick advance for 300 frames at tick 14998: speed=Paused, paused=True, topWindow=-, windows=0
+2026-11-19 04:55:04 regionids: run start room=18 district=24 region=483
+2026-11-19 04:55:04 run started: #0, tick=14998, scenario=none, ticks=76000, trace=False, quit=True, file=hash-c1-20261119-045504.txt
+2026-11-19 04:58:37 summary: map0 drafted=0 forbidden=57 plants=[]
+2026-11-19 04:58:37 summary: map0 jobs=[231:GotoWander@(179, 0, 156),234:GotoWander@(170, 0, 152),239:Wait_MaintainPosture@(179, 0, 166)]
+2026-11-19 04:58:37 summary: map0 settings=29B89D30A34E3B1A
+2026-11-19 04:58:37 summary: maps=1 player settlements=1 caravans=0
+2026-11-19 04:58:37 summary: absence= offline=[]
+2026-11-19 04:58:37 summary: squads= rejected=0 drafted=[]
+2026-11-19 04:58:37 summary: map0 designations=0 blueprints=0 zones=0; commands sent=0 executed=0 failed=0
+2026-11-19 04:58:37 run finished: file=hash-c1-20261119-045504.txt
+2026-11-19 04:58:37 queue: finished
+2026-11-19 04:58:37 lockstep: disconnect: прогон завершён
+2026-11-19 04:58:37 quitting game

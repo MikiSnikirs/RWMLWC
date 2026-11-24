@@ -1,0 +1,31 @@
+2026-11-19 11:11:22 autoload: loading save 'tst014'
+2026-11-19 11:11:29 lockstep: connecting to 127.0.0.1:52771 as 'c2'
+2026-11-19 11:11:29 regionids: after load room=18 district=24 region=483
+2026-11-19 11:11:30 lockstep: connected to quic:127.0.0.1:52771, Hello sent
+2026-11-19 11:11:30 mapinterface postfix: alive (diag T-076)
+2026-11-19 11:11:30 lockstep: Welcome, playerId=2, serverTick=14998, seed=7
+2026-11-19 11:11:30 presence: player 2 online
+2026-11-19 11:11:30 colonies diag: me=2, tick=14998, anyOwner=False, lowestOnline=False
+2026-11-19 11:11:32 watchdog: no tick advance for 300 frames at tick 14998: speed=Paused, paused=True, topWindow=ImmediateWindow, windows=3
+2026-11-19 11:12:30 lockstep: hold is over, requesting speed 3
+2026-11-19 11:12:30 regionids: run start room=18 district=24 region=483
+2026-11-19 11:12:30 run started: #0, tick=14998, scenario=raid, ticks=12000, trace=False, quit=True, file=hash-c2-20261119-111230.txt
+2026-11-19 11:12:31 scenario raid: executed=True, faction=Полмм
+2026-11-19 11:12:33 colonies: player 1 is the host, settlements claimed: 1
+2026-11-19 11:12:48 threats: map 0 adaptation 0.0 → -6.0 (Downed, Ross)
+2026-11-19 11:12:49 threats: map 0 adaptation -6.0 → -12.0 (Downed, Oleg)
+2026-11-19 11:12:49 threats: map 0 adaptation -12.0 → -42.0 (Died, Ross)
+2026-11-19 11:12:50 threats: map 0 adaptation -42.0 → -48.0 (Downed, Rika)
+2026-11-19 11:12:57 threats: map 0 adaptation -48.0 → -60.0 (Kidnapped, Rika)
+2026-11-19 11:13:08 summary: map0 drafted=0 forbidden=60 plants=[]
+2026-11-19 11:13:08 summary: map0 jobs=[234:Wait_Downed@(133, 0, 155),41794:GotoWander@(72, 0, 103)]
+2026-11-19 11:13:08 camera: this client moved its camera 78 times during the run
+2026-11-19 11:13:08 summary: map0 settings=3BBE8EE84EF5819F
+2026-11-19 11:13:08 summary: maps=1 player settlements=1 caravans=0
+2026-11-19 11:13:08 summary: absence= offline=[]
+2026-11-19 11:13:08 summary: squads= rejected=0 drafted=[]
+2026-11-19 11:13:08 summary: map0 designations=0 blueprints=0 zones=0; commands sent=0 executed=1 failed=0
+2026-11-19 11:13:08 run finished: file=hash-c2-20261119-111230.txt
+2026-11-19 11:13:08 queue: finished
+2026-11-19 11:13:08 lockstep: disconnect: прогон завершён
+2026-11-19 11:13:08 quitting game
