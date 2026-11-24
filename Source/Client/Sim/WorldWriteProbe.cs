@@ -107,6 +107,14 @@ internal static class WorldWriteProbe
         into[14] = Find.History?.archive?.ArchivablesListForReading.Count ?? 0;
     }
 
+    /// <summary>Подробный слепок мира строкой «часть=значение» (для файла хешей, T-056).</summary>
+    public static string DeepDigest()
+    {
+        double[] v = new double[Parts.Length];
+        Snapshot(v);
+        return string.Join(";", Parts.Select((p, i) => p + "=" + v[i].ToString("R", System.Globalization.CultureInfo.InvariantCulture)));
+    }
+
     public static void Begin()
     {
         if (depth++ == 0)
