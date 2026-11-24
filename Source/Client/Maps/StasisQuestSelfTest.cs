@@ -52,6 +52,10 @@ internal static class StasisQuestSelfTest
         Quest quest = Quest.MakeRaw();
         quest.name = name;
         quest.hidden = true;
+        // Без root игра выбрасывает задание при загрузке (QuestManager.ExposeData), а общий снимок при возвращении
+        // игрока — загрузка; не принятому заданию не приходит сигнал запуска (части слушают только Ongoing).
+        quest.root = DefDatabase<QuestScriptDef>.AllDefsListForReading.OrderBy(d => d.defName, System.StringComparer.Ordinal).First();
+        quest.SetInitiallyAccepted();
         quest.AddPart(new QuestPart_Delay { delayTicks = DelayTicks, inSignalEnable = quest.InitiateSignal });
         if (map != null)
         {

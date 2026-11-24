@@ -264,6 +264,9 @@ public static class TestAutomation
                 case "uiprobe":
                     cfg.uiProbe = value == "1";
                     break;
+                case "worldwrites":
+                    WorldWriteProbe.Enabled = value == "1";
+                    break;
                 case "noeqregen":
                     RoomRecreationDeterminism.EqRegenDisabled = value == "1";
                     break;
@@ -1476,6 +1479,10 @@ public static class TestAutomation
 
     public static void OnRunFinished(string? hashFile)
     {
+        if (WorldWriteProbe.Enabled && Current.Game != null)
+        {
+            WorldWriteProbe.MaybeReport(true);
+        }
         NoteMapSummary();
         if (LockstepClient.InSession && LockstepClient.PlayerCommandsSent > CommandBus.ExecutedOwn)
         {
