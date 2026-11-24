@@ -369,13 +369,51 @@ internal static class Patch_UniqueIDsManager_GetNextID
 {
     private static int presentationId = -1000;
 
+    private static int outsideTickNotes;
+
     private static bool Prefix(ref int __result)
     {
         if (!LockstepClient.InSession || MapRandContext.InTick)
         {
+            // Диагностика T-076 (m2/m8/s6): до подключения к сессии одна из копий выдаёт лишний
+            // номер из общего счётчика — записать, кто его берёт (только в автопрогоне).
+            if (!MapRandContext.InTick && TestAutomation.AutomationActive && outsideTickNotes < 8
+                && Current.ProgramState == ProgramState.Playing)
+            {
+                outsideTickNotes++;
+                TestAutomation.Note("ids diag: id outside tick, inSession=" + LockstepClient.InSession
+                    + ", tick=" + Find.TickManager.TicksGame + "\n" + System.Environment.StackTrace);
+            }
             return true;
         }
         __result = presentationId--;
         return false;
+    }
+}
+
+// Диагностика T-076 (id6/id7): в первом тике сессии одна копия выдаёт на один номер вещи больше.
+// В автопрогоне записать каждую вещь, получившую номер в первые тики, со стеком — сравнить c1 и c2.
+[HarmonyPatch(typeof(ThingIDMaker), nameof(ThingIDMaker.GiveIDTo))]
+internal static class Patch_ThingIDMaker_GiveIDTo_Diag
+{
+    private static int notes;
+
+    private static void Postfix(Thing t)
+    {
+        if (!TestAutomation.AutomationActive || !LockstepClient.InSession || notes >= 120
+            || Current.ProgramState != ProgramState.Playing || Find.TickManager.TicksGame > 15001)
+        {
+            return;
+        }
+        notes++;
+        string[] frames = System.Environment.StackTrace.Split('\n');
+        var sb = new System.Text.StringBuilder();
+        for (int i = 3; i < frames.Length && i < 16; i++)
+        {
+            sb.Append(" <").Append(frames[i].Trim());
+        }
+        TestAutomation.Note("idgive: tick=" + Find.TickManager.TicksGame + " inTick=" + MapRandContext.InTick
+            + " map=" + (MapRandContext.Current?.uniqueID.ToString() ?? "-") + " def=" + t.def.defName
+            + " id=" + t.thingIDNumber + sb);
     }
 }
