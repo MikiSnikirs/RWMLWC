@@ -348,6 +348,7 @@ public static class TestAutomation
             Find.TickManager.CurTimeSpeed = TimeSpeed.Superfast;
         }
         activeConfig = cfg;
+        TickTimer.Reset();
         Note("regionids: run start " + DeterministicRegionIds.Digest());
         sessionSteps.Clear();
         stepGates.Clear();
@@ -1501,6 +1502,7 @@ public static class TestAutomation
 
     public static void OnRunFinished(string? hashFile)
     {
+        Note("tick time: " + TickTimer.Summary());
         if (WorldWriteProbe.Enabled && Current.Game != null)
         {
             WorldWriteProbe.MaybeReport(true);
