@@ -19,4 +19,8 @@
     <!-- Сервер: классы сессии для TST-013; TST-012 ещё и запускает его отдельным процессом. -->
     <ProjectReference Include="../Server/RWMLWC.Server.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Файлы клиента без зависимостей от игры (только System.Xml): вшивание карты в сейв, T-030. -->
+    <Compile Include="../Client/Maps/MapSnapshot.cs" Link="Client/MapSnapshot.cs" />
+  </ItemGroup>
 </Project>
