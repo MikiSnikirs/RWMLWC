@@ -264,6 +264,9 @@ public static class TestAutomation
                 case "uiprobe":
                     cfg.uiProbe = value == "1";
                     break;
+                case "sleepforeign":
+                    PerMapSim.SleepForeignTest = value == "1";
+                    break;
                 case "worldwrites":
                     WorldWriteProbe.Enabled = value == "1";
                     break;
@@ -733,6 +736,7 @@ public static class TestAutomation
     public static void SessionFrame()
     {
         WanderCamera();
+        PerMapSim.UpdateSleepForeign();
         if (sessionSteps.Count == 0 || Current.Game == null || Find.TickManager.TicksGame < sessionSteps.Peek().tick)
         {
             return;

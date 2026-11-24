@@ -806,6 +806,10 @@ public static class LockstepClient
         List<Map> maps = Find.Maps;
         for (int i = 0; i < maps.Count; i++)
         {
+            if (PerMapSim.IsSleeping(maps[i]))
+            {
+                continue; // спящую карту считает другой игрок (T-056)
+            }
             MapStateHash hash = MapStateHasher.Compute(maps[i]);
             MapHashMessage message = new MapHashMessage
             {

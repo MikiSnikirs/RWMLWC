@@ -40,6 +40,43 @@ public static class PerMapSim
     /// </summary>
     public static uint SessionSeed;
 
+    /// <summary>
+    /// Спящие карты (T-056, этап 1): их считает другой игрок, этот компьютер их не тикает и не шлёт их хеш.
+    /// Только в памяти этого процесса, не в сейве и не в состоянии игры — в отличие от стазиса.
+    /// Пока задаётся только тестовым ключом <c>sleepforeign=1</c> (карты колоний других игроков).
+    /// </summary>
+    private static readonly System.Collections.Generic.HashSet<int> sleeping = new System.Collections.Generic.HashSet<int>();
+
+    public static bool SleepForeignTest;
+
+    public static bool IsSleeping(Map? map) => Enabled && map != null && sleeping.Contains(map.uniqueID);
+
+    public static void SetSleeping(Map map, bool asleep)
+    {
+        if (asleep ? sleeping.Add(map.uniqueID) : sleeping.Remove(map.uniqueID))
+        {
+            TestAutomation.Note($"sleeping: map {map.uniqueID} {(asleep ? "asleep" : "awake")} at tick {Find.TickManager.TicksGame}");
+        }
+    }
+
+    /// <summary>Тик карты пропускается: стазис (у всех) или спящая карта (только здесь).</summary>
+    public static bool SkipsTick(Map? map) => IsFrozen(map) || IsSleeping(map);
+
+    /// <summary>Тестовый режим sleepforeign: каждый кадр — карты колоний других игроков спят.</summary>
+    public static void UpdateSleepForeign()
+    {
+        if (!SleepForeignTest || !Enabled || Current.Game == null)
+        {
+            return;
+        }
+        RWMLWC.Client.World.ColoniesComponent? colonies = RWMLWC.Client.World.Colonies.Component;
+        foreach (Map m in Find.Maps)
+        {
+            int owner = m.Parent is RimWorld.Planet.Settlement st ? colonies?.OwnerOf(st) ?? 0 : 0;
+            SetSleeping(m, owner != 0 && owner != LockstepClient.PlayerId);
+        }
+    }
+
     public static bool IsFrozen(Map? map)
     {
         if (!Enabled || map == null)

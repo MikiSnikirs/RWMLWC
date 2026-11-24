@@ -297,6 +297,8 @@ public sealed class HashRecorder : GameComponent
     {
         int tick = Find.TickManager.TicksGame;
         buffer.AppendLine($"{tick};global;rand={MapRandContext.GlobalState:X16};ids={NextThingId(Find.UniqueIDsManager)}");
+        // T-056: хеш мира (как серверу) и подробный слепок мира (зонд worldwrites) — что разойдётся, когда карты считают раздельно.
+        buffer.AppendLine($"{tick};world;hash={WorldStateHasher.Compute():X16};{WorldWriteProbe.DeepDigest()}");
         List<Map> maps = Find.Maps;
         for (int i = 0; i < maps.Count; i++)
         {

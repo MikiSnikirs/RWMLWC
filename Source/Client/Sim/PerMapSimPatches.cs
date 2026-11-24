@@ -23,9 +23,9 @@ internal static class Patch_Thing_DoTick
         if (map != null)
         {
             MapSimState? state = MapSimState.For(map);
-            if (state != null && state.frozen)
+            if (state != null && state.frozen || PerMapSim.IsSleeping(map))
             {
-                return false; // вещь замороженной карты не тикает
+                return false; // вещь замороженной или спящей карты не тикает
             }
         }
         MapRandContext.Enter(map); // вещи вне карт (караваны, мир) — глобальный контекст
@@ -55,7 +55,7 @@ internal static class Patch_Map_MapPreTick
         {
             return true;
         }
-        if (PerMapSim.IsFrozen(__instance))
+        if (PerMapSim.SkipsTick(__instance))
         {
             return false;
         }
@@ -81,7 +81,7 @@ internal static class Patch_Map_MapPostTick
         {
             return true;
         }
-        if (PerMapSim.IsFrozen(__instance))
+        if (PerMapSim.SkipsTick(__instance))
         {
             return false;
         }
