@@ -369,10 +369,21 @@ internal static class Patch_UniqueIDsManager_GetNextID
 {
     private static int presentationId = -1000;
 
+    private static int outsideTickNotes;
+
     private static bool Prefix(ref int __result)
     {
         if (!LockstepClient.InSession || MapRandContext.InTick)
         {
+            // Диагностика T-076 (m2/m8/s6): до подключения к сессии одна из копий выдаёт лишний
+            // номер из общего счётчика — записать, кто его берёт (только в автопрогоне).
+            if (!MapRandContext.InTick && TestAutomation.AutomationActive && outsideTickNotes < 8
+                && Current.ProgramState == ProgramState.Playing)
+            {
+                outsideTickNotes++;
+                TestAutomation.Note("ids diag: id outside tick, inSession=" + LockstepClient.InSession
+                    + ", tick=" + Find.TickManager.TicksGame + "\n" + System.Environment.StackTrace);
+            }
             return true;
         }
         __result = presentationId--;
