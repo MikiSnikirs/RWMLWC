@@ -487,26 +487,31 @@ public static class TestAutomation
         }
         if (cfg.scenario == "blueprints")
         {
-            // TST-052 (T-052): c2 выбирает карте режим отсутствия и становится её владельцем (командой, у всех
-            // одинаково); c1 ставит стены — это предложения, колонисты их не строят; c1 пробует утвердить сам —
-            // отказ при исполнении; c2 утверждает часть, одну отклоняет — утверждённые строятся.
+            // TST-052 (T-052): роль — по правам, а не по номеру клиента (номера игроков раздаются по порядку
+            // подключения). Владелец колонии — хост; второй игрок ставит стены — это предложения, колонисты их не
+            // строят; он же пробует утвердить сам — отказ при исполнении; владелец утверждает часть, одну
+            // отклоняет — утверждённые строятся.
             Map BpMap() => Find.CurrentMap ?? Find.Maps[0];
-            int BpOwner() => RWMLWC.Client.Maps.AbsenceModes.Component?.OwnerOf(BpMap().uniqueID) ?? 0;
-            if (cfg.issuer)
+            bool OwnerKnown() => BpMap().Parent is RimWorld.Planet.Settlement st && (RWMLWC.Client.World.Colonies.Component?.OwnerOf(st) ?? 0) != 0;
+            bool IAmOwner() => RWMLWC.Client.Maps.BlueprintApproval.IsApprover(BpMap(), LockstepClient.PlayerId);
+            int Pending() => RWMLWC.Client.Maps.BlueprintApprovalComponent.Component?.Count ?? 0;
+            // Стартовые вещи сейва запрещены — без дерева стены не из чего строить: владелец снимает запрет разметкой.
+            stepGates["blueprints: unforbid start items"] = OwnerKnown;
+            sessionSteps.Enqueue((startTick + 200, "blueprints: unforbid start items", () =>
             {
-                stepGates["blueprints: propose walls"] = () => BpOwner() != 0 && BpOwner() != LockstepClient.PlayerId;
-                sessionSteps.Enqueue((startTick + 500, "blueprints: propose walls", () => BlueprintsPropose(BpMap())));
-                stepGates["blueprints: approve own proposal"] = () => (RWMLWC.Client.Maps.BlueprintApprovalComponent.Component?.Count ?? 0) > 0;
-                sessionSteps.Enqueue((startTick + 900, "blueprints: approve own proposal", () => BlueprintsDecide(BpMap(), 1, true)));
-            }
-            else
-            {
-                sessionSteps.Enqueue((startTick + 200, "blueprints: become owner", () => RWMLWC.Client.Maps.AbsenceModes.Set(BpMap(), RWMLWC.Client.Maps.AbsenceMode.Autopilot)));
-                stepGates["blueprints: approve"] = () => (RWMLWC.Client.Maps.BlueprintApprovalComponent.Component?.Count ?? 0) > 0;
-                sessionSteps.Enqueue((startTick + 3000, "blueprints: approve", () => BlueprintsDecide(BpMap(), 6, true)));
-                sessionSteps.Enqueue((startTick + 3100, "blueprints: reject", () => BlueprintsDecide(BpMap(), 1, false)));
-            }
+                if (!IAmOwner()) return;
+                Designator_Unforbid unforbid = new Designator_Unforbid();
+                List<IntVec3> cells = BpMap().listerThings.AllThings.Where(t => t.Spawned && t.IsForbidden(Faction.OfPlayer)).Select(t => t.Position).Distinct().OrderBy(c => c.x).ThenBy(c => c.z).ToList();
+                unforbid.DesignateMultiCell(cells);
+                Note($"blueprints: unforbid {cells.Count} cells");
+            }));
+            stepGates["blueprints: propose walls"] = OwnerKnown;
+            sessionSteps.Enqueue((startTick + 500, "blueprints: propose walls", () => { if (!IAmOwner()) BlueprintsPropose(BpMap()); }));
+            stepGates["blueprints: approve own proposal"] = () => Pending() > 0;
+            sessionSteps.Enqueue((startTick + 900, "blueprints: approve own proposal", () => { if (!IAmOwner()) BlueprintsDecide(BpMap(), 1, true); }));
             sessionSteps.Enqueue((startTick + 2900, "blueprints: state before approval", () => BlueprintsState(BpMap())));
+            sessionSteps.Enqueue((startTick + 3000, "blueprints: approve", () => { if (IAmOwner()) BlueprintsDecide(BpMap(), 6, true); }));
+            sessionSteps.Enqueue((startTick + 3100, "blueprints: reject", () => { if (IAmOwner()) BlueprintsDecide(BpMap(), 1, false); }));
             sessionSteps.Enqueue((startTick + 9000, "blueprints: state after approval", () => BlueprintsState(BpMap())));
         }
         if (cfg.issuer && cfg.scenario == "squads")
@@ -656,6 +661,8 @@ public static class TestAutomation
                 case "absence-raid":
                     ScenarioAbsenceRaid();
                     break;
+                case "blueprints":
+                    break; // шаги — в OnRunStarted
                 case "absence-points":
                     ScenarioAbsencePoints();
                     break;
@@ -1369,7 +1376,7 @@ public static class TestAutomation
             }
         }
         wall.DesignateMultiCell(cells);
-        Note($"blueprints: proposing {cells.Count} walls as player {LockstepClient.PlayerId}, owner {RWMLWC.Client.Maps.AbsenceModes.Component?.OwnerOf(map.uniqueID)}");
+        Note($"blueprints: proposing {cells.Count} walls as player {LockstepClient.PlayerId}");
     }
 
     // TST-052: нажать «Утвердить»/«Отклонить» у первых n неутверждённых чертежей (по номеру) — кнопкой, командой.

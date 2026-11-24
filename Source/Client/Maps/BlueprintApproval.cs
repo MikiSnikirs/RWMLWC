@@ -106,6 +106,10 @@ public static class BlueprintApproval
         if (!IsApprover(map, by))
         {
             TestAutomation.Note($"blueprints: player {by} may not decide on {blueprint.thingIDNumber}");
+            if (by == LockstepClient.PlayerId)
+            {
+                Messages.Message("RWMLWC: утверждает и отклоняет чертежи владелец или соавтор колонии", MessageTypeDefOf.RejectInput, false);
+            }
             return;
         }
         c.Remove(blueprint);
@@ -168,28 +172,24 @@ internal static class Patch_Blueprint_Gizmos_Approval
         {
             yield break;
         }
-        Map? map = __instance.MapHeld;
-        bool may = map != null && BlueprintApproval.IsApprover(map, LockstepClient.PlayerId);
+        // Кнопки одинаковы у всех клиентов (выключенная кнопка при исполнении пропускается — если бы она была
+        // выключена только у не-владельца, нажатие владельца исполнилось бы не у всех: расхождение в прогоне
+        // t052-bp3). Право проверяется при исполнении (Decide).
         Blueprint bp = __instance;
         var approve = new Command_Action
         {
             defaultLabel = "Утвердить",
-            defaultDesc = $"Чертёж предложил игрок {BlueprintApprovalComponent.Component?.AuthorOf(bp)}. После утверждения колонисты начнут его строить.",
+            defaultDesc = $"Чертёж предложил игрок {BlueprintApprovalComponent.Component?.AuthorOf(bp)}. После утверждения колонисты начнут его строить. Утверждает владелец или соавтор колонии.",
             icon = TexCommand.ForbidOff,
             action = () => BlueprintApproval.Decide(bp, true),
         };
         var reject = new Command_Action
         {
             defaultLabel = "Отклонить",
-            defaultDesc = "Убрать предложенный чертёж.",
+            defaultDesc = "Убрать предложенный чертёж. Отклоняет владелец или соавтор колонии.",
             icon = TexCommand.ForbidOn,
             action = () => BlueprintApproval.Decide(bp, false),
         };
-        if (!may)
-        {
-            approve.Disable("Утверждает владелец или соавтор колонии");
-            reject.Disable("Отклоняет владелец или соавтор колонии");
-        }
         yield return approve;
         yield return reject;
     }
@@ -205,5 +205,36 @@ internal static class Patch_Blueprint_Inspect_Approval
             string line = $"Ждёт утверждения владельцем колонии (предложил игрок {BlueprintApprovalComponent.Component?.AuthorOf(__instance)})";
             __result = string.IsNullOrEmpty(__result) ? line : __result + "\n" + line;
         }
+    }
+}
+
+[HarmonyPatch(typeof(WorkGiver_ConstructDeliverResources), "IsNewValidNearbyNeeder")]
+internal static class Patch_NearbyNeeder_Pending
+{
+    // Доставка к утверждённому чертежу заодно берёт соседние (FindNearbyNeeders) — неутверждённые не брать
+    // (прогон t052-bp4: три неутверждённые стены построились вместе с соседними утверждёнными).
+    private static void Postfix(Thing t, ref bool __result)
+    {
+        if (__result && BlueprintApproval.IsPending(t))
+        {
+            __result = false;
+        }
+    }
+}
+
+[HarmonyPatch(typeof(Blueprint), nameof(Blueprint.TryReplaceWithSolidThing))]
+internal static class Patch_Blueprint_Replace_Pending
+{
+    // Последняя защита: неутверждённый чертёж не превращается в каркас, каким бы путём к нему ни пришли.
+    private static bool Prefix(Blueprint __instance, ref Thing? createdThing, ref bool jobEnded, ref bool __result)
+    {
+        if (!BlueprintApproval.IsPending(__instance))
+        {
+            return true;
+        }
+        createdThing = null;
+        jobEnded = false;
+        __result = false;
+        return false;
     }
 }
