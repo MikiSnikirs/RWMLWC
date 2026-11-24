@@ -35,7 +35,7 @@ public static class WorldCommands
     private const byte OpTestHomeArea = 20;     // только тестовые прогоны (ключ exchangetest=1): домашняя зона под вещами карты
     // 21, 22 — капсулы (TransportPods)
     private const byte OpTestPodKit = 23;
-    // 24 — SOS (Absence/Sos.cs); 25, 26 — аренда пешек (World/Rentals.cs)       // только тестовые прогоны (ключ podtest=1): пусковая площадка с капсулой и топливом
+    // 24 — SOS (Absence/Sos.cs); 25, 26 — аренда пешек (World/Rentals.cs); 40 — события карты (Sim/MapEvents.cs)       // только тестовые прогоны (ключ podtest=1): пусковая площадка с капсулой и топливом
 
     private static readonly FieldInfo FormMapField = AccessTools.Field(typeof(Dialog_FormCaravan), "map");
     private static readonly FieldInfo FormReformField = AccessTools.Field(typeof(Dialog_FormCaravan), "reform");
@@ -710,6 +710,15 @@ public static class WorldCommands
         SendWorld(w);
     }
 
+    /// <summary>События карты (T-056, Sim/MapEvents.cs, операция 40).</summary>
+    public static void SendMapEvents(System.Action<PacketWriter> write)
+    {
+        PacketWriter w = BeginWorld();
+        w.WriteByte(RWMLWC.Client.Sim.MapEvents.OpMapEvents);
+        write(w);
+        SendWorld(w);
+    }
+
     public static void SendTestOp(byte op, int a, int b)
     {
         PacketWriter w = BeginWorld();
@@ -965,6 +974,11 @@ public static class WorldCommands
         if (op == RWMLWC.Client.World.Rentals.OpLend || op == RWMLWC.Client.World.Rentals.OpRecall)
         {
             RWMLWC.Client.World.Rentals.Execute(op, ref r);
+            return;
+        }
+        if (op == RWMLWC.Client.Sim.MapEvents.OpMapEvents)
+        {
+            RWMLWC.Client.Sim.MapEvents.Execute(ref r);
             return;
         }
         if (op == RWMLWC.Client.Absence.Sos.OpSos)

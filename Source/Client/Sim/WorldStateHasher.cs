@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using RimWorld;
 using RimWorld.Planet;
 using Verse;
 
@@ -54,6 +55,14 @@ public static class WorldStateHasher
             {
                 h.Add(v);
             }
+        }
+
+        // Сказания (T-056): применяются событием карты у всех одинаково; при раздельном счёте без событий расходились.
+        List<Tale> tales = Find.TaleManager.AllTalesListForReading;
+        h.Add(tales.Count);
+        for (int i = 0; i < tales.Count; i++)
+        {
+            h.Add(tales[i].id);
         }
 
         h.Add(MapRandContext.GlobalState);

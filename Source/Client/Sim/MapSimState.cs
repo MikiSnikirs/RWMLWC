@@ -30,6 +30,10 @@ public sealed class MapSimState : MapComponent
     /// </summary>
     public float absentWealth = -1f;
 
+    /// <summary>Последнее применённое событие этой карты (T-056, Sim/MapEvents.cs): общий тик и номер в тике.</summary>
+    public int lastEventTick = -1;
+    public int lastEventSeq = -1;
+
     /// <summary>Собственное состояние Rand этой карты (seed в младших 32 битах, счётчик в старших).</summary>
     public ulong randState;
 
@@ -127,6 +131,8 @@ public sealed class MapSimState : MapComponent
         Scribe_Values.Look(ref randInitialized, "rwmlwc_randInitialized", false);
         Scribe_Values.Look(ref nextThingId, "rwmlwc_nextThingId", 0);
         Scribe_Values.Look(ref absentWealth, "rwmlwc_absentWealth", -1f);
+        Scribe_Values.Look(ref lastEventTick, "rwmlwc_lastEventTick", -1);
+        Scribe_Values.Look(ref lastEventSeq, "rwmlwc_lastEventSeq", -1);
         Scribe_Collections.Look(ref idCounters, "rwmlwc_idCounters", LookMode.Value, LookMode.Value, ref tmpIdKeys, ref tmpIdValues);
         idCounters ??= new Dictionary<string, int>();
     }
