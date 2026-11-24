@@ -41,6 +41,9 @@ internal static class WorldWriteProbe
     private static readonly AccessTools.FieldRef<WorldPawns, HashSet<Pawn>> deadRef = AccessTools.FieldRefAccess<WorldPawns, HashSet<Pawn>>("pawnsDead");
     private static readonly AccessTools.FieldRef<WorldPawns, HashSet<Pawn>> mothRef = AccessTools.FieldRefAccess<WorldPawns, HashSet<Pawn>>("pawnsMothballed");
     private static AccessTools.FieldRef<UniqueIDsManager, int>[]? idRefs;
+    private static string[]? idNames;
+    private static int[] idsBefore = new int[0];
+    private static int[] idsAfter = new int[0];
 
     private static void Snapshot(double[] into)
     {
@@ -75,12 +78,20 @@ internal static class WorldWriteProbe
         }
         into[3] = q;
 
-        idRefs ??= AccessTools.GetDeclaredFields(typeof(UniqueIDsManager)).Where(f => f.FieldType == typeof(int) && !f.IsStatic)
-            .Select(f => AccessTools.FieldRefAccess<UniqueIDsManager, int>(f.Name)).ToArray();
+        if (idRefs == null)
+        {
+            var fields = AccessTools.GetDeclaredFields(typeof(UniqueIDsManager)).Where(f => f.FieldType == typeof(int) && !f.IsStatic).ToArray();
+            idRefs = fields.Select(f => AccessTools.FieldRefAccess<UniqueIDsManager, int>(f.Name)).ToArray();
+            idNames = fields.Select(f => f.Name).ToArray();
+            idsBefore = new int[idRefs.Length];
+            idsAfter = new int[idRefs.Length];
+        }
+        int[] idsInto = ReferenceEquals(into, before) ? idsBefore : idsAfter;
         double ids = 0;
         for (int i = 0; i < idRefs.Length; i++)
         {
-            ids += idRefs[i](g.uniqueIDsManager) * (double)(i + 1);
+            idsInto[i] = idRefs[i](g.uniqueIDsManager);
+            ids += idsInto[i] * (double)(i + 1);
         }
         into[4] = ids;
 
@@ -115,7 +126,12 @@ internal static class WorldWriteProbe
         {
             if (after[i] != before[i])
             {
-                string key = Parts[i] + " <- " + source;
+                string part = Parts[i];
+                if (i == 4 && idNames != null)
+                {
+                    part = "ids." + string.Join("+", Enumerable.Range(0, idNames.Length).Where(k => idsAfter[k] != idsBefore[k]).Select(k => idNames[k]));
+                }
+                string key = part + " <- " + source;
                 hits.TryGetValue(key, out int n);
                 hits[key] = n + 1;
                 if (n == 0)
@@ -140,6 +156,8 @@ internal static class WorldWriteProbe
             return;
         }
         lastReport = tick;
+        TestAutomation.Note($"worldwrites: tick {tick}, by part: " + string.Join("; ", hits.GroupBy(kv => kv.Key.Substring(0, kv.Key.IndexOf(" <- ", System.StringComparison.Ordinal)))
+            .OrderByDescending(gr => gr.Sum(kv => kv.Value)).Select(gr => $"{gr.Key} x{gr.Sum(kv => kv.Value)} ({gr.Count()} sources)")));
         TestAutomation.Note($"worldwrites: tick {tick}, {hits.Count} kinds: " +
             string.Join("; ", hits.OrderByDescending(kv => kv.Value).ThenBy(kv => kv.Key, System.StringComparer.Ordinal).Select(kv => $"{kv.Key} x{kv.Value} (from {firstTick[kv.Key]})")));
     }

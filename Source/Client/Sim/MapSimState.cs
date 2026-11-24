@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using Verse;
 
 namespace RWMLWC.Client.Sim;
@@ -60,6 +62,31 @@ public sealed class MapSimState : MapComponent
         return id;
     }
 
+    /// <summary>
+    /// Счётчики прочих номеров, взятых в тике этой карты (задания пешек, ранения, записи журнала, сказания, письма…;
+    /// T-056, Sim/PerMapIds.cs): ключ — имя метода <c>UniqueIDsManager.GetNext…ID</c>. Тот же блок, что у номеров вещей:
+    /// пространства номеров разных видов не пересекаются, поэтому один блок на карту для всех видов не конфликтует.
+    /// </summary>
+    private Dictionary<string, int> idCounters = new Dictionary<string, int>();
+    private List<string>? tmpIdKeys;
+    private List<int>? tmpIdValues;
+
+    /// <summary>Следующий номер вида <paramref name="kind"/> для этой карты или -1.</summary>
+    public int TakeId(string kind)
+    {
+        int slot = map.uniqueID + 1;
+        idCounters.TryGetValue(kind, out int next);
+        if (slot < 1 || slot > MaxMapsWithOwnIds || next >= ThingIdBlock - 1)
+        {
+            return -1;
+        }
+        idCounters[kind] = next + 1;
+        return slot * ThingIdBlock + next;
+    }
+
+    /// <summary>Для хеша и тестов: счётчики по видам в порядке имени.</summary>
+    public string IdCountersDigest() => string.Join(",", idCounters.OrderBy(kv => kv.Key, System.StringComparer.Ordinal).Select(kv => kv.Key + "=" + kv.Value));
+
     // Кэш последнего поиска: вещи одной карты обычно идут в списке тиков подряд.
     private static Map? cachedMap;
     private static MapSimState? cachedState;
@@ -100,6 +127,8 @@ public sealed class MapSimState : MapComponent
         Scribe_Values.Look(ref randInitialized, "rwmlwc_randInitialized", false);
         Scribe_Values.Look(ref nextThingId, "rwmlwc_nextThingId", 0);
         Scribe_Values.Look(ref absentWealth, "rwmlwc_absentWealth", -1f);
+        Scribe_Collections.Look(ref idCounters, "rwmlwc_idCounters", LookMode.Value, LookMode.Value, ref tmpIdKeys, ref tmpIdValues);
+        idCounters ??= new Dictionary<string, int>();
     }
 
     public override void MapRemoved()
