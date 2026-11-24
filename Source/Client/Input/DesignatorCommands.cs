@@ -161,6 +161,8 @@ public static class DesignatorCommands
                 }
             }
 
+            // T-052: чертежи игрока не из колонии — предложения до утверждения владельцем.
+            RWMLWC.Client.Maps.BlueprintApproval.BeginDesignate(map, designator);
             // Состояние карты могло измениться с момента действия игрока — проверяем заново.
             switch (method)
             {
@@ -186,6 +188,7 @@ public static class DesignatorCommands
         }
         finally
         {
+            RWMLWC.Client.Maps.BlueprintApproval.EndDesignate();
             for (int i = restore.Count - 1; i >= 0; i--)
             {
                 restore[i].field.SetValue(null, restore[i].old);

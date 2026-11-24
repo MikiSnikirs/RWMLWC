@@ -485,6 +485,30 @@ public static class TestAutomation
                 }));
             }
         }
+        if (cfg.scenario == "blueprints")
+        {
+            // TST-052 (T-052): c2 выбирает карте режим отсутствия и становится её владельцем (командой, у всех
+            // одинаково); c1 ставит стены — это предложения, колонисты их не строят; c1 пробует утвердить сам —
+            // отказ при исполнении; c2 утверждает часть, одну отклоняет — утверждённые строятся.
+            Map BpMap() => Find.CurrentMap ?? Find.Maps[0];
+            int BpOwner() => RWMLWC.Client.Maps.AbsenceModes.Component?.OwnerOf(BpMap().uniqueID) ?? 0;
+            if (cfg.issuer)
+            {
+                stepGates["blueprints: propose walls"] = () => BpOwner() != 0 && BpOwner() != LockstepClient.PlayerId;
+                sessionSteps.Enqueue((startTick + 500, "blueprints: propose walls", () => BlueprintsPropose(BpMap())));
+                stepGates["blueprints: approve own proposal"] = () => (RWMLWC.Client.Maps.BlueprintApprovalComponent.Component?.Count ?? 0) > 0;
+                sessionSteps.Enqueue((startTick + 900, "blueprints: approve own proposal", () => BlueprintsDecide(BpMap(), 1, true)));
+            }
+            else
+            {
+                sessionSteps.Enqueue((startTick + 200, "blueprints: become owner", () => RWMLWC.Client.Maps.AbsenceModes.Set(BpMap(), RWMLWC.Client.Maps.AbsenceMode.Autopilot)));
+                stepGates["blueprints: approve"] = () => (RWMLWC.Client.Maps.BlueprintApprovalComponent.Component?.Count ?? 0) > 0;
+                sessionSteps.Enqueue((startTick + 3000, "blueprints: approve", () => BlueprintsDecide(BpMap(), 6, true)));
+                sessionSteps.Enqueue((startTick + 3100, "blueprints: reject", () => BlueprintsDecide(BpMap(), 1, false)));
+            }
+            sessionSteps.Enqueue((startTick + 2900, "blueprints: state before approval", () => BlueprintsState(BpMap())));
+            sessionSteps.Enqueue((startTick + 9000, "blueprints: state after approval", () => BlueprintsState(BpMap())));
+        }
         if (cfg.issuer && cfg.scenario == "squads")
         {
             // TST-060, ч. 1: c1 создаёт два отряда, назначает участников и пешек, переводит пешку,
@@ -631,6 +655,9 @@ public static class TestAutomation
                     break;
                 case "absence-raid":
                     ScenarioAbsenceRaid();
+                    break;
+                case "absence-points":
+                    ScenarioAbsencePoints();
                     break;
                 case "settle-adjacent":
                     ScenarioSettle(adjacent: true);
@@ -1327,6 +1354,49 @@ public static class TestAutomation
     }
 
     // Те же вызовы, что делает интерфейс: в сессии они перехватываются и уходят командами (T-020).
+    // TST-052: десять деревянных стен в ряд к северу от центра — обычной разметкой (уходит командой).
+    private static void BlueprintsPropose(Map map)
+    {
+        Designator_Build wall = new Designator_Build(ThingDefOf.Wall);
+        wall.SetStuffDef(ThingDefOf.WoodLog);
+        List<IntVec3> cells = new List<IntVec3>();
+        for (int i = -5; i < 5; i++)
+        {
+            IntVec3 cell = map.Center + new IntVec3(i, 0, 12);
+            if (cell.InBounds(map) && wall.CanDesignateCell(cell).Accepted)
+            {
+                cells.Add(cell);
+            }
+        }
+        wall.DesignateMultiCell(cells);
+        Note($"blueprints: proposing {cells.Count} walls as player {LockstepClient.PlayerId}, owner {RWMLWC.Client.Maps.AbsenceModes.Component?.OwnerOf(map.uniqueID)}");
+    }
+
+    // TST-052: нажать «Утвердить»/«Отклонить» у первых n неутверждённых чертежей (по номеру) — кнопкой, командой.
+    private static void BlueprintsDecide(Map map, int n, bool approve)
+    {
+        string label = approve ? "Утвердить" : "Отклонить";
+        List<Blueprint> pending = map.listerThings.ThingsInGroup(ThingRequestGroup.Blueprint).OfType<Blueprint>()
+            .Where(RWMLWC.Client.Maps.BlueprintApproval.IsPending).OrderBy(b => b.thingIDNumber).Take(n).ToList();
+        int sent = 0;
+        foreach (Blueprint b in pending)
+        {
+            if (GizmoCommands.SendClick(map, b, g => g is Command_Action a && a.defaultLabel == label))
+            {
+                sent++;
+            }
+        }
+        Note($"blueprints: player {LockstepClient.PlayerId} pressed '{label}' on {sent}/{pending.Count}: [{string.Join(",", pending.Select(b => b.thingIDNumber))}]");
+    }
+
+    private static void BlueprintsState(Map map)
+    {
+        List<Thing> bps = map.listerThings.ThingsInGroup(ThingRequestGroup.Blueprint);
+        int frames = map.listerThings.ThingsInGroup(ThingRequestGroup.BuildingFrame).Count(f => f.def.entityDefToBuild == ThingDefOf.Wall);
+        int walls = map.listerThings.ThingsOfDef(ThingDefOf.Wall).Count(w => w.Stuff == ThingDefOf.WoodLog);
+        Note($"blueprints: tick {Find.TickManager.TicksGame}: blueprints {bps.Count}, pending [{RWMLWC.Client.Maps.BlueprintApprovalComponent.Component?.Digest()}], wall frames {frames}, wooden walls {walls}");
+    }
+
     private static void ScenarioDesignate()
     {
         Map map = Find.CurrentMap ?? Find.Maps[0];
@@ -1693,6 +1763,44 @@ public static class TestAutomation
         Note("absence-raid: offline owner, quest-style raid executed=" + FireRaidDirect(map));
         RWMLWC.Client.Maps.PlayerPresence.Component?.Apply(7, true);
         Note("absence-raid: owner back, raid fired=" + FireRaidViaStoryteller(map));
+    }
+
+    // T-072: очки угроз карты отсутствующего владельца не растут вместе с богатством. Одно и то же зерно Rand
+    // для каждого замера — сравнивается только зависимость от состояния карты. Только в сессии (вне её — как в игре).
+    private static void ScenarioAbsencePoints()
+    {
+        Map map = Find.Maps[0];
+        MapSimState? state = MapSimState.For(map);
+        if (state == null || !LockstepClient.InSession)
+        {
+            Note("absence-points: needs a session and map state");
+            return;
+        }
+        float Points()
+        {
+            Rand.PushState(12345);
+            try { return StorytellerUtility.DefaultThreatPointsNow(map); }
+            finally { Rand.PopState(); }
+        }
+        float before = Points();
+        RWMLWC.Client.Maps.AbsenceModes.Component?.SetDirect(map.uniqueID, RWMLWC.Client.Maps.AbsenceMode.Autopilot, 7);
+        RWMLWC.Client.Maps.PlayerPresence.Component?.Apply(7, false);
+        RWMLWC.Client.Maps.AbsentThreatPoints.Update(map, state);
+        float absent0 = Points();
+        // +200 000 богатства: 40 стопок золота по 500 (в начале игры очки — у нижней границы, нужен заметный рост).
+        for (int i = 0; i < 40; i++)
+        {
+            Thing gold = ThingMaker.MakeThing(ThingDefOf.Gold);
+            gold.stackCount = gold.def.stackLimit;
+            GenPlace.TryPlaceThing(gold, map.Center, map, ThingPlaceMode.Near);
+        }
+        map.wealthWatcher.ForceRecount();
+        float absentRich = Points();
+        RWMLWC.Client.Maps.PlayerPresence.Component?.Apply(7, true);
+        RWMLWC.Client.Maps.AbsentThreatPoints.Update(map, state);
+        float back = Points();
+        Note($"absence-points: before {before:F1}, absent {absent0:F1}, absent after +gold {absentRich:F1}, owner back {back:F1}, wealth now {map.PlayerWealthForStoryteller:F0}");
+        Note($"absence-points: frozen while absent={(System.Math.Abs(absentRich - absent0) < 0.01f)}, grows after return={(back > absentRich + 0.01f)}");
     }
 
     // T-073: «основать поселение» караваном из одного колониста — на соседней с колонией клетке (как самопроверка B)

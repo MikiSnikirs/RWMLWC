@@ -119,6 +119,7 @@ namespace RWMLWC.Client.Maps
                 }
                 if (check)
                 {
+                    AbsentThreatPoints.Update(maps[i], state);
                     bool freeze = ShouldFreeze(maps[i]);
                     if (freeze != state.frozen)
                     {
@@ -139,6 +140,10 @@ namespace RWMLWC.Client.Maps
                 {
                     state.stasisTicks++;
                 }
+            }
+            if (RWMLWC.Client.World.CaravanSelfTest.ArmKey("questtest=1"))
+            {
+                StasisQuestSelfTest.Tick();
             }
         }
 
@@ -233,11 +238,31 @@ namespace RWMLWC.Client.Maps
                 {
                     if (f.GetValue(part) is MapParent parent && parent.HasMap && PerMapSim.IsFrozen(parent.Map))
                     {
+                        Pause(__instance);
                         return false;
                     }
                 }
             }
             return true;
+        }
+
+        /// <summary>
+        /// Задание пропускает тик: его отметки времени (по общим часам: <c>enableTick</c> задержек и таймеров,
+        /// <c>fireRaidTick</c>, <c>endTick</c>… — поля частей на <c>Tick</c> со значением &gt; 0) и срок принятия
+        /// сдвигаются на тик вперёд. Иначе пауза ничего не дала бы: задержка считается как
+        /// <c>enableTick + delayTicks - TicksGame</c>, и после разморозки все сроки сработали бы разом.
+        /// Сдвиг по тику, а не одним разом при разморозке, — верно и при нескольких замороженных картах.
+        /// </summary>
+        private static void Pause(Quest quest)
+        {
+            foreach (QuestPart part in quest.PartsListForReading)
+            {
+                PawnClockShift.ShiftObject(part, 1);
+            }
+            if (quest.acceptanceExpireTick >= 0)
+            {
+                quest.acceptanceExpireTick++;
+            }
         }
 
         private static System.Reflection.FieldInfo[] FieldsOf(System.Type type)
@@ -298,7 +323,7 @@ namespace RWMLWC.Client.Maps
             TestAutomation.Note($"stasis: pawn {pawn.thingIDNumber} clock shifted by {delta}, {shifted} fields");
         }
 
-        private static int ShiftObject(object o, int delta)
+        internal static int ShiftObject(object o, int delta)
         {
             System.Type type = o.GetType();
             if (!tickFields.TryGetValue(type, out System.Reflection.FieldInfo[]? fields))
