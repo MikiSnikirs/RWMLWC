@@ -99,6 +99,9 @@ public static class RandTracer
     }
 
     /// <summary>Вызывается из префиксов Rand.Value и Rand.Int.</summary>
+    /// <summary>Пометка следующей записи: SEED=…, PUSH, POP — смена состояния Rand без вызова Value/Int (T-081).</summary>
+    public static string? Tag;
+
     public static void Record()
     {
         // Вне тика Rand принадлежит показу (интерфейс, отрисовка, звук) — это не симуляция, не пишем.
@@ -117,6 +120,10 @@ public static class RandTracer
             buffer.Append("map").Append(map.uniqueID);
         }
         buffer.Append(';');
+        if (Tag != null)
+        {
+            buffer.Append(Tag).Append(" < ");
+        }
 
         StackTrace trace = new StackTrace(1, false);
         int written = 0;

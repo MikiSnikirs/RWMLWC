@@ -160,3 +160,34 @@ internal static class Patch_CameraJumper_TryJumpAndSelect_Remote
 {
     private static bool Prefix() => !(CommandBus.ExecutingRemote || SessionLongEvents.RunningRemote);
 }
+
+// T-081: ExecuteWhenFinished выполняет действие сразу, если долгого события нет. Из тика игра ставит так действия
+// интерфейса (GravshipUtility.ArriveExistingMap: камера на карту, выбор инструмента переноса маркера; PauseOnLoad) —
+// они шли в состоянии симуляции, и у каждого клиента своё состояние интерфейса давало свои вызовы Rand: общий Rand
+// расходился на 3 вызова к тику посадки (t081-g13, g23, g24). В сессии такие действия — с изолированным Rand.
+[HarmonyPatch(typeof(LongEventHandler), nameof(LongEventHandler.ExecuteWhenFinished))]
+internal static class Patch_LongEventHandler_ExecuteWhenFinished_Isolate
+{
+    private static void Prefix(ref Action action)
+    {
+        if (!LockstepClient.InSession || !MapRandContext.InTick)
+        {
+            return;
+        }
+        Action inner = action;
+        action = () =>
+        {
+            Rand.PushState();
+            RandTracer.PushSuppress();
+            try
+            {
+                inner();
+            }
+            finally
+            {
+                RandTracer.PopSuppress();
+                Rand.PopState();
+            }
+        };
+    }
+}
