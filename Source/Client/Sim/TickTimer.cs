@@ -36,9 +36,20 @@ internal static class TickTimer
 [HarmonyPatch(typeof(TickManager), nameof(TickManager.DoSingleTick))]
 internal static class Patch_TickManager_DoSingleTick_Timer
 {
-    [HarmonyPriority(Priority.First)]
-    private static void Prefix() => TickTimer.Begin();
-
     [HarmonyPriority(Priority.Last)]
-    private static void Finalizer() => TickTimer.End();
+    private static void Prefix(bool __runOriginal)
+    {
+        if (__runOriginal)
+        {
+            TickTimer.Begin();
+        }
+    }
+
+    private static void Postfix(bool __runOriginal)
+    {
+        if (__runOriginal)
+        {
+            TickTimer.End();
+        }
+    }
 }

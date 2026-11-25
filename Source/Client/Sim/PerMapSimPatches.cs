@@ -101,8 +101,12 @@ internal static class Patch_Map_MapPostTick
 [HarmonyPatch(typeof(TickManager), nameof(TickManager.DoSingleTick))]
 internal static class Patch_TickManager_DoSingleTick
 {
-    private static void Prefix()
+    private static void Prefix(bool __runOriginal)
     {
+        if (!__runOriginal)
+        {
+            return; // лишний тик в сессии отменён (StrayTickGuard) — тик не начинается
+        }
         // Точка «строго перед тиком»: здесь стартует тестовый прогон, заказанный при загрузке сейва.
         HashRecorder.BeforeTick();
         if (PerMapSim.Enabled)

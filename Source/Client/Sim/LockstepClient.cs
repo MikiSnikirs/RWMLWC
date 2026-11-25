@@ -116,6 +116,9 @@ public static class LockstepClient
     /// <summary>Клиент владеет тиками: штатный цикл игры отключён.</summary>
     public static bool OwnsTicking => state != State.Off;
 
+    /// <summary>Идёт тик из цикла сессии (RunTicks). Любой другой DoSingleTick в сессии — лишний (Sim/StrayTickGuard.cs).</summary>
+    public static bool InRunTicks { get; private set; }
+
     /// <summary>Идёт сессия: сервер прислал Welcome.</summary>
     public static bool InSession => state == State.InSession;
 
@@ -774,7 +777,15 @@ public static class LockstepClient
         int cap = TestAutomation.TicksPerFrameCap;
         while (tickManager.TicksGame < tickUpTo && state == State.InSession && (cap == 0 || done < cap) && !SessionLongEvents.PendingFromSimulation)
         {
-            tickManager.DoSingleTick();
+            InRunTicks = true;
+            try
+            {
+                tickManager.DoSingleTick();
+            }
+            finally
+            {
+                InRunTicks = false;
+            }
             done++;
             if (tickManager.TicksGame % HashInterval == 0)
             {

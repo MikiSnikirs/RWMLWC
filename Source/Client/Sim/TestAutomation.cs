@@ -264,6 +264,10 @@ public static class TestAutomation
                 case "uiprobe":
                     cfg.uiProbe = value == "1";
                     break;
+                case "pauseonload":
+                    // Проверка StrayTickGuard: настройка игрока, при которой игра сама делает тик после загрузки.
+                    Prefs.PauseOnLoad = value == "1";
+                    break;
                 case "sleepforeign":
                     PerMapSim.SleepForeignTest = value == "1";
                     break;
