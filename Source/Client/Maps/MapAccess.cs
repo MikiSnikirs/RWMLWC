@@ -119,6 +119,47 @@ public static class MapAccess
     }
 
     /// <summary>Права игрока на карте выданы «только пока владельца нет» (управляющий, v7).</summary>
+    // T-075 (задача B, взята с разрешения владельца 24.11): соавторы колонии получают полный доступ к её карте сами.
+    // Выдаёт хозяин карты своим клиентом (сервер принимает выдачу только от хозяина), пока он в сети; повторно —
+    // не раньше, чем через 300 кадров, если сервер ещё не прислал новую таблицу.
+    private static readonly Dictionary<(int map, int player), int> autoGrantFrame = new Dictionary<(int, int), int>();
+
+    public static void AutoGrantCoauthors()
+    {
+        if (!LockstepClient.InSession || !HasTable || Current.Game == null)
+        {
+            return;
+        }
+        RWMLWC.Client.World.ColoniesComponent? colonies = RWMLWC.Client.World.Colonies.Component;
+        if (colonies == null)
+        {
+            return;
+        }
+        int me = LockstepClient.PlayerId;
+        int frame = Time.frameCount;
+        foreach (Map map in Find.Maps)
+        {
+            if (OwnerOf(map.uniqueID) != me || !(map.Parent is RimWorld.Planet.Settlement settlement))
+            {
+                continue;
+            }
+            foreach (int member in colonies.MembersOf(settlement))
+            {
+                if (member == me || GrantedLevel(map.uniqueID, member) >= PermissionLevel.Full)
+                {
+                    continue;
+                }
+                if (autoGrantFrame.TryGetValue((map.uniqueID, member), out int last) && frame - last < 300)
+                {
+                    continue;
+                }
+                autoGrantFrame[(map.uniqueID, member)] = frame;
+                Grant(map.uniqueID, member, PermissionLevel.Full);
+                RWMLWC.Client.Sim.TestAutomation.Note($"access: co-author {member} of colony {settlement.ID} gets Full on map {map.uniqueID} automatically");
+            }
+        }
+    }
+
     public static bool IsUntilReturn(int mapId, int playerId) =>
         table.TryGetValue(mapId, out MapEntry? entry) && entry.untilReturn.Contains(playerId);
 

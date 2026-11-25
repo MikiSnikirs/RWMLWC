@@ -577,6 +577,24 @@ public static class TestAutomation
             sessionSteps.Enqueue((startTick + 4000, "gravship: state", () =>
                 Note($"gravship: state — maps {Find.Maps.Count}, engines {Find.Maps.Sum(m => m.listerThings.ThingsOfDef(ThingDefOf.GravEngine).Count)}, in flight {(Current.Game.Gravship != null)}")));
         }
+        if (cfg.scenario == "coauthor")
+        {
+            // TST-075: соавтор (colonychoice=join) получает полный доступ к карте колонии сам, когда хозяин её занял.
+            Map CoMap() => Find.Maps[0];
+            RimWorld.Planet.Settlement? CoColony() => CoMap().Parent as RimWorld.Planet.Settlement;
+            bool IsColonyOwner() => CoColony() != null && RWMLWC.Client.World.Colonies.Component?.OwnerOf(CoColony()!) == LockstepClient.PlayerId;
+            stepGates["coauthor: owner claims the map"] = () => CoColony() != null && (RWMLWC.Client.World.Colonies.Component?.MembersOf(CoColony()!).Any() ?? false);
+            sessionSteps.Enqueue((startTick + 500, "coauthor: owner claims the map", () =>
+            {
+                if (IsColonyOwner())
+                {
+                    RWMLWC.Client.Maps.MapAccess.Claim(CoMap());
+                    Note("coauthor: colony owner claims map " + CoMap().uniqueID);
+                }
+            }));
+            sessionSteps.Enqueue((startTick + 2500, "coauthor: state", () =>
+                Note($"coauthor: player {LockstepClient.PlayerId}, colony owner={IsColonyOwner()}, map owner {RWMLWC.Client.Maps.MapAccess.OwnerOf(CoMap().uniqueID)}, my level {RWMLWC.Client.Maps.MapAccess.MyLevel(CoMap().uniqueID)}, members [{string.Join(",", RWMLWC.Client.World.Colonies.Component?.MembersOf(CoColony()!) ?? Enumerable.Empty<int>())}]")));
+        }
         if (cfg.issuer && cfg.scenario == "squads")
         {
             // TST-060, ч. 1: c1 создаёт два отряда, назначает участников и пешек, переводит пешку,
@@ -726,6 +744,7 @@ public static class TestAutomation
                     break;
                 case "blueprints":
                 case "gravship":
+                case "coauthor":
                     break; // шаги — в OnRunStarted
                 case "absence-points":
                     ScenarioAbsencePoints();

@@ -23,6 +23,7 @@ public sealed class SessionFrameHooks : GameComponent
         }
         RoofCountIsolation.ProbeFrame();
         MapEvents.Frame();
+        RWMLWC.Client.Maps.MapAccess.AutoGrantCoauthors();
         RWMLWC.Client.SessionView.ChatSelfTest.Frame();
         RWMLWC.Client.Absence.IdleAlarm.Frame();
         RWMLWC.Client.Net.Reconnect.Frame();
