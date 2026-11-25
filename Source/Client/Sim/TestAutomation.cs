@@ -46,6 +46,10 @@ public static class TestAutomation
         public int denseTo = HashRecorder.DenseTicks;
         public bool perProcess;
         public int snapAt = 2000;
+        /// <summary>shotat=тик:имя+тик:имя — снимки экрана игрой на тиках от старта прогона (проверка «глазами»).</summary>
+        public List<(int at, string name)> shots = new List<(int, string)>();
+        /// <summary>openlend=тик — открыть окно аренды (T-053, проверка «глазами») для первого колониста карты 0.</summary>
+        public int openLendAt = -1;
         public string? serverHost;
         public int serverPort;
         public string thumbprint = "";
@@ -268,6 +272,22 @@ public static class TestAutomation
                     // Проверка StrayTickGuard: настройка игрока, при которой игра сама делает тик после загрузки.
                     Prefs.PauseOnLoad = value == "1";
                     break;
+                case "openlend":
+                    if (int.TryParse(value, out int ol) && ol > 0)
+                    {
+                        cfg.openLendAt = ol;
+                    }
+                    break;
+                case "shotat":
+                    foreach (string part in value.Split('+'))
+                    {
+                        string[] kv = part.Split(':');
+                        if (kv.Length == 2 && int.TryParse(kv[0], out int at) && at > 0)
+                        {
+                            cfg.shots.Add((at, kv[1].Trim()));
+                        }
+                    }
+                    break;
                 case "sleepforeign":
                     PerMapSim.SleepForeignTest = value == "1";
                     break;
@@ -352,6 +372,7 @@ public static class TestAutomation
             Find.TickManager.CurTimeSpeed = TimeSpeed.Superfast;
         }
         activeConfig = cfg;
+        shotsStartTick = startTick;
         TickTimer.Reset();
         Note("regionids: run start " + DeterministicRegionIds.Digest());
         sessionSteps.Clear();
@@ -810,9 +831,43 @@ public static class TestAutomation
     }
 
     /// <summary>Раз в кадр в сессии, между тиками: сценарии, которые действуют как игрок.</summary>
+    private static int shotsStartTick = -1;
+
+    // Снимки экрана по ключу shotat (папка Screenshots данных клиента). Камера — как есть у этого клиента.
+    private static void TakeScheduledShots()
+    {
+        Config? cfg = activeConfig;
+        if (cfg == null || (cfg.shots.Count == 0 && cfg.openLendAt < 0) || Current.Game == null || shotsStartTick < 0)
+        {
+            return;
+        }
+        int elapsed = Find.TickManager.TicksGame - shotsStartTick;
+        if (cfg.openLendAt > 0 && elapsed >= cfg.openLendAt)
+        {
+            cfg.openLendAt = -1;
+            Pawn? pawn = Find.Maps[0].mapPawns.FreeColonistsSpawned.OrderBy(p => p.thingIDNumber).FirstOrDefault();
+            if (pawn != null)
+            {
+                Find.WindowStack.Add(new RWMLWC.Client.World.Dialog_Lend(pawn));
+                Note("lend window opened for " + pawn.LabelShort);
+            }
+        }
+        for (int i = cfg.shots.Count - 1; i >= 0; i--)
+        {
+            if (elapsed >= cfg.shots[i].at)
+            {
+                string name = cfg.shots[i].name;
+                cfg.shots.RemoveAt(i);
+                ScreenshotTaker.TakeNonSteamShot(name);
+                Note($"screenshot '{name}' at tick {Find.TickManager.TicksGame} saved to {GenFilePaths.ScreenshotFolderPath}");
+            }
+        }
+    }
+
     public static void SessionFrame()
     {
         WanderCamera();
+        TakeScheduledShots();
         PerMapSim.UpdateSleepForeign();
         if (sessionSteps.Count == 0 || Current.Game == null || Find.TickManager.TicksGame < sessionSteps.Peek().tick)
         {
