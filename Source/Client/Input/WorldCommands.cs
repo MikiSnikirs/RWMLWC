@@ -36,7 +36,7 @@ public static class WorldCommands
     // 21, 22 — капсулы (TransportPods)
     private const byte OpTestPodKit = 23;
     private const byte OpTestGravship = 41;    // только тестовые прогоны (ключ gravtest=1): a=0 — построить корабль, a=1 — взлёт (T-081)
-    // 24 — SOS (Absence/Sos.cs); 25, 26 — аренда пешек (World/Rentals.cs); 40 — события карты (Sim/MapEvents.cs)       // только тестовые прогоны (ключ podtest=1): пусковая площадка с капсулой и топливом
+    // 24 — SOS (Absence/Sos.cs); 25, 26 — аренда пешек (World/Rentals.cs); 40 — события карты (Sim/MapEvents.cs); 42 — посадка гравикорабля (Sim/GravshipSession.cs)       // только тестовые прогоны (ключ podtest=1): пусковая площадка с капсулой и топливом
 
     private static readonly FieldInfo FormMapField = AccessTools.Field(typeof(Dialog_FormCaravan), "map");
     private static readonly FieldInfo FormReformField = AccessTools.Field(typeof(Dialog_FormCaravan), "reform");
@@ -763,10 +763,13 @@ public static class WorldCommands
     }
 
     /// <summary>События карты (T-056, Sim/MapEvents.cs, операция 40).</summary>
-    public static void SendMapEvents(System.Action<PacketWriter> write)
+    public static void SendMapEvents(System.Action<PacketWriter> write) => SendOp(RWMLWC.Client.Sim.MapEvents.OpMapEvents, write);
+
+    /// <summary>Операция мира с произвольным телом (40 — события карты, 42 — посадка гравикорабля).</summary>
+    public static void SendOp(byte op, System.Action<PacketWriter> write)
     {
         PacketWriter w = BeginWorld();
-        w.WriteByte(RWMLWC.Client.Sim.MapEvents.OpMapEvents);
+        w.WriteByte(op);
         write(w);
         SendWorld(w);
     }
@@ -1040,6 +1043,11 @@ public static class WorldCommands
         if (op == RWMLWC.Client.World.Rentals.OpLend || op == RWMLWC.Client.World.Rentals.OpRecall)
         {
             RWMLWC.Client.World.Rentals.Execute(op, ref r);
+            return;
+        }
+        if (op == RWMLWC.Client.Sim.GravshipSession.OpLand)
+        {
+            RWMLWC.Client.Sim.GravshipSession.ExecuteLand(ref r);
             return;
         }
         if (op == RWMLWC.Client.Sim.MapEvents.OpMapEvents)
