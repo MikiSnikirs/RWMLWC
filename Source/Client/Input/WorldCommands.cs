@@ -35,6 +35,7 @@ public static class WorldCommands
     private const byte OpTestHomeArea = 20;     // только тестовые прогоны (ключ exchangetest=1): домашняя зона под вещами карты
     // 21, 22 — капсулы (TransportPods)
     private const byte OpTestPodKit = 23;
+    private const byte OpTestGravship = 41;    // только тестовые прогоны (ключ gravtest=1): a=0 — построить корабль, a=1 — взлёт (T-081)
     // 24 — SOS (Absence/Sos.cs); 25, 26 — аренда пешек (World/Rentals.cs); 40 — события карты (Sim/MapEvents.cs)       // только тестовые прогоны (ключ podtest=1): пусковая площадка с капсулой и топливом
 
     private static readonly FieldInfo FormMapField = AccessTools.Field(typeof(Dialog_FormCaravan), "map");
@@ -691,6 +692,57 @@ public static class WorldCommands
     }
 
     /// <summary>Тест часов пешки: перевести колониста с карты from на карту to (как караваном, но сразу).</summary>
+    // T-081: маленький корабль — настил 9×9 у центра карты на свободных клетках и двигатель посередине.
+    private static string TestGravshipBuild(Map map)
+    {
+        for (int dz = 0; dz < 60; dz += 3)
+        {
+            foreach (int dx in new[] { 0, 12, -12, 24, -24 })
+            {
+                IntVec3 c0 = map.Center + new IntVec3(dx, 0, 20 + dz);
+                CellRect rect = CellRect.CenteredOn(c0, 4);
+                if (!rect.InBounds(map) || rect.Cells.Any(c => !c.Standable(map) || c.GetEdifice(map) != null || c.GetFirstPawn(map) != null))
+                {
+                    continue;
+                }
+                foreach (IntVec3 c in rect.Cells)
+                {
+                    map.terrainGrid.SetFoundation(c, TerrainDefOf.Substructure);
+                }
+                Thing engine = ThingMaker.MakeThing(ThingDefOf.GravEngine);
+                engine.SetFaction(Faction.OfPlayer);
+                GenSpawn.Spawn(engine, c0, map);
+                // Пульт пилота обязателен: по нему корабль выбирает направление взлёта (Gravship.DetermineLaunchDirection).
+                ThingDef? consoleDef = DefDatabase<ThingDef>.GetNamedSilentFail("PilotConsole");
+                if (consoleDef != null)
+                {
+                    Thing console = ThingMaker.MakeThing(consoleDef, consoleDef.MadeFromStuff ? GenStuff.DefaultStuffFor(consoleDef) : null);
+                    console.SetFaction(Faction.OfPlayer);
+                    GenSpawn.Spawn(console, c0 + new IntVec3(0, 0, 3), map, Rot4.North);
+                }
+                (engine as Building_GravEngine)?.ForceSubstructureDirty();
+                int valid = (engine as Building_GravEngine)?.ValidSubstructure.Count ?? -1;
+                return $"built engine {engine.thingIDNumber} at {c0}, substructure {rect.Area}, valid {valid}";
+            }
+        }
+        return "no free place for the test ship";
+    }
+
+    private static string TestGravshipLaunch(Map map)
+    {
+        Building_GravEngine? engine = map.listerThings.ThingsOfDef(ThingDefOf.GravEngine).OfType<Building_GravEngine>().FirstOrDefault();
+        if (engine == null)
+        {
+            return "no engine to launch";
+        }
+        List<PlanetTile> near = new List<PlanetTile>();
+        Find.WorldGrid.GetTileNeighbors(map.Tile, near);
+        PlanetTile target = near.Where(t => !Find.WorldObjects.AnyWorldObjectAt(t)).OrderBy(t => t.tileId).FirstOrDefault();
+        engine.launchInfo ??= new LaunchInfo { quality = 1f };
+        Find.GravshipController.InitiateTakeoff(engine, target);
+        return $"launch requested to tile {target}, maps now {Find.Maps.Count}, gravship {(Current.Game.Gravship != null ? "in flight" : "none")}";
+    }
+
     /// <summary>Тест часов пешки (clocktest): поле-отметка времени в <c>mindState</c> со значением &gt; 0, lastIngestTick в приоритете, затем по имени.</summary>
     private static System.Reflection.FieldInfo? ClockTestField(Pawn p)
     {
@@ -732,6 +784,7 @@ public static class WorldCommands
     public const byte TestGoTradeOp = OpTestGoTrade;
     public const byte TestHomeAreaOp = OpTestHomeArea;
     public const byte TestPodKitOp = OpTestPodKit;
+    public const byte TestGravshipOp = OpTestGravship;
 
     /// <summary>Тест капсул: как если бы игрок построил пусковую площадку с капсулой у колонистов и заправил её.</summary>
     private static string SpawnPodKit(Map map)
@@ -871,6 +924,19 @@ public static class WorldCommands
                     TestAutomation.Note("pods: kit on map " + a + ": " + SpawnPodKit(map));
                     break;
                 }
+            case OpTestGravship:
+                {
+                    int a = r.ReadInt32();
+                    r.ReadInt32();
+                    if (!RWMLWC.Client.World.CaravanSelfTest.ArmKey("gravtest=1"))
+                    {
+                        return;
+                    }
+                    Map map = Find.Maps[0];
+                    MapRandContext.Enter(map);
+                    TestAutomation.Note("gravship test: " + (a == 0 ? TestGravshipBuild(map) : TestGravshipLaunch(map)));
+                    break;
+                }
             case OpTestTransfer:
                 {
                     int fromId = r.ReadInt32();
@@ -996,7 +1062,7 @@ public static class WorldCommands
             SharedWindows.Execute(op, ref r);
             return;
         }
-        if (op == OpColonyClaim || op == OpColonyJoin || op == OpColonyNew || op == OpColonyTestAbsent || op == OpTestPresence || op == OpTestKill || op == OpTestTransfer || op == OpTestTrader || op == OpTestGoTrade || op == OpTestHomeArea || op == OpTestPodKit)
+        if (op == OpColonyClaim || op == OpColonyJoin || op == OpColonyNew || op == OpColonyTestAbsent || op == OpTestPresence || op == OpTestKill || op == OpTestTransfer || op == OpTestTrader || op == OpTestGoTrade || op == OpTestHomeArea || op == OpTestPodKit || op == OpTestGravship)
         {
             ExecuteColony(op, ref r);
             return;
