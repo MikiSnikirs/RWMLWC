@@ -548,6 +548,15 @@ public static class TestAutomation
             // TST-081: c1 командами строит маленький корабль и взлетает с ним на соседнюю клетку мира.
             sessionSteps.Enqueue((startTick + 300, "gravship: build", () => RWMLWC.Client.Input.WorldCommands.SendTestOp(RWMLWC.Client.Input.WorldCommands.TestGravshipOp, 0, 0)));
             sessionSteps.Enqueue((startTick + 900, "gravship: launch", () => RWMLWC.Client.Input.WorldCommands.SendTestOp(RWMLWC.Client.Input.WorldCommands.TestGravshipOp, 1, 0)));
+            // Этап 2: после прибытия на новой карте стоит маркер посадки — нажать «подтвердить посадку», как кнопка.
+            stepGates["gravship: confirm landing"] = () => Find.Maps.Any(m => m.listerThings.ThingsOfDef(ThingDefOf.GravshipLandingMarker).Any());
+            sessionSteps.Enqueue((startTick + 1500, "gravship: confirm landing", () =>
+            {
+                GravshipLandingMarker marker = Find.Maps.SelectMany(m => m.listerThings.ThingsOfDef(ThingDefOf.GravshipLandingMarker)).OfType<GravshipLandingMarker>().First();
+                marker.BeginLanding(Find.GravshipController);
+            }));
+            sessionSteps.Enqueue((startTick + 4000, "gravship: state", () =>
+                Note($"gravship: state — maps {Find.Maps.Count}, engines {Find.Maps.Sum(m => m.listerThings.ThingsOfDef(ThingDefOf.GravEngine).Count)}, in flight {(Current.Game.Gravship != null)}")));
         }
         if (cfg.issuer && cfg.scenario == "squads")
         {
