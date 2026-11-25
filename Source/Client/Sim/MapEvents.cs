@@ -36,7 +36,7 @@ public static class MapEvents
         public int seq;
         public byte kind;
         public Tale? tale;
-        public string xml = "";
+        public string? xml; // снимается при отправке (вызывающий может дописать сказание после RecordTale: customLabel)
         public bool sent;
     }
 
@@ -69,8 +69,7 @@ public static class MapEvents
         }
         seqByMap.TryGetValue(map.uniqueID, out int seq);
         seqByMap[map.uniqueID] = seq + 1;
-        string xml = Scribe.saver.DebugOutputFor(tale);
-        pending.Add(new Pending { map = map.uniqueID, tick = tick, seq = seq, kind = KindTale, tale = tale, xml = xml });
+        pending.Add(new Pending { map = map.uniqueID, tick = tick, seq = seq, kind = KindTale, tale = tale });
         TestAutomation.Note($"map events: tale {tale.def.defName} #{tale.id} on map {map.uniqueID} queued at tick {tick}.{seq}");
     }
 
@@ -82,6 +81,10 @@ public static class MapEvents
     {
         foreach (Pending p in pending)
         {
+            if (p.xml == null && p.tale != null)
+            {
+                p.xml = Scribe.saver.DebugOutputFor(p.tale); // ссылки — по номерам, годятся и для новой игры
+            }
             p.tale = null;
         }
         seqTick = -1;
@@ -120,6 +123,10 @@ public static class MapEvents
                 continue;
             }
             List<Pending> items = group.OrderBy(p => p.tick).ThenBy(p => p.seq).Take(MaxPerCommand).ToList();
+            foreach (Pending p in items)
+            {
+                p.xml ??= p.tale != null ? Scribe.saver.DebugOutputFor(p.tale) : "";
+            }
             RWMLWC.Client.Input.WorldCommands.SendMapEvents(w =>
             {
                 w.WriteInt32(group.Key);
@@ -129,7 +136,7 @@ public static class MapEvents
                     w.WriteInt32(p.tick);
                     w.WriteInt32(p.seq);
                     w.WriteByte(p.kind);
-                    w.WriteString(p.xml);
+                    w.WriteString(p.xml ?? "");
                 }
             });
             foreach (Pending p in items)
