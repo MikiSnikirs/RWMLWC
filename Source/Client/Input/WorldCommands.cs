@@ -36,7 +36,7 @@ public static class WorldCommands
     // 21, 22 — капсулы (TransportPods)
     private const byte OpTestPodKit = 23;
     private const byte OpTestGravship = 41;    // только тестовые прогоны (ключ gravtest=1): a=0 — построить корабль, a=1 — взлёт (T-081)
-    // 24 — SOS (Absence/Sos.cs); 25, 26 — аренда пешек (World/Rentals.cs); 40 — события карты (Sim/MapEvents.cs); 42, 43, 44 — посадка, отмена посадки, перенос маркера гравикорабля (Sim/GravshipSession.cs)       // только тестовые прогоны (ключ podtest=1): пусковая площадка с капсулой и топливом
+    // 24 — SOS (Absence/Sos.cs); 25, 26 — аренда пешек (World/Rentals.cs); 40 — события карты (Sim/MapEvents.cs); 42, 43, 44 — посадка, отмена посадки, перенос маркера гравикорабля; 45–48 — обмен между игроками (World/PlayerTrade.cs) (Sim/GravshipSession.cs)       // только тестовые прогоны (ключ podtest=1): пусковая площадка с капсулой и топливом
 
     private static readonly FieldInfo FormMapField = AccessTools.Field(typeof(Dialog_FormCaravan), "map");
     private static readonly FieldInfo FormReformField = AccessTools.Field(typeof(Dialog_FormCaravan), "reform");
@@ -1057,6 +1057,11 @@ public static class WorldCommands
         if (op == RWMLWC.Client.World.Rentals.OpLend || op == RWMLWC.Client.World.Rentals.OpRecall)
         {
             RWMLWC.Client.World.Rentals.Execute(op, ref r);
+            return;
+        }
+        if (op >= RWMLWC.Client.World.PlayerTrade.OpPropose && op <= RWMLWC.Client.World.PlayerTrade.OpTestGive)
+        {
+            RWMLWC.Client.World.PlayerTrade.Execute(op, ref r);
             return;
         }
         if (op == RWMLWC.Client.Sim.GravshipSession.OpMoveMarker)
