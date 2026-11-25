@@ -539,6 +539,12 @@ public static class TestAutomation
             sessionSteps.Enqueue((startTick + 3100, "blueprints: reject", () => { if (IAmOwner()) BlueprintsDecide(BpMap(), 1, false); }));
             sessionSteps.Enqueue((startTick + 9000, "blueprints: state after approval", () => BlueprintsState(BpMap())));
         }
+        if (cfg.issuer && cfg.scenario == "gravship")
+        {
+            // TST-081: c1 командами строит маленький корабль и взлетает с ним на соседнюю клетку мира.
+            sessionSteps.Enqueue((startTick + 300, "gravship: build", () => RWMLWC.Client.Input.WorldCommands.SendTestOp(RWMLWC.Client.Input.WorldCommands.TestGravshipOp, 0, 0)));
+            sessionSteps.Enqueue((startTick + 900, "gravship: launch", () => RWMLWC.Client.Input.WorldCommands.SendTestOp(RWMLWC.Client.Input.WorldCommands.TestGravshipOp, 1, 0)));
+        }
         if (cfg.issuer && cfg.scenario == "squads")
         {
             // TST-060, ч. 1: c1 создаёт два отряда, назначает участников и пешек, переводит пешку,
@@ -687,6 +693,7 @@ public static class TestAutomation
                     ScenarioAbsenceRaid();
                     break;
                 case "blueprints":
+                case "gravship":
                     break; // шаги — в OnRunStarted
                 case "absence-points":
                     ScenarioAbsencePoints();
