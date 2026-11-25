@@ -637,6 +637,58 @@ public static class TestAutomation
             sessionSteps.Enqueue((startTick + 2500, "coauthor: state", () =>
                 Note($"coauthor: player {LockstepClient.PlayerId}, colony owner={IsColonyOwner()}, map owner {RWMLWC.Client.Maps.MapAccess.OwnerOf(CoMap().uniqueID)}, my level {RWMLWC.Client.Maps.MapAccess.MyLevel(CoMap().uniqueID)}, members [{string.Join(",", RWMLWC.Client.World.Colonies.Component?.MembersOf(CoColony()!) ?? Enumerable.Empty<int>())}]")));
         }
+        if (RWMLWC.Client.World.CaravanSelfTest.ArmKey("playertrade=1"))
+        {
+            // TST-036, этап 3 (вместе с caravantest/exchangetest): гость предлагает 10 стали за 5 штук вещи с карты хозяина,
+            // хозяин принимает. Роли — по состоянию игры, не по номеру клиента.
+            Pawn? MyGuest() => Find.Maps.SelectMany(m => m.mapPawns.AllPawnsSpawned)
+                .Where(p => RWMLWC.Client.Maps.GuestsComponent.Component?.GuestPlayer(p) == LockstepClient.PlayerId).OrderBy(p => p.thingIDNumber).FirstOrDefault();
+            stepGates["trade: give guest steel"] = () => MyGuest() != null || (RWMLWC.Client.World.PlayerTrade.Component?.offers.Count ?? 0) > 0 || Find.TickManager.TicksGame > startTick + 40000;
+            sessionSteps.Enqueue((startTick + 3000, "trade: give guest steel", () =>
+            {
+                Pawn? g = MyGuest();
+                if (g != null) RWMLWC.Client.Input.WorldCommands.SendOp(RWMLWC.Client.World.PlayerTrade.OpTestGive, w => { w.WriteInt32(g.MapHeld.uniqueID); w.WriteInt32(10); });
+            }));
+            stepGates["trade: propose"] = () => MyGuest() == null || MyGuest()!.inventory.innerContainer.Any(t => t.def == ThingDefOf.Steel && t.stackCount >= 10);
+            sessionSteps.Enqueue((startTick + 3100, "trade: propose", () =>
+            {
+                Pawn? g = MyGuest();
+                if (g == null) return;
+                Thing steel = g.inventory.innerContainer.First(t => t.def == ThingDefOf.Steel && t.stackCount >= 10);
+                Thing? want = g.MapHeld.listerThings.ThingsInGroup(ThingRequestGroup.HaulableEver)
+                    .Where(t => t.Spawned && t.def.category == ThingCategory.Item && t.stackCount >= 5 && t.def != ThingDefOf.Steel).OrderBy(t => t.thingIDNumber).FirstOrDefault();
+                if (want == null) { Note("trade: nothing to ask for on the host map"); return; }
+                Note($"trade: proposing 10 steel ({steel.thingIDNumber}) for 5 {want.def.defName} ({want.thingIDNumber}, stack {want.stackCount})");
+                RWMLWC.Client.World.PlayerTrade.SendPropose(g, new[] { (steel, 10) }, new[] { (want, 5) });
+            }));
+            stepGates["trade: look"] = () => (RWMLWC.Client.World.PlayerTrade.Component?.offers.Count ?? 0) > 0;
+            sessionSteps.Enqueue((startTick + 3150, "trade: look", () =>
+            {
+                var o = RWMLWC.Client.World.PlayerTrade.Component!.offers[0];
+                Map? m = Find.Maps.FirstOrDefault(x => x.uniqueID == o.mapId);
+                Pawn? g = MyGuest();
+                if (m != null && RWMLWC.Client.World.PlayerTrade.MayAccept(m, LockstepClient.PlayerId)) Find.WindowStack.Add(new RWMLWC.Client.World.Dialog_TradeOffers(m));
+                else if (g != null) Find.WindowStack.Add(new RWMLWC.Client.World.Dialog_PlayerTrade(g));
+            }));
+            sessionSteps.Enqueue((startTick + 3180, "trade: screenshot", () =>
+            {
+                ScreenshotTaker.TakeNonSteamShot("trade-look");
+                Note("trade: screenshot saved to " + GenFilePaths.ScreenshotFolderPath);
+            }));
+            stepGates["trade: accept"] = () => (RWMLWC.Client.World.PlayerTrade.Component?.offers.Count ?? 0) > 0;
+            sessionSteps.Enqueue((startTick + 3200, "trade: accept", () =>
+            {
+                var o = RWMLWC.Client.World.PlayerTrade.Component!.offers[0];
+                Map? m = Find.Maps.FirstOrDefault(x => x.uniqueID == o.mapId);
+                if (m != null && RWMLWC.Client.World.PlayerTrade.MayAccept(m, LockstepClient.PlayerId)) RWMLWC.Client.World.PlayerTrade.SendAccept(o.id);
+            }));
+            stepGates["trade: state"] = () => (RWMLWC.Client.World.PlayerTrade.Component?.offers.Count ?? 0) == 0;
+            sessionSteps.Enqueue((startTick + 4500, "trade: state", () =>
+            {
+                Pawn? g = Find.Maps.SelectMany(m => m.mapPawns.AllPawnsSpawned).Where(p => (RWMLWC.Client.Maps.GuestsComponent.Component?.GuestPlayer(p) ?? 0) != 0).OrderBy(p => p.thingIDNumber).FirstOrDefault();
+                Note($"trade: state — offers [{RWMLWC.Client.World.PlayerTrade.Component?.Digest()}], guest {g?.thingIDNumber} inventory [{string.Join(",", g?.inventory.innerContainer.Select(t => t.def.defName + "x" + t.stackCount) ?? Enumerable.Empty<string>())}]");
+            }));
+        }
         if (cfg.issuer && cfg.scenario == "squads")
         {
             // TST-060, ч. 1: c1 создаёт два отряда, назначает участников и пешек, переводит пешку,
