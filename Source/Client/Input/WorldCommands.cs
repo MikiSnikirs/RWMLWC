@@ -36,7 +36,7 @@ public static class WorldCommands
     // 21, 22 — капсулы (TransportPods)
     private const byte OpTestPodKit = 23;
     private const byte OpTestGravship = 41;    // только тестовые прогоны (ключ gravtest=1): a=0 — построить корабль, a=1 — взлёт (T-081)
-    // 24 — SOS (Absence/Sos.cs); 25, 26 — аренда пешек (World/Rentals.cs); 40 — события карты (Sim/MapEvents.cs); 42 — посадка гравикорабля (Sim/GravshipSession.cs)       // только тестовые прогоны (ключ podtest=1): пусковая площадка с капсулой и топливом
+    // 24 — SOS (Absence/Sos.cs); 25, 26 — аренда пешек (World/Rentals.cs); 40 — события карты (Sim/MapEvents.cs); 42, 43, 44 — посадка, отмена посадки, перенос маркера гравикорабля (Sim/GravshipSession.cs)       // только тестовые прогоны (ключ podtest=1): пусковая площадка с капсулой и топливом
 
     private static readonly FieldInfo FormMapField = AccessTools.Field(typeof(Dialog_FormCaravan), "map");
     private static readonly FieldInfo FormReformField = AccessTools.Field(typeof(Dialog_FormCaravan), "reform");
@@ -746,6 +746,12 @@ public static class WorldCommands
         List<PlanetTile> near = new List<PlanetTile>();
         Find.WorldGrid.GetTileNeighbors(map.Tile, near);
         PlanetTile target = near.Where(t => !Find.WorldObjects.AnyWorldObjectAt(t)).OrderBy(t => t.tileId).FirstOrDefault();
+        // gravabort=1: лететь к другой колонии (существующая карта: маркер, отмена посадки).
+        Map? other = RWMLWC.Client.World.CaravanSelfTest.ArmKey("gravabort=1") || RWMLWC.Client.World.CaravanSelfTest.ArmKey("gravland=1") ? Find.Maps.Where(m => m != map && m.IsPlayerHome).OrderBy(m => m.uniqueID).FirstOrDefault() : null;
+        if (other != null)
+        {
+            target = other.Tile;
+        }
         engine.launchInfo ??= new LaunchInfo { quality = 1f };
         Find.GravshipController.InitiateTakeoff(engine, target);
         return $"launch requested to tile {target}, maps now {Find.Maps.Count}, gravship {(Current.Game.Gravship != null ? "in flight" : "none")}";
@@ -1051,6 +1057,16 @@ public static class WorldCommands
         if (op == RWMLWC.Client.World.Rentals.OpLend || op == RWMLWC.Client.World.Rentals.OpRecall)
         {
             RWMLWC.Client.World.Rentals.Execute(op, ref r);
+            return;
+        }
+        if (op == RWMLWC.Client.Sim.GravshipSession.OpMoveMarker)
+        {
+            RWMLWC.Client.Sim.GravshipSession.ExecuteMoveMarker(ref r);
+            return;
+        }
+        if (op == RWMLWC.Client.Sim.GravshipSession.OpAbort)
+        {
+            RWMLWC.Client.Sim.GravshipSession.ExecuteAbort(ref r);
             return;
         }
         if (op == RWMLWC.Client.Sim.GravshipSession.OpLand)

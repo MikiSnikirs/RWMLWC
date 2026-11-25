@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using RimWorld;
 using RimWorld.Planet;
 using Verse;
@@ -15,6 +16,28 @@ namespace RWMLWC.Client.Sim;
 public static class WorldStateHasher
 {
     private static readonly List<WorldObject> tmp = new List<WorldObject>();
+
+    /// <summary>Подхеши частей мира для поиска расхождения (файл хешей, строка world): карты, объекты мира, колонии, сказания, Rand.</summary>
+    public static string Parts()
+    {
+        Fnv64 m = Fnv64.Create();
+        foreach (Map map in Find.Maps) { m.Add(map.uniqueID); m.Add(map.Tile.tileId); }
+        Fnv64 o = Fnv64.Create();
+        tmp.Clear();
+        tmp.AddRange(Find.WorldObjects.AllWorldObjects);
+        tmp.Sort((a, b) => a.ID.CompareTo(b.ID));
+        foreach (WorldObject w in tmp)
+        {
+            o.Add(w.ID); o.Add((int)w.def.shortHash); o.Add(w.Tile.tileId); o.Add(w.Faction?.loadID ?? -1);
+            if (w is Caravan c) { o.Add(c.PawnsListForReading.Count); o.Add(c.pather.Moving ? c.pather.Destination.tileId : -1); }
+        }
+        string objs = string.Join(",", tmp.Select(w => w.ID + ":" + w.def.defName + "@" + w.Tile.tileId));
+        tmp.Clear();
+        Fnv64 col = Fnv64.Create();
+        RWMLWC.Client.World.ColoniesComponent? colonies = RWMLWC.Client.World.Colonies.Component;
+        if (colonies != null) { foreach (int v in colonies.HashValues()) { col.Add(v); } }
+        return $"pMaps={m.Value:X16};pObjs={o.Value:X16};pCol={col.Value:X16};pRand={MapRandContext.GlobalState:X16};objs={objs}";
+    }
 
     public static ulong Compute()
     {
