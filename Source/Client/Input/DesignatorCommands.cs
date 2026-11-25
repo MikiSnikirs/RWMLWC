@@ -58,6 +58,12 @@ public static class DesignatorCommands
         {
             return true;
         }
+        // Перенос маркера посадки гравикорабля — своей командой (T-081, Sim/GravshipSession.cs).
+        if (designator is Designator_MoveGravship moveGravship && method == MethodCell)
+        {
+            RWMLWC.Client.Sim.GravshipSession.SendMoveMarker(moveGravship, cell);
+            return false;
+        }
         Type type = designator.GetType();
         if (!CanRebuild(type) || designator is Designator_Plan_Copy || designator is Designator_Plan_CopySelectionPaste)
         {

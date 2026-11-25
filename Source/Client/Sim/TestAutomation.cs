@@ -548,9 +548,28 @@ public static class TestAutomation
             // TST-081: c1 командами строит маленький корабль и взлетает с ним на соседнюю клетку мира.
             sessionSteps.Enqueue((startTick + 300, "gravship: build", () => RWMLWC.Client.Input.WorldCommands.SendTestOp(RWMLWC.Client.Input.WorldCommands.TestGravshipOp, 0, 0)));
             sessionSteps.Enqueue((startTick + 900, "gravship: launch", () => RWMLWC.Client.Input.WorldCommands.SendTestOp(RWMLWC.Client.Input.WorldCommands.TestGravshipOp, 1, 0)));
+            // gravabort=1: прибытие к другой колонии — нажать «отменить посадку» (как кнопка и окно подтверждения).
+            if (RWMLWC.Client.World.CaravanSelfTest.ArmKey("gravabort=1"))
+            {
+                stepGates["gravship: abort landing"] = () => HarmonyLib.Traverse.Create(Find.GravshipController).Field("landingMap").GetValue<Map>() != null;
+                sessionSteps.Enqueue((startTick + 1200, "gravship: abort landing", () => HarmonyLib.Traverse.Create(Find.GravshipController).Method("AbortLanding").GetValue()));
+            }
+            // gravland=1: прибытие к другой колонии — поставить маркер инструментом переноса у центра карты.
+            if (RWMLWC.Client.World.CaravanSelfTest.ArmKey("gravland=1"))
+            {
+                stepGates["gravship: place marker"] = () => HarmonyLib.Traverse.Create(Find.GravshipController).Field("landingMap").GetValue<Map>() != null;
+                sessionSteps.Enqueue((startTick + (RWMLWC.Client.World.CaravanSelfTest.ArmKey("gravfixed=1") ? 3000 : 1200), "gravship: place marker", () =>
+                {
+                    Map landing = HarmonyLib.Traverse.Create(Find.GravshipController).Field("landingMap").GetValue<Map>();
+                    Designator_MoveGravship d = Find.GravshipController.MoveDesignator();
+                    IntVec3 spot = landing.Center + new IntVec3(0, 0, 30);
+                    Note($"gravship: placing marker near {spot} on map {landing.uniqueID}, valid={d.CanDesignateCell(spot).Accepted}");
+                    d.DesignateSingleCell(spot);
+                }));
+            }
             // Этап 2: после прибытия на новой карте стоит маркер посадки — нажать «подтвердить посадку», как кнопка.
             stepGates["gravship: confirm landing"] = () => Find.Maps.Any(m => m.listerThings.ThingsOfDef(ThingDefOf.GravshipLandingMarker).Any());
-            sessionSteps.Enqueue((startTick + 1500, "gravship: confirm landing", () =>
+            sessionSteps.Enqueue((startTick + (RWMLWC.Client.World.CaravanSelfTest.ArmKey("gravfixed=1") ? 3100 : 1500), "gravship: confirm landing", () =>
             {
                 GravshipLandingMarker marker = Find.Maps.SelectMany(m => m.listerThings.ThingsOfDef(ThingDefOf.GravshipLandingMarker)).OfType<GravshipLandingMarker>().First();
                 marker.BeginLanding(Find.GravshipController);

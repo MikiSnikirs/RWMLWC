@@ -16,6 +16,76 @@ namespace RWMLWC.Client.Sim;
 internal static class GravshipSession
 {
     public const byte OpLand = 42;
+    public const byte OpAbort = 43;
+    public const byte OpMoveMarker = 44;
+
+    /// <summary>
+    /// Перенос маркера посадки (Designator_MoveGravship) — своей командой: общий механизм разметки передал бы ссылку
+    /// на маркер, которого на карте ещё нет, и потерял бы поворот (он хранится в маркере). Вызывает DesignatorCommands.
+    /// </summary>
+    public static void SendMoveMarker(Designator_MoveGravship designator, IntVec3 cell)
+    {
+        GravshipLandingMarker marker = designator.marker;
+        RWMLWC.Client.Input.WorldCommands.SendOp(OpMoveMarker, w =>
+        {
+            w.WriteInt32(designator.map.uniqueID);
+            RWMLWC.Client.Input.ValueCodec.WriteCell(w, cell);
+            w.WriteInt32(marker.GravshipRotation.AsInt);
+        });
+        Find.DesignatorManager.Deselect();
+    }
+
+    public static void ExecuteMoveMarker(ref RWMLWC.Shared.Protocol.PacketReader r)
+    {
+        int mapId = r.ReadInt32();
+        IntVec3 cell = RWMLWC.Client.Input.ValueCodec.ReadCell(ref r);
+        Rot4 rot = new Rot4(r.ReadInt32());
+        WorldComponent_GravshipController c = Find.GravshipController;
+        GravshipLandingMarker? marker = Traverse.Create(c).Field("landingMarker").GetValue<GravshipLandingMarker>();
+        Map? map = Find.Maps.FirstOrDefault(m => m.uniqueID == mapId);
+        if (marker == null || map == null || marker.gravship == null)
+        {
+            TestAutomation.Note($"gravship: marker move on map {mapId} dropped — no landing marker");
+            return;
+        }
+        MapRandContext.Enter(map);
+        marker.GravshipRotation = rot;
+        Designator_MoveGravship d = new Designator_MoveGravship(map, marker);
+        IntVec3 adjusted = Traverse.Create(d).Method("GetSizeRotAdjustedCell", new[] { typeof(IntVec3) }).GetValue<IntVec3>(cell);
+        if (marker.Spawned)
+        {
+            marker.DeSpawn();
+        }
+        marker.Position = PrefabUtility.GetRoot(adjusted, marker.gravship.Bounds.Size, rot);
+        GenSpawn.Spawn(marker, marker.Position, map);
+        marker.Notify_Moved();
+        TestAutomation.Note($"gravship: marker {marker.thingIDNumber} placed on map {mapId} at {marker.Position} rot {rot} at tick {Find.TickManager.TicksGame}");
+    }
+    internal static bool executingAbort;
+
+    /// <summary>Отмена посадки (кнопка в OnGUI контроллера → окно подтверждения → AbortLanding): в сессии — команда.</summary>
+    public static void ExecuteAbort(ref RWMLWC.Shared.Protocol.PacketReader r)
+    {
+        int mapId = r.ReadInt32();
+        WorldComponent_GravshipController c = Find.GravshipController;
+        Map? landingMap = Traverse.Create(c).Field("landingMap").GetValue<Map>();
+        if (landingMap == null || landingMap.uniqueID != mapId)
+        {
+            TestAutomation.Note($"gravship: abort for map {mapId} dropped — no landing in progress there");
+            return;
+        }
+        MapRandContext.Enter(null); // Rand.Chance исхода и поиск клетки — в мире
+        executingAbort = true;
+        try
+        {
+            Traverse.Create(c).Method("AbortLanding").GetValue();
+        }
+        finally
+        {
+            executingAbort = false;
+        }
+        TestAutomation.Note($"gravship: landing on map {mapId} aborted at tick {Find.TickManager.TicksGame}, new destination {Find.CurrentGravship?.destinationTile}");
+    }
 
     internal static bool Active => LockstepClient.InSession && ModsConfig.OdysseyActive;
 
@@ -138,5 +208,41 @@ internal static class Patch_Gravship_InitiateLanding_Session
         TestAutomation.Note($"gravship: landed on map {map.uniqueID} at {landingPos} rot {landingRot} at tick {Find.TickManager.TicksGame}, engine {engine?.thingIDNumber}");
         t.Method("LandingEnded").GetValue();
         return false;
+    }
+}
+
+[HarmonyPatch(typeof(WorldComponent_GravshipController), "AbortLanding")]
+internal static class Patch_Gravship_AbortLanding_Session
+{
+    private static bool Prefix(WorldComponent_GravshipController __instance)
+    {
+        if (!GravshipSession.Active || GravshipSession.executingAbort)
+        {
+            return true;
+        }
+        Map? landingMap = Traverse.Create(__instance).Field("landingMap").GetValue<Map>();
+        if (landingMap == null)
+        {
+            return true;
+        }
+        RWMLWC.Client.Input.WorldCommands.SendOp(GravshipSession.OpAbort, w => w.WriteInt32(landingMap.uniqueID));
+        TestAutomation.Note($"gravship: abort pressed locally for map {landingMap.uniqueID}, sent as a command");
+        return false;
+    }
+}
+
+[HarmonyPatch(typeof(GravshipUtility), nameof(GravshipUtility.ArriveExistingMap))]
+internal static class Patch_GravshipUtility_ArriveExistingMap_Trace
+{
+    // Диагностика T-081 (ключ gravtrace=1): трассировка Rand на 600 тиков от прибытия к существующей карте.
+    private static void Postfix()
+    {
+        if (GravshipSession.Active && RWMLWC.Client.World.CaravanSelfTest.ArmKey("gravtrace=1"))
+        {
+            int tick = Find.TickManager.TicksGame;
+            string file = System.IO.Path.Combine(GenFilePaths.SaveDataFolderPath, "RWMLWC", $"randtrace-grav-{tick}.txt");
+            RandTracer.Start(file, tick, tick + 600);
+            TestAutomation.Note($"gravship: arrived at an existing map at tick {tick}, rand trace to {tick + 600}");
+        }
     }
 }
