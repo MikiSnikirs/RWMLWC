@@ -885,9 +885,25 @@ public static class TestAutomation
         }
     }
 
+    private static bool autopilotSet;
+
     public static void SessionFrame()
     {
         WanderCamera();
+        // TST-041 (ключ autopilotself=1): каждый игрок ставит своей колонии режим «автопилот» (командой, как в окне).
+        if (!autopilotSet && Current.Game != null && RWMLWC.Client.World.CaravanSelfTest.ArmKey("autopilotself=1"))
+        {
+            Map? mine = Find.Maps.FirstOrDefault(m => m.Parent is RimWorld.Planet.Settlement st && RWMLWC.Client.World.Colonies.Component?.OwnerOf(st) == LockstepClient.PlayerId);
+            if (mine != null)
+            {
+                autopilotSet = true;
+                if (RWMLWC.Client.Maps.AbsenceModes.Get(mine) != RWMLWC.Client.Maps.AbsenceMode.Autopilot)
+                {
+                    RWMLWC.Client.Maps.AbsenceModes.Set(mine, RWMLWC.Client.Maps.AbsenceMode.Autopilot);
+                    Note($"autopilot: player {LockstepClient.PlayerId} sets Autopilot for map {mine.uniqueID}");
+                }
+            }
+        }
         TakeScheduledShots();
         PerMapSim.UpdateSleepForeign();
         if (sessionSteps.Count == 0 || Current.Game == null || Find.TickManager.TicksGame < sessionSteps.Peek().tick)
