@@ -390,6 +390,18 @@ public static class TestAutomation
                 // Отзыв действует сразу: c2 отзывает права на 3000-м тике, шаг ждёт, пока отзыв дойдёт до c1.
                 sessionSteps.Enqueue((startTick + 3300, "access: designate after revoke", () => AccessTry("designate, revoked", ScenarioDesignate)));
                 sessionSteps.Enqueue((startTick + 4000, "access: draft with Full until return", () => AccessTry("draft, Full until return, owner online", GizmoDraft)));
+                // TST-042 (ключ managerleave=1): владелец ушёл — права «пока меня нет» действуют, приказ проходит.
+                if (RWMLWC.Client.World.CaravanSelfTest.ArmKey("managerleave=1"))
+                {
+                    stepGates["access: draft with Full until return, owner away"] = () =>
+                    {
+                        int owner = RWMLWC.Client.Maps.MapAccess.OwnerOf((Find.CurrentMap ?? Find.Maps[0]).uniqueID);
+                        return owner != 0 && !RWMLWC.Client.SessionView.SessionUi.Players.Any(p => p.PlayerId == owner && p.Online);
+                    };
+                    sessionSteps.Enqueue((startTick + 4600, "access: draft with Full until return, owner away", () => AccessTry("draft, Full until return, owner away", GizmoDraft)));
+                    sessionSteps.Enqueue((startTick + 5200, "access: drafted after owner left", () =>
+                        Note("access: drafted now [" + string.Join(",", (Find.CurrentMap ?? Find.Maps[0]).mapPawns.FreeColonistsSpawned.Where(p => p.Drafted).Select(p => p.thingIDNumber)) + "]")));
+                }
                 stepGates["access: draft with Full until return"] = () =>
                     RWMLWC.Client.Maps.MapAccess.IsUntilReturn((Find.CurrentMap ?? Find.Maps[0]).uniqueID, LockstepClient.PlayerId);
                 stepGates["access: designate after revoke"] = () =>
@@ -423,6 +435,15 @@ public static class TestAutomation
                     Find.WindowStack.Add(new RWMLWC.Client.Maps.Dialog_MapAccess());
                 }));
                 sessionSteps.Enqueue((startTick + 4000, "access: screenshot", () => ScreenshotTaker.TakeNonSteamShot("access-look")));
+                if (RWMLWC.Client.World.CaravanSelfTest.ArmKey("managerleave=1"))
+                {
+                    sessionSteps.Enqueue((startTick + 4300, "access: owner leaves", () =>
+                    {
+                        Note("access: owner leaves the session (managerleave)");
+                        LockstepClient.Disconnect("владелец ушёл (тест)");
+                        Root.Shutdown();
+                    }));
+                }
             }
         }
         if (cfg.issuer && cfg.scenario == "tabs")
