@@ -156,6 +156,50 @@ internal static class Patch_Rand_Int
     }
 }
 
+// Смена состояния Rand без вызова Value/Int: задание зерна и стек состояний (T-081: посадка на существующую карту —
+// число вызовов совпадало, а состояние расходилось). Пишется в ту же трассировку с пометкой.
+[HarmonyPatch(typeof(Rand), nameof(Rand.Seed), MethodType.Setter)]
+internal static class Patch_Rand_SeedSet_Trace
+{
+    private static void Prefix(int value)
+    {
+        if (RandTracer.Active)
+        {
+            RandTracer.Tag = "SEED=" + value;
+            RandTracer.Record();
+            RandTracer.Tag = null;
+        }
+    }
+}
+
+[HarmonyPatch(typeof(Rand), nameof(Rand.PushState), new System.Type[0])]
+internal static class Patch_Rand_PushState_Trace
+{
+    private static void Prefix()
+    {
+        if (RandTracer.Active)
+        {
+            RandTracer.Tag = "PUSH";
+            RandTracer.Record();
+            RandTracer.Tag = null;
+        }
+    }
+}
+
+[HarmonyPatch(typeof(Rand), nameof(Rand.PopState))]
+internal static class Patch_Rand_PopState_Trace
+{
+    private static void Prefix()
+    {
+        if (RandTracer.Active)
+        {
+            RandTracer.Tag = "POP";
+            RandTracer.Record();
+            RandTracer.Tag = null;
+        }
+    }
+}
+
 // Номера вещей по картам: вещь, созданная в тике карты, получает номер из счётчика этой карты.
 // Вещи, созданные в глобальном контексте (рейд от рассказчика, мир) или вне тика, — из общего счётчика игры.
 [HarmonyPatch(typeof(UniqueIDsManager), nameof(UniqueIDsManager.GetNextThingID))]
