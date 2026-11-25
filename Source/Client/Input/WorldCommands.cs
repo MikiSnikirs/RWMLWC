@@ -720,6 +720,14 @@ public static class WorldCommands
                     console.SetFaction(Faction.OfPlayer);
                     GenSpawn.Spawn(console, c0 + new IntVec3(0, 0, 3), map, Rot4.North);
                 }
+                // Колонист на борту (T-081: корабль с пешками) — первый по номеру, на угол палубы.
+                Pawn? crew = map.mapPawns.FreeColonistsSpawned.OrderBy(p => p.thingIDNumber).FirstOrDefault();
+                if (crew != null)
+                {
+                    crew.DeSpawn();
+                    GenSpawn.Spawn(crew, c0 + new IntVec3(-3, 0, -3), map);
+                    crew.drafter.Drafted = true; // стоит на месте до взлёта
+                }
                 (engine as Building_GravEngine)?.ForceSubstructureDirty();
                 int valid = (engine as Building_GravEngine)?.ValidSubstructure.Count ?? -1;
                 return $"built engine {engine.thingIDNumber} at {c0}, substructure {rect.Area}, valid {valid}";
