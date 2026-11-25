@@ -155,5 +155,11 @@ internal static class RoomStateProbe
 [HarmonyPatch(typeof(TickManager), nameof(TickManager.DoSingleTick))]
 internal static class Patch_TickManager_DoSingleTick_RoomProbe
 {
-    private static void Postfix() => RoomStateProbe.AfterTick();
+    private static void Postfix(bool __runOriginal)
+    {
+        if (__runOriginal)
+        {
+            RoomStateProbe.AfterTick();
+        }
+    }
 }
