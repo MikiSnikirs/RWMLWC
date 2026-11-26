@@ -1,0 +1,99 @@
+2026-11-26 10:37:01 autoload: loading save 'tst014'
+2026-11-26 10:37:10 lockstep: connecting to 127.0.0.1:59603 as 'c2'
+2026-11-26 10:37:10 regionids: after load room=18 district=24 region=483
+2026-11-26 10:37:11 lockstep: connected to quic:127.0.0.1:59603, Hello sent
+2026-11-26 10:37:12 mapinterface postfix: alive (diag T-076)
+2026-11-26 10:37:12 lockstep: Welcome, playerId=2, serverTick=14998, seed=7
+2026-11-26 10:37:12 presence: player 2 online
+2026-11-26 10:37:12 colonies diag: me=2, tick=14998, anyOwner=False, lowestOnline=False
+2026-11-26 10:37:14 watchdog: no tick advance for 300 frames at tick 14998: speed=Paused, paused=True, topWindow=ImmediateWindow, windows=3
+2026-11-26 10:38:12 lockstep: hold is over, requesting speed 3
+2026-11-26 10:38:12 regionids: run start room=18 district=24 region=483
+2026-11-26 10:38:12 run started: #0, tick=14998, scenario=none, ticks=180000, trace=False, quit=True, file=hash-c2-20261126-103812.txt
+2026-11-26 10:38:13 worldpawn gc: discarding Human #3123 (dead=False, colonist=False) at tick 15036
+2026-11-26 10:38:13 worldpawn gc: discarding Human #3130 (dead=False, colonist=False) at tick 15036
+2026-11-26 10:38:15 colonies: player 1 is the host, settlements claimed: 1
+2026-11-26 10:38:15 colonies: auto choice — new colony at 65243,0
+2026-11-26 10:38:16 colonies: new colony for player 2 at 65243,0: 3 colonists, 10 item stacks
+2026-11-26 10:38:16 tale diag: added #5 TileSettled outside map context (tick 15300)
+2026-11-26 10:38:16 colonies: settlement 253 belongs to player 2
+2026-11-26 10:38:16 long event 'GeneratingMap' start, maps 1
+2026-11-26 10:38:19 long event 'GeneratingMap' done, maps 2
+2026-11-26 10:38:19 map 1 after 'GeneratingMap': Pawn=61,Item=465,Building=36798,Plant=9691,Filth=1376; pawns Raccoon#91319@(26, 0, 211),Ibex#91320@(148, 0, 106),Crow#91321@(100, 0, 174),Crow#91322@(102, 0, 173),Crow#91323@(103, 0, 174),Crow#91324@(102, 0, 176),Boomrat#91325@(177, 0, 81),Hare#91326@(59, 0, 180),Hare#91327@(55, 0, 116),Rat#91328@(12, 0, 72),Porcupine#91329@(13, 0, 76),Alpaca#91330@(6, 0, 22),Alpaca#91331@(10, 0, 22),Alpaca#91332@(5, 0, 20),Raccoon#91333@(26, 0, 89),Quail#91334@(70, 0, 219),Quail#91335@(71, 0, 220),Quail#91336@(72, 0, 219),Quail#91337@(71, 0, 219),Muffalo#91338@(40, 0, 146),Muffalo#91339@(37, 0, 144),Muffalo#91340@(40, 0, 145),Ibex#91341@(10, 0, 80),Ibex#91342@(9, 0, 80),Ibex#91343@(9, 0, 81),Bluebird#91344@(118, 0, 159),Bluebird#91345@(99, 0, 118),Boomrat#91346@(33, 0, 193),Ibex#91347@(81, 0, 185),Ibex#91348@(81, 0, 183),Sparrow#91349@(34, 0, 187),Sparrow#91350@(35, 0, 184),Sparrow#91351@(37, 0, 184),Sparrow#91352@(35, 0, 185),Sparrow#91353@(34, 0, 185),Rat#91354@(117, 0, 29),Hare#91355@(74, 0, 149),Bluebird#91356@(120, 0, 124),Turkey#91357@(57, 0, 198),Raccoon#91358@(166, 0, 56),Squirrel#91359@(7, 0, 19),Boomrat#91360@(98, 0, 167),Ibex#91361@(184, 0, 75),Squirrel#91362@(139, 0, 71),Bluebird#91363@(11, 0, 72),Hare#91364@(89, 0, 111),Megasloth#91365@(131, 0, 160),Rat#91366@(125, 0, 95),Bluebird#91367@(24, 0, 51),Raccoon#91368@(141, 0, 135),Squirrel#91369@(76, 0, 211),Turkey#91370@(8, 0, 64),Bluebird#91371@(93, 0, 61),Alpaca#91372@(87, 0, 141),Alpaca#91373@(87, 0, 146),Alpaca#91374@(89, 0, 145),Mink#91375@(95, 0, 1),Raccoon#91376@(56, 0, 185),Turkey#91377@(123, 0, 89),Hare#91378@(55, 0, 173),Porcupine#91379@(113, 0, 50); rand 00000928FB25C5A1
+2026-11-26 10:38:20 long event 'SpawningColonists' start, maps 2
+2026-11-26 10:38:20 long event 'SpawningColonists' done, maps 2
+2026-11-26 10:38:20 map 1 after 'SpawningColonists': Pawn=65,Item=481,Building=36798,Plant=9691,Filth=1376; pawns Human#41747@(119, 0, 124),Human#41750@(122, 0, 126),Human#41753@(121, 0, 124),Warg#41766@(120, 0, 121),Raccoon#91319@(26, 0, 211),Ibex#91320@(148, 0, 106),Crow#91321@(100, 0, 174),Crow#91322@(102, 0, 173),Crow#91323@(103, 0, 174),Crow#91324@(102, 0, 176),Boomrat#91325@(177, 0, 81),Hare#91326@(59, 0, 180),Hare#91327@(55, 0, 116),Rat#91328@(12, 0, 72),Porcupine#91329@(13, 0, 76),Alpaca#91330@(6, 0, 22),Alpaca#91331@(10, 0, 22),Alpaca#91332@(5, 0, 20),Raccoon#91333@(26, 0, 89),Quail#91334@(70, 0, 219),Quail#91335@(71, 0, 220),Quail#91336@(72, 0, 219),Quail#91337@(71, 0, 219),Muffalo#91338@(40, 0, 146),Muffalo#91339@(37, 0, 144),Muffalo#91340@(40, 0, 145),Ibex#91341@(10, 0, 80),Ibex#91342@(9, 0, 80),Ibex#91343@(9, 0, 81),Bluebird#91344@(118, 0, 159),Bluebird#91345@(99, 0, 118),Boomrat#91346@(33, 0, 193),Ibex#91347@(81, 0, 185),Ibex#91348@(81, 0, 183),Sparrow#91349@(34, 0, 187),Sparrow#91350@(35, 0, 184),Sparrow#91351@(37, 0, 184),Sparrow#91352@(35, 0, 185),Sparrow#91353@(34, 0, 185),Rat#91354@(117, 0, 29),Hare#91355@(74, 0, 149),Bluebird#91356@(120, 0, 124),Turkey#91357@(57, 0, 198),Raccoon#91358@(166, 0, 56),Squirrel#91359@(7, 0, 19),Boomrat#91360@(98, 0, 167),Ibex#91361@(184, 0, 75),Squirrel#91362@(139, 0, 71),Bluebird#91363@(11, 0, 72),Hare#91364@(89, 0, 111),Megasloth#91365@(131, 0, 160),Rat#91366@(125, 0, 95),Bluebird#91367@(24, 0, 51),Raccoon#91368@(141, 0, 135),Squirrel#91369@(76, 0, 211),Turkey#91370@(8, 0, 64),Bluebird#91371@(93, 0, 61),Alpaca#91372@(87, 0, 141),Alpaca#91373@(87, 0, 146),Alpaca#91374@(89, 0, 145),Mink#91375@(95, 0, 1),Raccoon#91376@(56, 0, 185),Turkey#91377@(123, 0, 89),Hare#91378@(55, 0, 173),Porcupine#91379@(113, 0, 50); rand 000009CEFB25C5A1
+2026-11-26 10:38:21 lockstep: player 1 asked for a snapshot at tick 15480; waiting for it
+2026-11-26 10:38:22 lockstep: snapshot 5 received, 2897096 bytes; loading
+2026-11-26 10:38:22 curtain: shown (c1 подключается — синхронизация мира…), map 1, world view False
+2026-11-26 10:38:23 sleepremove: player 2 reloads without maps [0], keeps map 1
+2026-11-26 10:38:23 regionids: reset at load, bump=0
+2026-11-26 10:38:25 regionids: after load room=21 district=27 region=318
+2026-11-26 10:38:25 curtain: view restored — map 1, world view False
+2026-11-26 10:38:25 lockstep: snapshot loaded, tick 15480, serverTick=15480, perMapSim=True
+2026-11-26 10:38:27 watchdog: no tick advance for 300 frames at tick 15480: speed=Paused, paused=True, topWindow=ImmediateWindow, windows=2
+2026-11-26 10:39:25 lockstep: hold is over, requesting speed 3
+2026-11-26 10:39:27 resumed after snapshot reload at tick 15480, perMapSim=True
+2026-11-26 10:39:46 map events: pawn leave Ibex #91347 from map 1 queued at tick 22322.0 (freed=False)
+2026-11-26 10:39:46 map events: sent 1 for map 1
+2026-11-26 10:39:55 map events: pawn leave Raccoon #91376 from map 1 queued at tick 25603.0 (freed=False)
+2026-11-26 10:39:55 map events: sent 1 for map 1
+2026-11-26 10:40:07 worldpawn gc: discarding Human #37708 (dead=True, colonist=False) at tick 30030
+2026-11-26 10:40:07 worldpawn gc: discarding Human #37712 (dead=True, colonist=False) at tick 30030
+2026-11-26 10:40:07 worldpawn gc: discarding Human #37718 (dead=True, colonist=False) at tick 30030
+2026-11-26 10:40:07 worldpawn gc: discarding Ibex #91347 (dead=False, colonist=False) at tick 30030
+2026-11-26 10:40:07 worldpawn gc: discarding Raccoon #91376 (dead=False, colonist=False) at tick 30030
+2026-11-26 10:40:17 map events: tale #100000000 Meditated applied at tick 33445 (restored, map 0 absent)
+2026-11-26 10:40:36 map events: pawn leave Bison #37652 applied at tick 40544 (restored, map 0 absent, freed=False)
+2026-11-26 10:40:41 map events: tale Meditated #200000000 on map 1 queued at tick 42303.0
+2026-11-26 10:40:41 map events: sent 1 for map 1
+2026-11-26 10:40:41 map events: tale #200000000 Meditated applied at tick 42306 (own, map 1)
+2026-11-26 10:40:49 worldpawn gc: discarding Bison #37652 (dead=False, colonist=False) at tick 45030
+2026-11-26 10:41:34 map events: pawn death Rat #37632 applied at tick 61357 (restored, map 0 absent)
+2026-11-26 10:42:12 map events: pawn death Swan #37628 applied at tick 74765 (restored, map 0 absent)
+2026-11-26 10:42:12 worldpawn gc: discarding Swan #37628 (dead=True, colonist=False) at tick 75030
+2026-11-26 10:42:12 worldpawn gc: discarding Rat #37632 (dead=True, colonist=False) at tick 75030
+2026-11-26 10:42:24 map events: tale Wounded #200000001 on map 1 queued at tick 79113.0
+2026-11-26 10:42:24 map events: pawn death Bluebird #91344 on map 1 queued at tick 79113.1
+2026-11-26 10:42:24 map events: sent 2 for map 1
+2026-11-26 10:42:24 map events: tale #200000001 Wounded applied at tick 79144 (own, map 1)
+2026-11-26 10:42:41 map events: pawn leave Turkey #91377 from map 1 queued at tick 85389.0 (freed=False)
+2026-11-26 10:42:41 map events: sent 1 for map 1
+2026-11-26 10:42:54 worldpawn gc: discarding Bluebird #91344 (dead=True, colonist=False) at tick 90030
+2026-11-26 10:42:54 map events: tale remove #200000001 queued at tick 90030.0
+2026-11-26 10:42:54 worldpawn gc: discarding Turkey #91377 (dead=False, colonist=False) at tick 90030
+2026-11-26 10:43:40 map events: pawn leave Gazelle #37619 applied at tick 106585 (restored, map 0 absent, freed=False)
+2026-11-26 10:44:17 worldpawn gc: discarding Gazelle #37619 (dead=False, colonist=False) at tick 120030
+2026-11-26 10:45:03 map events: pawn death Rat #37622 applied at tick 136349 (restored, map 0 absent)
+2026-11-26 10:45:09 map events: tale #100000001 Downed applied at tick 138479 (restored, map 0 absent)
+2026-11-26 10:45:15 map events: tale #100000002 MentalStateGaveUp applied at tick 140966 (restored, map 0 absent)
+2026-11-26 10:45:41 worldpawn gc: discarding Rat #37622 (dead=True, colonist=False) at tick 150030
+2026-11-26 10:46:13 map events: pawn death Human #231 applied at tick 161737 (restored, map 0 absent)
+2026-11-26 10:46:19 map events: tale #100000003 Downed applied at tick 163654 (restored, map 0 absent)
+2026-11-26 10:46:32 map events: pawn leave Ibex #91342 from map 1 queued at tick 168640.0 (freed=False)
+2026-11-26 10:46:32 map events: sent 1 for map 1
+2026-11-26 10:46:45 map events: pawn leave Human #200000541 from map 1 queued at tick 173261.0 (freed=False)
+2026-11-26 10:46:45 map events: sent 1 for map 1
+2026-11-26 10:47:04 worldpawn gc: discarding Ibex #91342 (dead=False, colonist=False) at tick 180032
+2026-11-26 10:47:04 worldpawn gc: discarding Human #200000541 (dead=False, colonist=False) at tick 180032
+2026-11-26 10:47:09 map events: tale Wounded #200000002 on map 1 queued at tick 181668.0
+2026-11-26 10:47:09 map events: tale KilledCapacity #200000003 on map 1 queued at tick 181668.1
+2026-11-26 10:47:09 map events: pawn death Bluebird #91356 on map 1 queued at tick 181668.2
+2026-11-26 10:47:09 map events: sent 3 for map 1
+2026-11-26 10:47:09 map events: tale #200000002 Wounded applied at tick 181669 (own, map 1)
+2026-11-26 10:47:09 map events: tale #200000003 KilledCapacity applied at tick 181669 (own, map 1)
+2026-11-26 10:47:13 map events: pawn leave Human #100001363 applied at tick 183365 (restored, map 0 absent, freed=False)
+2026-11-26 10:47:35 map events: pawn death Human #234 applied at tick 191256 (restored, map 0 absent)
+2026-11-26 10:47:46 tick time: 179999 ticks, avg 0.409 ms, total 73.6 s
+2026-11-26 10:47:46 summary: map1 drafted=0 forbidden=0 plants=[]
+2026-11-26 10:47:46 summary: map1 jobs=[41747:GotoWander@(120, 0, 117),41750:Wait_Wander@(122, 0, 124),41753:GotoWander@(123, 0, 123)]
+2026-11-26 10:47:46 camera: this client moved its camera 1169 times during the run
+2026-11-26 10:47:46 summary: map1 settings=0431F5E6919865E5
+2026-11-26 10:47:46 summary: maps=1 player settlements=2 caravans=0
+2026-11-26 10:47:46 summary: absence= offline=[]
+2026-11-26 10:47:46 summary: squads= rejected=0 drafted=[]
+2026-11-26 10:47:46 summary: map1 designations=0 blueprints=0 zones=0; commands sent=9 executed=22 failed=0
+2026-11-26 10:47:46 run finished: file=hash-c2-20261126-103812.txt
+2026-11-26 10:47:46 queue: finished
+2026-11-26 10:47:46 lockstep: disconnect: прогон завершён
+2026-11-26 10:47:46 quitting game
