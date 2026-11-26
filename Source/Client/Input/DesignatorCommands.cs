@@ -169,6 +169,18 @@ public static class DesignatorCommands
 
             // T-052: чертежи игрока не из колонии — предложения до утверждения владельцем.
             RWMLWC.Client.Maps.BlueprintApproval.BeginDesignate(map, designator);
+            // Постройки без работы (место для сна, для крафта) игра ставит сразу, без чертежа, — мимо утверждения.
+            // Игроку не из колонии их ставить нельзя.
+            if (RWMLWC.Client.Maps.BlueprintApproval.PendingAuthor != 0 && designator is Designator_Build build
+                && build.PlacingDef.GetStatValueAbstract(StatDefOf.WorkToBuild, build.StuffDef) == 0f)
+            {
+                TestAutomation.Note($"blueprints: instant {build.PlacingDef.defName} by player {RWMLWC.Client.Maps.BlueprintApproval.PendingAuthor} rejected — not a colony member");
+                if (!CommandBus.ExecutingRemote)
+                {
+                    Messages.Message("RWMLWC: постройки без работы в чужой колонии ставит только её владелец или соавтор", MessageTypeDefOf.RejectInput, false);
+                }
+                return;
+            }
             // Состояние карты могло измениться с момента действия игрока — проверяем заново.
             switch (method)
             {

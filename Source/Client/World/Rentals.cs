@@ -229,6 +229,11 @@ public sealed class Dialog_Lend : Window
         float y = inRect.y;
         Widgets.Label(new Rect(inRect.x, y, inRect.width, 24f), $"Одолжить {_pawn.LabelShort} другому игроку");
         y += 28f;
+        if (_borrower == 0)
+        {
+            // По умолчанию — первый другой игрок в сети (снимок t053-look: ни один не был выбран).
+            _borrower = SessionView.SessionUi.Players.Where(p => p.PlayerId != LockstepClient.PlayerId && p.Online).Select(p => p.PlayerId).DefaultIfEmpty(0).Min();
+        }
         foreach (PlayerInfo p in SessionView.SessionUi.Players.Where(p => p.PlayerId != LockstepClient.PlayerId))
         {
             bool chosen = _borrower == p.PlayerId;

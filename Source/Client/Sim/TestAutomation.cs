@@ -1618,6 +1618,14 @@ public static class TestAutomation
         }
         wall.DesignateMultiCell(cells);
         Note($"blueprints: proposing {cells.Count} walls as player {LockstepClient.PlayerId}");
+        // Постройка без работы (место для сна) — должна быть отклонена, а не поставлена сразу.
+        ThingDef? spot = DefDatabase<ThingDef>.GetNamedSilentFail("SleepingSpot");
+        if (spot != null)
+        {
+            Designator_Build sleep = new Designator_Build(spot);
+            IntVec3 c = map.Center + new IntVec3(0, 0, 16);
+            if (sleep.CanDesignateCell(c).Accepted) sleep.DesignateSingleCell(c);
+        }
     }
 
     // TST-052: нажать «Утвердить»/«Отклонить» у первых n неутверждённых чертежей (по номеру) — кнопкой, командой.
@@ -1642,6 +1650,7 @@ public static class TestAutomation
         List<Thing> bps = map.listerThings.ThingsInGroup(ThingRequestGroup.Blueprint);
         int frames = map.listerThings.ThingsInGroup(ThingRequestGroup.BuildingFrame).Count(f => f.def.entityDefToBuild == ThingDefOf.Wall);
         int walls = map.listerThings.ThingsOfDef(ThingDefOf.Wall).Count(w => w.Stuff == ThingDefOf.WoodLog);
+        Note($"blueprints: sleeping spots {map.listerThings.ThingsOfDef(DefDatabase<ThingDef>.GetNamedSilentFail("SleepingSpot") ?? ThingDefOf.Wall).Count}");
         Note($"blueprints: tick {Find.TickManager.TicksGame}: blueprints {bps.Count}, pending [{RWMLWC.Client.Maps.BlueprintApprovalComponent.Component?.Digest()}], wall frames {frames}, wooden walls {walls}");
     }
 
