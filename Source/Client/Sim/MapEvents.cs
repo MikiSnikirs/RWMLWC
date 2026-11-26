@@ -267,9 +267,32 @@ internal static class Patch_TaleManager_Add_MapEvent
     {
         if (!MapEvents.ShouldDefer(out Map? map) || map == null)
         {
+            if (PerMapSim.SleepRemoveTest && LockstepClient.InSession && tale != null)
+            {
+                TestAutomation.Note($"tale diag: added #{tale.id} {tale.def?.defName} outside map context (tick {Find.TickManager.TicksGame})");
+            }
             return true;
         }
         MapEvents.QueueTale(map, tale);
         return false;
+    }
+}
+
+/// <summary>Диагностика sleepremove (T-056): кто и откуда убирает сказание — список входит в хеш мира.</summary>
+[HarmonyPatch(typeof(TaleManager), "RemoveTale")]
+internal static class Patch_TaleManager_RemoveTale_Diag
+{
+    private static void Prefix(Tale tale)
+    {
+        if (PerMapSim.SleepRemoveTest && tale != null)
+        {
+            string caller = new System.Diagnostics.StackTrace(2).ToString();
+            int nl = caller.IndexOf('\n');
+            if (nl >= 0)
+            {
+                caller = caller.Substring(0, nl);
+            }
+            TestAutomation.Note($"tale diag: removing #{tale.id} {tale.def?.defName} (uses={tale.Uses}, pawn={(tale.DominantPawn == null ? "null" : tale.DominantPawn.thingIDNumber.ToString())}) by {caller.Trim()}");
+        }
     }
 }
