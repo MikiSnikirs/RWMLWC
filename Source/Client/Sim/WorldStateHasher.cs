@@ -49,7 +49,7 @@ public static class WorldStateHasher
         Fnv64 h = Fnv64.Create();
         // sleepremove (T-056, 11.4б): карт чужих колоний у игрока нет, список карт у каждого свой.
         // Поселения всё равно проверяются — они в объектах мира ниже. Список карт для диагностики — pMaps в Parts().
-        if (!PerMapSim.SleepRemoveTest)
+        if (!PerMapSim.Split)
         {
             List<Map> maps = Find.Maps;
             h.Add(maps.Count);
@@ -97,7 +97,7 @@ public static class WorldStateHasher
         // карты, под Rand карты. Поэтому в хеш мира сказания не входят; синхронизация событием сохраняется,
         // список номеров — в диагностике Parts() (taleIds). Полный возврат сказаний в хеш — с событиями ухода
         // и смерти пешек (шаг 4 плана 11.4б).
-        if (!PerMapSim.SleepRemoveTest)
+        if (!PerMapSim.Split)
         {
             List<Tale> tales = Find.TaleManager.AllTalesListForReading;
             h.Add(tales.Count);

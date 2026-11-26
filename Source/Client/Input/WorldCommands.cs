@@ -1059,6 +1059,11 @@ public static class WorldCommands
             RWMLWC.Client.World.Rentals.Execute(op, ref r);
             return;
         }
+        if (op == RWMLWC.Client.Sim.SplitColonies.OpMode || op == RWMLWC.Client.Sim.SplitColonies.OpVisit)
+        {
+            RWMLWC.Client.Sim.SplitColonies.Execute(op, ref r);
+            return;
+        }
         if (op == LetterChoices.OpChoice)
         {
             LetterChoices.Execute(ref r);
