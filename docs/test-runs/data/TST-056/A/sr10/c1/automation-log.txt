@@ -1,0 +1,191 @@
+2026-11-26 07:57:01 autoload: loading save 'tst014'
+2026-11-26 07:57:10 lockstep: connecting to 127.0.0.1:53975 as 'c1'
+2026-11-26 07:57:10 regionids: after load room=18 district=24 region=483
+2026-11-26 07:57:12 lockstep: connected to quic:127.0.0.1:53975, Hello sent
+2026-11-26 07:57:12 mapinterface postfix: alive (diag T-076)
+2026-11-26 07:57:12 lockstep: Welcome, playerId=1, serverTick=14998, seed=7
+2026-11-26 07:57:12 presence: player 1 online
+2026-11-26 07:57:12 colonies diag: me=1, tick=14998, anyOwner=False, lowestOnline=True
+2026-11-26 07:57:13 presence: player 2 online
+2026-11-26 07:57:14 watchdog: no tick advance for 300 frames at tick 14998: speed=Paused, paused=True, topWindow=ImmediateWindow, windows=3
+2026-11-26 07:58:14 regionids: run start room=18 district=24 region=483
+2026-11-26 07:58:14 run started: #0, tick=14998, scenario=none, ticks=180000, trace=False, quit=True, file=hash-c1-20261126-075814.txt
+2026-11-26 07:58:15 colonies: claim sent (lowest online player)
+2026-11-26 07:58:17 colonies: player 1 is the host, settlements claimed: 1
+2026-11-26 07:58:19 colonies: new colony for player 2 at 97621,0: 3 colonists, 10 item stacks
+2026-11-26 07:58:19 tale diag: added #5 TileSettled outside map context (tick 15305)
+2026-11-26 07:58:19 colonies: settlement 253 belongs to player 2
+2026-11-26 07:58:19 long event 'GeneratingMap' start, maps 1
+2026-11-26 07:58:34 long event 'GeneratingMap' done, maps 2
+2026-11-26 07:58:34 map 1 after 'GeneratingMap': Pawn=15,Item=1588,Building=1344,Plant=10592,Filth=4354,Ethereal=2; pawns Human#43630@(-1000, -1000, -1000),Megascarab#43640@(-1000, -1000, -1000),Megascarab#43641@(-1000, -1000, -1000),Megascarab#43642@(-1000, -1000, -1000),Human#43644@(-1000, -1000, -1000),Megascarab#43651@(-1000, -1000, -1000),Megascarab#43652@(-1000, -1000, -1000),Megascarab#43653@(-1000, -1000, -1000),Megascarab#43654@(-1000, -1000, -1000),Megascarab#43655@(-1000, -1000, -1000),Rat#61522@(83, 0, 196),Rat#61523@(32, 0, 214),Toxalope#61524@(69, 0, 135),Toxalope#61525@(72, 0, 135),Toxalope#61526@(72, 0, 135),Toxalope#61527@(72, 0, 136),Rat#61528@(77, 0, 134),Rat#61529@(23, 0, 158),Raccoon#61530@(91, 0, 205),Raccoon#61531@(8, 0, 137); rand 00000928FB25C5A1
+2026-11-26 07:58:35 sleepremove: both colony maps present, requesting common snapshot
+2026-11-26 07:58:35 long event 'SpawningColonists' start, maps 2
+2026-11-26 07:58:35 long event 'SpawningColonists' done, maps 2
+2026-11-26 07:58:35 map 1 after 'SpawningColonists': Pawn=19,Item=1604,Building=1344,Plant=10592,Filth=4354,Ethereal=2; pawns Human#41747@(127, 0, 131),Human#41750@(125, 0, 130),Human#41753@(126, 0, 134),Warg#41766@(126, 0, 129),Human#43630@(-1000, -1000, -1000),Megascarab#43640@(-1000, -1000, -1000),Megascarab#43641@(-1000, -1000, -1000),Megascarab#43642@(-1000, -1000, -1000),Human#43644@(-1000, -1000, -1000),Megascarab#43651@(-1000, -1000, -1000),Megascarab#43652@(-1000, -1000, -1000),Megascarab#43653@(-1000, -1000, -1000),Megascarab#43654@(-1000, -1000, -1000),Megascarab#43655@(-1000, -1000, -1000),Rat#61522@(83, 0, 196),Rat#61523@(32, 0, 214),Toxalope#61524@(69, 0, 135),Toxalope#61525@(72, 0, 135),Toxalope#61526@(72, 0, 135),Toxalope#61527@(72, 0, 136),Rat#61528@(77, 0, 134),Rat#61529@(23, 0, 158),Raccoon#61530@(91, 0, 205),Raccoon#61531@(8, 0, 137); rand 00000951FB25C5A1
+2026-11-26 07:58:35 snapshot: SaveGame start (RWMLWC-snapshot-out)
+2026-11-26 07:58:36 snapshot: SaveGame done in 1269 ms
+2026-11-26 07:58:36 lockstep: snapshot for player 1 at tick 15480: raw=22366585 bytes, packed=2928149 bytes (13.1%), save=1269 ms, pack=26 ms, 15 chunks sent; reloading it here too
+2026-11-26 07:58:36 curtain: shown (Синхронизация мира…), map 0, world view False
+2026-11-26 07:58:37 sleepremove: player 1 reloads without maps [1], keeps map 0
+2026-11-26 07:58:38 regionids: reset at load, bump=0
+2026-11-26 07:58:41 regionids: after load room=18 district=24 region=483
+2026-11-26 07:58:41 curtain: view restored — map 0, world view False
+2026-11-26 07:58:41 lockstep: snapshot loaded, tick 15480, serverTick=15480, perMapSim=True
+2026-11-26 07:58:43 watchdog: no tick advance for 300 frames at tick 15480: speed=Paused, paused=True, topWindow=ImmediateWindow, windows=3
+2026-11-26 07:59:41 lockstep: hold is over, requesting speed 3
+2026-11-26 07:59:42 resumed after snapshot reload at tick 15480, perMapSim=True
+2026-11-26 08:00:48 map events: tale #200000000 ToxicityRevealed applied at tick 39399 (restored, map 1 absent)
+2026-11-26 08:00:57 map events: tale #200000001 ToxicityRevealed applied at tick 42728 (restored, map 1 absent)
+2026-11-26 08:01:36 lockstep: autosave #8 at tick 56772: taking world snapshot
+2026-11-26 08:01:36 snapshot: SaveGame start (RWMLWC-snapshot-out)
+2026-11-26 08:01:37 snapshot: SaveGame done in 586 ms
+2026-11-26 08:01:37 lockstep: autosave #8: snapshot taken, sending 2615927 bytes
+2026-11-26 08:01:37 lockstep: autosave #8 at tick 56772: raw=16814907 bytes, packed=2615927 bytes (15.6%), save=587 ms, pack=19 ms, 14 chunks sent to the server
+2026-11-26 08:01:42 map events: tale #200000002 Meditated applied at tick 58695 (restored, map 1 absent)
+2026-11-26 08:02:06 map events: tale #200000003 ToxicityRevealed applied at tick 67203 (restored, map 1 absent)
+2026-11-26 08:02:40 map events: tale #200000004 Wounded applied at tick 79529 (restored, map 1 absent)
+2026-11-26 08:02:40 map events: tale #200000005 Wounded applied at tick 79529 (restored, map 1 absent)
+2026-11-26 08:02:40 map events: tale #200000006 Wounded applied at tick 79623 (restored, map 1 absent)
+2026-11-26 08:02:40 map events: tale #200000007 Downed applied at tick 79623 (restored, map 1 absent)
+2026-11-26 08:03:58 map events: tale #200000008 ToxicityRevealed applied at tick 107615 (restored, map 1 absent)
+2026-11-26 08:05:24 map events: tale Downed #100000000 on map 0 queued at tick 138474.0
+2026-11-26 08:05:24 map events: sent 1 for map 0
+2026-11-26 08:05:24 map events: tale #100000000 Downed applied at tick 138477 (own, map 0)
+2026-11-26 08:05:48 map events: tale Downed #100000001 on map 0 queued at tick 147106.0
+2026-11-26 08:05:48 map events: sent 1 for map 0
+2026-11-26 08:05:48 map events: tale #100000001 Downed applied at tick 147107 (own, map 0)
+2026-11-26 08:06:28 threats: map 0 adaptation 0.0 → -30.0 (Died, Ross)
+2026-11-26 08:06:33 map events: tale Downed #100000002 on map 0 queued at tick 163652.0
+2026-11-26 08:06:33 map events: sent 1 for map 0
+2026-11-26 08:06:33 map events: tale #100000002 Downed applied at tick 163655 (own, map 0)
+2026-11-26 08:06:34 lockstep: notice 3: мир тик 163860: игрок 1 ≠ игрок 2
+2026-11-26 08:06:34 lockstep: desync reported, the server orders a common snapshot
+2026-11-26 08:06:34 lockstep: sleepremove — server healing snapshot #17 at tick 163865 skipped (no full world holder)
+2026-11-26 08:06:36 lockstep: notice 3: мир тик 164460: игрок 1 ≠ игрок 2
+2026-11-26 08:06:36 lockstep: sleepremove — server healing snapshot #18 at tick 164463 skipped (no full world holder)
+2026-11-26 08:06:36 lockstep: autosave #19 at tick 164711: taking world snapshot
+2026-11-26 08:06:36 snapshot: SaveGame start (RWMLWC-snapshot-out)
+2026-11-26 08:06:37 snapshot: SaveGame done in 467 ms
+2026-11-26 08:06:37 lockstep: autosave #19: snapshot taken, sending 2612318 bytes
+2026-11-26 08:06:37 lockstep: autosave #19 at tick 164711: raw=16334024 bytes, packed=2612318 bytes (16.0%), save=468 ms, pack=19 ms, 14 chunks sent to the server
+2026-11-26 08:06:37 lockstep: notice 3: мир тик 165060: игрок 1 ≠ игрок 2
+2026-11-26 08:06:37 lockstep: sleepremove — server healing snapshot #20 at tick 165061 skipped (no full world holder)
+2026-11-26 08:06:39 lockstep: notice 3: мир тик 165660: игрок 1 ≠ игрок 2
+2026-11-26 08:06:39 lockstep: sleepremove — server healing snapshot #21 at tick 165661 skipped (no full world holder)
+2026-11-26 08:06:41 lockstep: notice 3: мир тик 166260: игрок 1 ≠ игрок 2
+2026-11-26 08:06:41 lockstep: sleepremove — server healing snapshot #22 at tick 166262 skipped (no full world holder)
+2026-11-26 08:06:42 lockstep: notice 3: мир тик 166860: игрок 1 ≠ игрок 2
+2026-11-26 08:06:42 lockstep: sleepremove — server healing snapshot #23 at tick 166861 skipped (no full world holder)
+2026-11-26 08:06:44 lockstep: notice 3: мир тик 167460: игрок 1 ≠ игрок 2
+2026-11-26 08:06:44 lockstep: desync reported, the server orders a common snapshot
+2026-11-26 08:06:44 lockstep: sleepremove — server healing snapshot #24 at tick 167461 skipped (no full world holder)
+2026-11-26 08:06:46 lockstep: notice 3: мир тик 168060: игрок 1 ≠ игрок 2
+2026-11-26 08:06:46 lockstep: sleepremove — server healing snapshot #25 at tick 168060 skipped (no full world holder)
+2026-11-26 08:06:47 lockstep: notice 3: мир тик 168660: игрок 1 ≠ игрок 2
+2026-11-26 08:06:47 lockstep: sleepremove — server healing snapshot #26 at tick 168660 skipped (no full world holder)
+2026-11-26 08:06:49 lockstep: notice 3: мир тик 169260: игрок 1 ≠ игрок 2
+2026-11-26 08:06:49 lockstep: sleepremove — server healing snapshot #27 at tick 169261 skipped (no full world holder)
+2026-11-26 08:06:51 lockstep: notice 3: мир тик 169860: игрок 1 ≠ игрок 2
+2026-11-26 08:06:51 lockstep: sleepremove — server healing snapshot #28 at tick 169860 skipped (no full world holder)
+2026-11-26 08:06:52 lockstep: notice 3: мир тик 170460: игрок 1 ≠ игрок 2
+2026-11-26 08:06:52 lockstep: sleepremove — server healing snapshot #29 at tick 170460 skipped (no full world holder)
+2026-11-26 08:06:53 threats: map 0 adaptation -30.0 → -60.0 (Died, Rika)
+2026-11-26 08:06:54 lockstep: notice 3: мир тик 171060: игрок 1 ≠ игрок 2
+2026-11-26 08:06:54 lockstep: sleepremove — server healing snapshot #30 at tick 171062 skipped (no full world holder)
+2026-11-26 08:06:56 lockstep: notice 3: мир тик 171660: игрок 1 ≠ игрок 2
+2026-11-26 08:06:56 lockstep: desync reported, the server orders a common snapshot
+2026-11-26 08:06:56 lockstep: sleepremove — server healing snapshot #31 at tick 171661 skipped (no full world holder)
+2026-11-26 08:06:57 lockstep: notice 3: мир тик 172260: игрок 1 ≠ игрок 2
+2026-11-26 08:06:57 lockstep: sleepremove — server healing snapshot #32 at tick 172260 skipped (no full world holder)
+2026-11-26 08:06:59 lockstep: notice 3: мир тик 172860: игрок 1 ≠ игрок 2
+2026-11-26 08:06:59 lockstep: sleepremove — server healing snapshot #33 at tick 172860 skipped (no full world holder)
+2026-11-26 08:07:01 lockstep: notice 3: мир тик 173460: игрок 1 ≠ игрок 2
+2026-11-26 08:07:01 lockstep: sleepremove — server healing snapshot #34 at tick 173461 skipped (no full world holder)
+2026-11-26 08:07:02 lockstep: notice 3: мир тик 174060: игрок 1 ≠ игрок 2
+2026-11-26 08:07:02 lockstep: sleepremove — server healing snapshot #35 at tick 174060 skipped (no full world holder)
+2026-11-26 08:07:04 lockstep: notice 3: мир тик 174660: игрок 1 ≠ игрок 2
+2026-11-26 08:07:04 lockstep: sleepremove — server healing snapshot #36 at tick 174665 skipped (no full world holder)
+2026-11-26 08:07:06 lockstep: notice 3: мир тик 175260: игрок 1 ≠ игрок 2
+2026-11-26 08:07:06 lockstep: desync reported, the server orders a common snapshot
+2026-11-26 08:07:06 lockstep: sleepremove — server healing snapshot #37 at tick 175263 skipped (no full world holder)
+2026-11-26 08:07:07 lockstep: notice 3: мир тик 175860: игрок 1 ≠ игрок 2
+2026-11-26 08:07:07 lockstep: sleepremove — server healing snapshot #38 at tick 175863 skipped (no full world holder)
+2026-11-26 08:07:09 lockstep: notice 3: мир тик 176460: игрок 1 ≠ игрок 2
+2026-11-26 08:07:09 lockstep: sleepremove — server healing snapshot #39 at tick 176461 skipped (no full world holder)
+2026-11-26 08:07:11 lockstep: notice 3: мир тик 177060: игрок 1 ≠ игрок 2
+2026-11-26 08:07:11 lockstep: sleepremove — server healing snapshot #40 at tick 177061 skipped (no full world holder)
+2026-11-26 08:07:12 lockstep: notice 3: мир тик 177660: игрок 1 ≠ игрок 2
+2026-11-26 08:07:12 lockstep: sleepremove — server healing snapshot #41 at tick 177661 skipped (no full world holder)
+2026-11-26 08:07:14 lockstep: notice 3: мир тик 178260: игрок 1 ≠ игрок 2
+2026-11-26 08:07:14 lockstep: sleepremove — server healing snapshot #42 at tick 178261 skipped (no full world holder)
+2026-11-26 08:07:16 lockstep: notice 3: мир тик 178860: игрок 1 ≠ игрок 2
+2026-11-26 08:07:16 lockstep: sleepremove — server healing snapshot #43 at tick 178861 skipped (no full world holder)
+2026-11-26 08:07:17 lockstep: notice 3: мир тик 179460: игрок 1 ≠ игрок 2
+2026-11-26 08:07:17 lockstep: desync reported, the server orders a common snapshot
+2026-11-26 08:07:17 lockstep: sleepremove — server healing snapshot #44 at tick 179460 skipped (no full world holder)
+2026-11-26 08:07:19 lockstep: notice 3: мир тик 180060: игрок 1 ≠ игрок 2
+2026-11-26 08:07:19 lockstep: sleepremove — server healing snapshot #45 at tick 180064 skipped (no full world holder)
+2026-11-26 08:07:21 lockstep: notice 3: мир тик 180660: игрок 1 ≠ игрок 2
+2026-11-26 08:07:21 lockstep: sleepremove — server healing snapshot #46 at tick 180664 skipped (no full world holder)
+2026-11-26 08:07:22 lockstep: notice 3: мир тик 181260: игрок 1 ≠ игрок 2
+2026-11-26 08:07:22 lockstep: sleepremove — server healing snapshot #47 at tick 181264 skipped (no full world holder)
+2026-11-26 08:07:24 lockstep: notice 3: мир тик 181860: игрок 1 ≠ игрок 2
+2026-11-26 08:07:24 lockstep: sleepremove — server healing snapshot #48 at tick 181862 skipped (no full world holder)
+2026-11-26 08:07:26 lockstep: notice 3: мир тик 182460: игрок 1 ≠ игрок 2
+2026-11-26 08:07:26 lockstep: sleepremove — server healing snapshot #49 at tick 182460 skipped (no full world holder)
+2026-11-26 08:07:27 lockstep: notice 3: мир тик 183060: игрок 1 ≠ игрок 2
+2026-11-26 08:07:27 lockstep: desync reported, the server orders a common snapshot
+2026-11-26 08:07:27 lockstep: sleepremove — server healing snapshot #50 at tick 183065 skipped (no full world holder)
+2026-11-26 08:07:29 lockstep: notice 3: мир тик 183660: игрок 1 ≠ игрок 2
+2026-11-26 08:07:29 lockstep: sleepremove — server healing snapshot #51 at tick 183664 skipped (no full world holder)
+2026-11-26 08:07:31 lockstep: notice 3: мир тик 184260: игрок 1 ≠ игрок 2
+2026-11-26 08:07:31 lockstep: sleepremove — server healing snapshot #52 at tick 184260 skipped (no full world holder)
+2026-11-26 08:07:32 lockstep: notice 3: мир тик 184860: игрок 1 ≠ игрок 2
+2026-11-26 08:07:32 lockstep: sleepremove — server healing snapshot #53 at tick 184860 skipped (no full world holder)
+2026-11-26 08:07:34 lockstep: notice 3: мир тик 185460: игрок 1 ≠ игрок 2
+2026-11-26 08:07:34 lockstep: sleepremove — server healing snapshot #54 at tick 185460 skipped (no full world holder)
+2026-11-26 08:07:36 lockstep: notice 3: мир тик 186060: игрок 1 ≠ игрок 2
+2026-11-26 08:07:36 lockstep: sleepremove — server healing snapshot #55 at tick 186060 skipped (no full world holder)
+2026-11-26 08:07:37 lockstep: notice 3: мир тик 186660: игрок 1 ≠ игрок 2
+2026-11-26 08:07:37 lockstep: desync reported, the server orders a common snapshot
+2026-11-26 08:07:37 lockstep: sleepremove — server healing snapshot #56 at tick 186665 skipped (no full world holder)
+2026-11-26 08:07:39 lockstep: notice 3: мир тик 187260: игрок 1 ≠ игрок 2
+2026-11-26 08:07:39 lockstep: sleepremove — server healing snapshot #57 at tick 187264 skipped (no full world holder)
+2026-11-26 08:07:41 lockstep: notice 3: мир тик 187860: игрок 1 ≠ игрок 2
+2026-11-26 08:07:41 lockstep: sleepremove — server healing snapshot #58 at tick 187864 skipped (no full world holder)
+2026-11-26 08:07:42 lockstep: notice 3: мир тик 188460: игрок 1 ≠ игрок 2
+2026-11-26 08:07:42 lockstep: sleepremove — server healing snapshot #59 at tick 188464 skipped (no full world holder)
+2026-11-26 08:07:44 lockstep: notice 3: мир тик 189060: игрок 1 ≠ игрок 2
+2026-11-26 08:07:44 lockstep: sleepremove — server healing snapshot #60 at tick 189063 skipped (no full world holder)
+2026-11-26 08:07:46 lockstep: notice 3: мир тик 189660: игрок 1 ≠ игрок 2
+2026-11-26 08:07:46 lockstep: sleepremove — server healing snapshot #61 at tick 189663 skipped (no full world holder)
+2026-11-26 08:07:47 lockstep: notice 3: мир тик 190260: игрок 1 ≠ игрок 2
+2026-11-26 08:07:47 lockstep: sleepremove — server healing snapshot #62 at tick 190263 skipped (no full world holder)
+2026-11-26 08:07:49 lockstep: notice 3: мир тик 190860: игрок 1 ≠ игрок 2
+2026-11-26 08:07:49 lockstep: desync reported, the server orders a common snapshot
+2026-11-26 08:07:49 lockstep: sleepremove — server healing snapshot #63 at tick 190864 skipped (no full world holder)
+2026-11-26 08:07:50 threats: map 0 adaptation -57.0 → -60.0 (Died, Oleg)
+2026-11-26 08:07:51 lockstep: notice 3: мир тик 191460: игрок 1 ≠ игрок 2
+2026-11-26 08:07:51 lockstep: sleepremove — server healing snapshot #64 at tick 191465 skipped (no full world holder)
+2026-11-26 08:07:52 lockstep: notice 3: мир тик 192060: игрок 1 ≠ игрок 2
+2026-11-26 08:07:52 lockstep: sleepremove — server healing snapshot #65 at tick 192065 skipped (no full world holder)
+2026-11-26 08:07:54 lockstep: notice 3: мир тик 192660: игрок 1 ≠ игрок 2
+2026-11-26 08:07:54 lockstep: sleepremove — server healing snapshot #66 at tick 192664 skipped (no full world holder)
+2026-11-26 08:07:56 lockstep: notice 3: мир тик 193260: игрок 1 ≠ игрок 2
+2026-11-26 08:07:56 lockstep: sleepremove — server healing snapshot #67 at tick 193265 skipped (no full world holder)
+2026-11-26 08:07:57 lockstep: notice 3: мир тик 193860: игрок 1 ≠ игрок 2
+2026-11-26 08:07:57 lockstep: sleepremove — server healing snapshot #68 at tick 193864 skipped (no full world holder)
+2026-11-26 08:07:59 lockstep: notice 3: мир тик 194460: игрок 1 ≠ игрок 2
+2026-11-26 08:07:59 lockstep: sleepremove — server healing snapshot #69 at tick 194463 skipped (no full world holder)
+2026-11-26 08:08:01 tick time: 179999 ticks, avg 0.407 ms, total 73.3 s
+2026-11-26 08:08:01 summary: map0 drafted=0 forbidden=62 plants=[]
+2026-11-26 08:08:01 summary: map0 jobs=[65460:Wait_Wander@(199, 0, 114)]
+2026-11-26 08:08:01 summary: map0 settings=368CE8C487B6D099
+2026-11-26 08:08:01 summary: maps=1 player settlements=2 caravans=0
+2026-11-26 08:08:01 summary: absence= offline=[]
+2026-11-26 08:08:01 summary: squads= rejected=0 drafted=[]
+2026-11-26 08:08:01 summary: map0 designations=0 blueprints=0 zones=0; commands sent=5 executed=12 failed=0
+2026-11-26 08:08:01 run finished: file=hash-c1-20261126-075814.txt
+2026-11-26 08:08:01 queue: finished
+2026-11-26 08:08:01 lockstep: disconnect: прогон завершён
+2026-11-26 08:08:01 quitting game

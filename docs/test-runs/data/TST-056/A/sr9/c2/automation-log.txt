@@ -1,0 +1,62 @@
+2026-11-26 07:47:18 autoload: loading save 'tst014'
+2026-11-26 07:47:26 lockstep: connecting to 127.0.0.1:57029 as 'c2'
+2026-11-26 07:47:26 regionids: after load room=18 district=24 region=483
+2026-11-26 07:47:27 lockstep: connected to quic:127.0.0.1:57029, Hello sent
+2026-11-26 07:47:28 mapinterface postfix: alive (diag T-076)
+2026-11-26 07:47:28 lockstep: Welcome, playerId=1, serverTick=14998, seed=7
+2026-11-26 07:47:28 presence: player 1 online
+2026-11-26 07:47:28 colonies diag: me=1, tick=14998, anyOwner=False, lowestOnline=True
+2026-11-26 07:47:28 presence: player 2 online
+2026-11-26 07:47:30 watchdog: no tick advance for 300 frames at tick 14998: speed=Paused, paused=True, topWindow=ImmediateWindow, windows=3
+2026-11-26 07:48:28 lockstep: hold is over, requesting speed 3
+2026-11-26 07:48:29 regionids: run start room=18 district=24 region=483
+2026-11-26 07:48:29 run started: #0, tick=14998, scenario=none, ticks=82000, trace=False, quit=True, file=hash-c2-20261126-074829.txt
+2026-11-26 07:48:30 colonies: claim sent (lowest online player)
+2026-11-26 07:48:32 colonies: player 1 is the host, settlements claimed: 1
+2026-11-26 07:48:34 colonies: new colony for player 2 at 230170,0: 3 colonists, 10 item stacks
+2026-11-26 07:48:34 tale diag: added #5 TileSettled outside map context (tick 15300)
+2026-11-26 07:48:34 colonies: settlement 253 belongs to player 2
+2026-11-26 07:48:34 long event 'GeneratingMap' start, maps 1
+2026-11-26 07:48:38 long event 'GeneratingMap' done, maps 2
+2026-11-26 07:48:38 map 1 after 'GeneratingMap': Pawn=14,Item=1528,Building=3774,Plant=285,Filth=4078,Ethereal=2; pawns Human#45490@(-1000, -1000, -1000),Human#45497@(-1000, -1000, -1000),Human#45506@(-1000, -1000, -1000),Human#45513@(-1000, -1000, -1000),Human#45522@(-1000, -1000, -1000),Human#45529@(-1000, -1000, -1000),Iguana#52486@(82, 0, 48),MonitorLizard#52487@(67, 0, 167),Vulture#52488@(241, 0, 7),Iguana#52489@(210, 0, 5),Boomalope#52490@(174, 0, 39),Boomalope#52491@(171, 0, 37),Boomalope#52492@(169, 0, 37),Boomalope#52493@(170, 0, 41),Boomalope#52494@(169, 0, 39); rand 00000928FB25C5A1
+2026-11-26 07:48:39 sleepremove: both colony maps present, requesting common snapshot
+2026-11-26 07:48:39 long event 'SpawningColonists' start, maps 2
+2026-11-26 07:48:39 long event 'SpawningColonists' done, maps 2
+2026-11-26 07:48:39 map 1 after 'SpawningColonists': Pawn=18,Item=1544,Building=3774,Plant=285,Filth=4078,Ethereal=2; pawns Human#41747@(127, 0, 131),Human#41750@(125, 0, 130),Human#41753@(124, 0, 133),Warg#41766@(126, 0, 129),Human#45490@(-1000, -1000, -1000),Human#45497@(-1000, -1000, -1000),Human#45506@(-1000, -1000, -1000),Human#45513@(-1000, -1000, -1000),Human#45522@(-1000, -1000, -1000),Human#45529@(-1000, -1000, -1000),Iguana#52486@(82, 0, 48),MonitorLizard#52487@(67, 0, 167),Vulture#52488@(241, 0, 7),Iguana#52489@(210, 0, 5),Boomalope#52490@(174, 0, 39),Boomalope#52491@(171, 0, 37),Boomalope#52492@(169, 0, 37),Boomalope#52493@(170, 0, 41),Boomalope#52494@(169, 0, 39); rand 00000951FB25C5A1
+2026-11-26 07:48:39 snapshot: SaveGame start (RWMLWC-snapshot-out)
+2026-11-26 07:48:40 snapshot: SaveGame done in 1234 ms
+2026-11-26 07:48:40 lockstep: snapshot for player 1 at tick 15447: raw=18087686 bytes, packed=2698049 bytes (14.9%), save=1235 ms, pack=29 ms, 14 chunks sent; reloading it here too
+2026-11-26 07:48:40 curtain: shown (Синхронизация мира…), map 0, world view False
+2026-11-26 07:48:41 sleepremove: player 1 reloads without maps [1], keeps map 0
+2026-11-26 07:48:42 regionids: reset at load, bump=0
+2026-11-26 07:48:44 regionids: after load room=18 district=24 region=483
+2026-11-26 07:48:45 curtain: view restored — map 0, world view False
+2026-11-26 07:48:45 lockstep: snapshot loaded, tick 15447, serverTick=15485, perMapSim=True
+2026-11-26 07:48:45 resumed after snapshot reload at tick 15447, perMapSim=True
+2026-11-26 07:48:47 watchdog: no tick advance for 300 frames at tick 15485: speed=Paused, paused=True, topWindow=ImmediateWindow, windows=3
+2026-11-26 07:49:45 lockstep: hold is over, requesting speed 3
+2026-11-26 07:51:34 map events: tale #200000000 Meditated applied at tick 54844 (restored, map 1 absent)
+2026-11-26 07:51:55 lockstep: autosave #7 at tick 62182: taking world snapshot
+2026-11-26 07:51:55 snapshot: SaveGame start (RWMLWC-snapshot-out)
+2026-11-26 07:51:55 snapshot: SaveGame done in 562 ms
+2026-11-26 07:51:55 lockstep: autosave #7: snapshot taken, sending 2602561 bytes
+2026-11-26 07:51:55 lockstep: autosave #7 at tick 62182: raw=15604682 bytes, packed=2602561 bytes (16.7%), save=563 ms, pack=18 ms, 14 chunks sent to the server
+2026-11-26 07:52:42 map events: tale #200000001 Wounded applied at tick 79199 (restored, map 1 absent)
+2026-11-26 07:52:42 map events: tale #200000002 Wounded applied at tick 79199 (restored, map 1 absent)
+2026-11-26 07:52:42 map events: tale #200000003 Wounded applied at tick 79381 (restored, map 1 absent)
+2026-11-26 07:52:43 map events: tale #200000004 Wounded applied at tick 79458 (restored, map 1 absent)
+2026-11-26 07:52:43 map events: tale #200000005 Wounded applied at tick 79552 (restored, map 1 absent)
+2026-11-26 07:52:44 map events: tale #200000006 Wounded applied at tick 79827 (restored, map 1 absent)
+2026-11-26 07:53:31 tick time: 81999 ticks, avg 0.416 ms, total 34.1 s
+2026-11-26 07:53:31 summary: map0 drafted=0 forbidden=58 plants=[]
+2026-11-26 07:53:31 summary: map0 jobs=[231:GotoWander@(177, 0, 176),234:GotoWander@(195, 0, 162),239:Wait_Wander@(196, 0, 157)]
+2026-11-26 07:53:31 camera: this client moved its camera 533 times during the run
+2026-11-26 07:53:31 summary: map0 settings=29B89D30A34E3B1A
+2026-11-26 07:53:31 summary: maps=1 player settlements=2 caravans=0
+2026-11-26 07:53:31 summary: absence= offline=[]
+2026-11-26 07:53:31 summary: squads= rejected=0 drafted=[]
+2026-11-26 07:53:31 summary: map0 designations=0 blueprints=0 zones=0; commands sent=2 executed=8 failed=0
+2026-11-26 07:53:31 run finished: file=hash-c2-20261126-074829.txt
+2026-11-26 07:53:31 queue: finished
+2026-11-26 07:53:31 lockstep: disconnect: прогон завершён
+2026-11-26 07:53:31 quitting game

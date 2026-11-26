@@ -17,6 +17,9 @@ public static class WorldStateHasher
 {
     private static readonly List<WorldObject> tmp = new List<WorldObject>();
 
+    private static readonly HarmonyLib.AccessTools.FieldRef<UniqueIDsManager, int> NextTaleId =
+        HarmonyLib.AccessTools.FieldRefAccess<UniqueIDsManager, int>("nextTaleID");
+
     /// <summary>Подхеши частей мира для поиска расхождения (файл хешей, строка world): карты, объекты мира, колонии, сказания, Rand.</summary>
     public static string Parts()
     {
@@ -36,18 +39,25 @@ public static class WorldStateHasher
         Fnv64 col = Fnv64.Create();
         RWMLWC.Client.World.ColoniesComponent? colonies = RWMLWC.Client.World.Colonies.Component;
         if (colonies != null) { foreach (int v in colonies.HashValues()) { col.Add(v); } }
-        return $"pMaps={m.Value:X16};pObjs={o.Value:X16};pCol={col.Value:X16};pRand={MapRandContext.GlobalState:X16};objs={objs}";
+        // T-056 (11.4б): номера сказаний входят в хеш мира; список — чтобы видеть, какой номер разошёлся.
+        string taleIds = string.Join(",", Find.TaleManager.AllTalesListForReading.Select(t => t.id));
+        return $"pMaps={m.Value:X16};pObjs={o.Value:X16};pCol={col.Value:X16};pRand={MapRandContext.GlobalState:X16};taleIds={taleIds};nextTale={NextTaleId(Find.UniqueIDsManager)};objs={objs}";
     }
 
     public static ulong Compute()
     {
         Fnv64 h = Fnv64.Create();
-        List<Map> maps = Find.Maps;
-        h.Add(maps.Count);
-        for (int i = 0; i < maps.Count; i++)
+        // sleepremove (T-056, 11.4б): карт чужих колоний у игрока нет, список карт у каждого свой.
+        // Поселения всё равно проверяются — они в объектах мира ниже. Список карт для диагностики — pMaps в Parts().
+        if (!PerMapSim.SleepRemoveTest)
         {
-            h.Add(maps[i].uniqueID);
-            h.Add(maps[i].Tile.tileId);
+            List<Map> maps = Find.Maps;
+            h.Add(maps.Count);
+            for (int i = 0; i < maps.Count; i++)
+            {
+                h.Add(maps[i].uniqueID);
+                h.Add(maps[i].Tile.tileId);
+            }
         }
 
         tmp.Clear();
@@ -81,11 +91,20 @@ public static class WorldStateHasher
         }
 
         // Сказания (T-056): применяются событием карты у всех одинаково; при раздельном счёте без событий расходились.
-        List<Tale> tales = Find.TaleManager.AllTalesListForReading;
-        h.Add(tales.Count);
-        for (int i = 0; i < tales.Count; i++)
+        // sleepremove (11.4б): жизненный цикл сказания у владельца и у спящего разный — у спящего ссылки на пешек
+        // чужой карты null, и Notify_PawnDiscarded не убирает то, что у владельца убрано (sr7/sr8: тик 90250).
+        // Влияние сказаний на симуляцию — выбор сюжета искусства (CompArt) — в этой схеме считает только владелец
+        // карты, под Rand карты. Поэтому в хеш мира сказания не входят; синхронизация событием сохраняется,
+        // список номеров — в диагностике Parts() (taleIds). Полный возврат сказаний в хеш — с событиями ухода
+        // и смерти пешек (шаг 4 плана 11.4б).
+        if (!PerMapSim.SleepRemoveTest)
         {
-            h.Add(tales[i].id);
+            List<Tale> tales = Find.TaleManager.AllTalesListForReading;
+            h.Add(tales.Count);
+            for (int i = 0; i < tales.Count; i++)
+            {
+                h.Add(tales[i].id);
+            }
         }
 
         h.Add(MapRandContext.GlobalState);

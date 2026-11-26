@@ -476,6 +476,14 @@ public static class LockstepClient
             CommandOrderedMessage command = pendingCommands.Dequeue();
             if (command.Kind == RequestSnapshotKind)
             {
+                // sleepremove (T-056, 11.4б): лечебный снимок от сервера (игрок 0) никто не может отдать
+                // целиком — у каждого только свои карты. Пропускаем и измеряем расхождение файлом хешей;
+                // сбор полного сейва из карт владельцев — шаг 3 плана (сервер).
+                if (PerMapSim.SleepRemoveTest && command.PlayerId == 0)
+                {
+                    TestAutomation.Note($"lockstep: sleepremove — server healing snapshot #{command.Seq} at tick {command.Tick} skipped (no full world holder)");
+                    continue;
+                }
                 BeginSnapshotRound(command);
                 continue; // состояние сменилось: цикл остановится, остальные команды — после загрузки
             }
@@ -591,9 +599,10 @@ public static class LockstepClient
         int count = SendWorldChunks(expectedSnapshotId, packed, tickManager.TicksGame);
         TestAutomation.Note($"lockstep: snapshot for player {request.PlayerId} at tick {tickManager.TicksGame}: {stats}, {count} chunks sent; reloading it here too");
         // Отправитель загружает тот же снимок, что и остальные — под застывшим кадром (SyncCurtain).
+        // В режиме sleepremove каждый вырезает из снимка карты чужих колоний (T-056, 11.4б шаг 1).
         state = State.Loading;
         gameLoadedPending = false;
-        RWMLWC.Client.SessionView.SyncCurtain.BeforeReload(true, curtainText, () => GameSnapshot.Apply(packed));
+        RWMLWC.Client.SessionView.SyncCurtain.BeforeReload(true, curtainText, () => GameSnapshot.Apply(PerMapSim.StripForeignMaps(packed)));
     }
 
     /// <summary>
@@ -716,7 +725,7 @@ public static class LockstepClient
         {
             try
             {
-                GameSnapshot.Apply(packed);
+                GameSnapshot.Apply(PerMapSim.StripForeignMaps(packed));
             }
             catch (Exception ex)
             {

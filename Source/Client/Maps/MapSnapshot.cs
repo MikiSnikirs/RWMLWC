@@ -1,4 +1,5 @@
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Xml;
 
@@ -42,6 +43,60 @@ public static class MapSnapshot
         part.LoadXml(mapXml);
         XmlNode imported = doc.ImportNode(part.DocumentElement!, true);
         old.ParentNode.ReplaceChild(imported, old);
+        using MemoryStream ms = new MemoryStream();
+        using (XmlWriter w = XmlWriter.Create(ms, new XmlWriterSettings { Encoding = new UTF8Encoding(false), Indent = false }))
+        {
+            doc.Save(w);
+        }
+        return ms.ToArray();
+    }
+
+    /// <summary>
+    /// Полный сейв без карт <paramref name="mapUniqueIds"/> (T-056, вариант (б): чужой колонии у игрока
+    /// нет — заглушка без карты). Узлы <c>maps/li</c> удаляются, мир не трогается. <c>currentMapIndex</c>
+    /// указывает на оставшуюся карту <paramref name="currentMapId"/> (своя карта клиента), иначе на первую.
+    /// Ссылки из мира на вещи удалённых карт при загрузке станут null — это измеряется прогоном шага 1.
+    /// </summary>
+    public static byte[] RemoveMaps(byte[] rawSave, System.Collections.Generic.IReadOnlyCollection<int> mapUniqueIds, int currentMapId = -1)
+    {
+        XmlDocument doc = Load(rawSave);
+        XmlNodeList? maps = doc.SelectNodes("/savegame/game/maps/li");
+        bool removed = false;
+        if (maps != null)
+        {
+            for (int i = maps.Count - 1; i >= 0; i--)
+            {
+                XmlNode m = maps[i]!;
+                if (int.TryParse(m["uniqueID"]?.InnerText, System.Globalization.NumberStyles.Integer,
+                        System.Globalization.CultureInfo.InvariantCulture, out int id) && mapUniqueIds.Contains(id))
+                {
+                    m.ParentNode!.RemoveChild(m);
+                    removed = true;
+                }
+            }
+        }
+        if (!removed)
+        {
+            return rawSave;
+        }
+        XmlNode? indexNode = doc.SelectSingleNode("/savegame/game/currentMapIndex");
+        if (indexNode != null)
+        {
+            int index = 0;
+            XmlNodeList? left = doc.SelectNodes("/savegame/game/maps/li");
+            if (left != null && currentMapId >= 0)
+            {
+                for (int i = 0; i < left.Count; i++)
+                {
+                    if (left[i]!["uniqueID"]?.InnerText == currentMapId.ToString(System.Globalization.CultureInfo.InvariantCulture))
+                    {
+                        index = i;
+                        break;
+                    }
+                }
+            }
+            indexNode.InnerText = index.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
         using MemoryStream ms = new MemoryStream();
         using (XmlWriter w = XmlWriter.Create(ms, new XmlWriterSettings { Encoding = new UTF8Encoding(false), Indent = false }))
         {

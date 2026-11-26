@@ -1,0 +1,50 @@
+2026-11-26 07:19:17 autoload: loading save 'tst014'
+2026-11-26 07:19:27 lockstep: connecting to 127.0.0.1:58062 as 'c2'
+2026-11-26 07:19:27 regionids: after load room=18 district=24 region=483
+2026-11-26 07:19:29 lockstep: connected to quic:127.0.0.1:58062, Hello sent
+2026-11-26 07:19:29 mapinterface postfix: alive (diag T-076)
+2026-11-26 07:19:29 lockstep: Welcome, playerId=2, serverTick=14998, seed=7
+2026-11-26 07:19:29 presence: player 2 online
+2026-11-26 07:19:29 colonies diag: me=2, tick=14998, anyOwner=False, lowestOnline=False
+2026-11-26 07:19:31 watchdog: no tick advance for 300 frames at tick 14998: speed=Paused, paused=True, topWindow=ImmediateWindow, windows=3
+2026-11-26 07:20:29 regionids: run start room=18 district=24 region=483
+2026-11-26 07:20:29 run started: #0, tick=14998, scenario=none, ticks=30000, trace=False, quit=True, file=hash-c2-20261126-072029.txt
+2026-11-26 07:20:33 colonies: player 1 is the host, settlements claimed: 1
+2026-11-26 07:20:33 colonies: auto choice — new colony at 54867,0
+2026-11-26 07:20:35 colonies: new colony for player 2 at 54867,0: 3 colonists, 10 item stacks
+2026-11-26 07:20:35 colonies: settlement 253 belongs to player 2
+2026-11-26 07:20:35 long event 'GeneratingMap' start, maps 1
+2026-11-26 07:20:44 long event 'GeneratingMap' done, maps 2
+2026-11-26 07:20:44 map 1 after 'GeneratingMap': Pawn=38,Item=404,Building=31461,Plant=3632,Filth=1272; pawns Megascarab#79584@(57, 0, 209),Megaspider#79585@(55, 0, 211),Spelopede#79586@(56, 0, 212),Megaspider#79587@(56, 0, 210),Spelopede#79588@(58, 0, 210),Megascarab#79601@(76, 0, 45),Spelopede#79602@(78, 0, 43),Megascarab#79603@(77, 0, 42),Locust#79604@(76, 0, 45),Megascarab#79605@(76, 0, 41),Megascarab#79606@(74, 0, 43),Locust#79607@(75, 0, 42),Megaspider#79608@(75, 0, 43),Boomrat#79616@(164, 0, 178),Rat#79617@(92, 0, 218),Rat#79618@(116, 0, 161),Rat#79619@(80, 0, 177),Boomrat#79620@(248, 0, 45),Rat#79621@(188, 0, 17),Rat#79622@(212, 0, 110),Raccoon#79623@(166, 0, 237),Raccoon#79624@(142, 0, 185),Rat#79625@(139, 0, 84),Rat#79626@(215, 0, 153),Rat#79627@(130, 0, 197),Boomrat#79628@(158, 0, 236),Rat#79629@(88, 0, 218),Raccoon#79630@(147, 0, 144),Rat#79631@(206, 0, 34),Rat#79632@(158, 0, 116),Boomrat#79633@(220, 0, 155),Raccoon#79634@(76, 0, 149),Rat#79635@(132, 0, 97),Hare#79636@(111, 0, 242),Boomrat#79637@(223, 0, 117),Raccoon#79638@(187, 0, 62),Raccoon#79639@(240, 0, 82),Raccoon#79640@(108, 0, 98); rand 00000928FB25C5A1
+2026-11-26 07:20:45 long event 'SpawningColonists' start, maps 2
+2026-11-26 07:20:45 long event 'SpawningColonists' done, maps 2
+2026-11-26 07:20:45 map 1 after 'SpawningColonists': Pawn=42,Item=420,Building=31461,Plant=3632,Filth=1272; pawns Human#41747@(131, 0, 136),Human#41750@(133, 0, 134),Human#41753@(133, 0, 136),Warg#41766@(133, 0, 133),Megascarab#79584@(57, 0, 209),Megaspider#79585@(55, 0, 211),Spelopede#79586@(56, 0, 212),Megaspider#79587@(56, 0, 210),Spelopede#79588@(58, 0, 210),Megascarab#79601@(76, 0, 45),Spelopede#79602@(78, 0, 43),Megascarab#79603@(77, 0, 42),Locust#79604@(76, 0, 45),Megascarab#79605@(76, 0, 41),Megascarab#79606@(74, 0, 43),Locust#79607@(75, 0, 42),Megaspider#79608@(75, 0, 43),Boomrat#79616@(164, 0, 178),Rat#79617@(92, 0, 218),Rat#79618@(116, 0, 161),Rat#79619@(80, 0, 177),Boomrat#79620@(248, 0, 45),Rat#79621@(188, 0, 17),Rat#79622@(212, 0, 110),Raccoon#79623@(166, 0, 237),Raccoon#79624@(142, 0, 185),Rat#79625@(139, 0, 84),Rat#79626@(215, 0, 153),Rat#79627@(130, 0, 197),Boomrat#79628@(158, 0, 236),Rat#79629@(88, 0, 218),Raccoon#79630@(147, 0, 144),Rat#79631@(206, 0, 34),Rat#79632@(158, 0, 116),Boomrat#79633@(220, 0, 155),Raccoon#79634@(76, 0, 149),Rat#79635@(132, 0, 97),Hare#79636@(111, 0, 242),Boomrat#79637@(223, 0, 117),Raccoon#79638@(187, 0, 62),Raccoon#79639@(240, 0, 82),Raccoon#79640@(108, 0, 98); rand 00000945FB25C5A1
+2026-11-26 07:20:45 snapshot: SaveGame start (RWMLWC-snapshot-out)
+2026-11-26 07:20:47 snapshot: SaveGame done in 1562 ms
+2026-11-26 07:20:47 lockstep: snapshot for player 1 at tick 15479: raw=18434812 bytes, packed=2754607 bytes (14.9%), save=1562 ms, pack=28 ms, 14 chunks sent; reloading it here too
+2026-11-26 07:20:47 curtain: shown (c1 подключается — синхронизация мира…), map 1, world view False
+2026-11-26 07:20:47 sleepremove: player 2 reloads without maps [0], keeps map 1
+2026-11-26 07:20:48 regionids: reset at load, bump=0
+2026-11-26 07:20:50 regionids: after load room=44 district=48 region=450
+2026-11-26 07:20:52 curtain: view restored — map 1, world view False
+2026-11-26 07:20:52 lockstep: snapshot loaded, tick 15479, serverTick=15512, perMapSim=True
+2026-11-26 07:20:52 resumed after snapshot reload at tick 15479, perMapSim=True
+2026-11-26 07:20:54 watchdog: no tick advance for 300 frames at tick 15512: speed=Paused, paused=True, topWindow=ImmediateWindow, windows=3
+2026-11-26 07:21:52 lockstep: hold is over, requesting speed 3
+2026-11-26 07:22:43 map events: tale #100000000 Meditated applied at tick 33559 (restored, map 0 absent)
+2026-11-26 07:23:07 map events: tale Meditated #200000000 on map 1 queued at tick 42422.0
+2026-11-26 07:23:07 map events: sent 1 for map 1
+2026-11-26 07:23:07 map events: tale #200000000 Meditated applied at tick 42429 (own, map 1)
+2026-11-26 07:23:14 tick time: 29999 ticks, avg 0.592 ms, total 17.8 s
+2026-11-26 07:23:14 summary: map1 drafted=0 forbidden=2 plants=[]
+2026-11-26 07:23:14 summary: map1 jobs=[41747:Skygaze@(112, 0, 152),41750:Wait_Wander@(140, 0, 153),41753:GoForWalk@(158, 0, 157)]
+2026-11-26 07:23:14 camera: this client moved its camera 195 times during the run
+2026-11-26 07:23:14 summary: map1 settings=0431F5E6919865E5
+2026-11-26 07:23:14 summary: maps=1 player settlements=2 caravans=0
+2026-11-26 07:23:14 summary: absence= offline=[]
+2026-11-26 07:23:14 summary: squads= rejected=0 drafted=[]
+2026-11-26 07:23:14 summary: map1 designations=0 blueprints=0 zones=0; commands sent=2 executed=4 failed=0
+2026-11-26 07:23:14 run finished: file=hash-c2-20261126-072029.txt
+2026-11-26 07:23:14 queue: finished
+2026-11-26 07:23:14 lockstep: disconnect: прогон завершён
+2026-11-26 07:23:14 quitting game

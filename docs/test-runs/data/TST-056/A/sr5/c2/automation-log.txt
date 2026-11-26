@@ -1,0 +1,59 @@
+2026-11-26 07:13:26 autoload: loading save 'tst014'
+2026-11-26 07:13:36 lockstep: connecting to 127.0.0.1:59258 as 'c2'
+2026-11-26 07:13:36 regionids: after load room=18 district=24 region=483
+2026-11-26 07:13:38 lockstep: connected to quic:127.0.0.1:59258, Hello sent
+2026-11-26 07:13:38 mapinterface postfix: alive (diag T-076)
+2026-11-26 07:13:38 lockstep: Welcome, playerId=1, serverTick=14998, seed=7
+2026-11-26 07:13:38 presence: player 1 online
+2026-11-26 07:13:38 colonies diag: me=1, tick=14998, anyOwner=False, lowestOnline=True
+2026-11-26 07:13:39 presence: player 2 online
+2026-11-26 07:13:40 watchdog: no tick advance for 300 frames at tick 14998: speed=Paused, paused=True, topWindow=ImmediateWindow, windows=3
+2026-11-26 07:14:39 regionids: run start room=18 district=24 region=483
+2026-11-26 07:14:39 run started: #0, tick=14998, scenario=none, ticks=30000, trace=False, quit=True, file=hash-c2-20261126-071439.txt
+2026-11-26 07:14:41 colonies: claim sent (lowest online player)
+2026-11-26 07:14:43 colonies: player 1 is the host, settlements claimed: 1
+2026-11-26 07:14:45 colonies: new colony for player 2 at 37000,0: 3 colonists, 10 item stacks
+2026-11-26 07:14:45 colonies: settlement 253 belongs to player 2
+2026-11-26 07:14:45 long event 'GeneratingMap' start, maps 1
+2026-11-26 07:14:47 long event 'GeneratingMap' done, maps 2
+2026-11-26 07:14:47 map 1 after 'GeneratingMap': Pawn=21,Item=1577,Building=2192,Plant=6538,Filth=4182; pawns Emu#57522@(113, 0, 233),Vulture#57523@(242, 0, 205),Vulture#57524@(152, 0, 123),Dromedary#57525@(176, 0, 60),Dromedary#57526@(180, 0, 61),Megasloth#57527@(63, 0, 168),Rat#57528@(159, 0, 163),Emu#57529@(72, 0, 59),MonitorLizard#57530@(213, 0, 41),Boomrat#57531@(59, 0, 23),Ostrich#57532@(33, 0, 149),Hare#57533@(149, 0, 174),Gazelle#57534@(104, 0, 247),Gazelle#57535@(103, 0, 244),Gazelle#57536@(108, 0, 246),Gazelle#57537@(108, 0, 247),Gazelle#57538@(108, 0, 245),Gazelle#57539@(105, 0, 243),Hare#57540@(15, 0, 204),Vulture#57541@(89, 0, 53),Vulture#57542@(52, 0, 62); rand 00000928FB25C5A1
+2026-11-26 07:14:48 sleepremove: both colony maps present, requesting common snapshot
+2026-11-26 07:14:48 long event 'SpawningColonists' start, maps 2
+2026-11-26 07:14:48 long event 'SpawningColonists' done, maps 2
+2026-11-26 07:14:48 map 1 after 'SpawningColonists': Pawn=25,Item=1593,Building=2192,Plant=6538,Filth=4182; pawns Human#41747@(127, 0, 131),Human#41750@(125, 0, 130),Human#41753@(124, 0, 133),Warg#41766@(126, 0, 129),Emu#57522@(113, 0, 233),Vulture#57523@(242, 0, 205),Vulture#57524@(152, 0, 123),Dromedary#57525@(176, 0, 60),Dromedary#57526@(180, 0, 61),Megasloth#57527@(63, 0, 168),Rat#57528@(159, 0, 163),Emu#57529@(72, 0, 59),MonitorLizard#57530@(213, 0, 41),Boomrat#57531@(59, 0, 23),Ostrich#57532@(33, 0, 149),Hare#57533@(149, 0, 174),Gazelle#57534@(104, 0, 247),Gazelle#57535@(103, 0, 244),Gazelle#57536@(108, 0, 246),Gazelle#57537@(108, 0, 247),Gazelle#57538@(108, 0, 245),Gazelle#57539@(105, 0, 243),Hare#57540@(15, 0, 204),Vulture#57541@(89, 0, 53),Vulture#57542@(52, 0, 62); rand 00000951FB25C5A1
+2026-11-26 07:14:48 snapshot: SaveGame start (RWMLWC-snapshot-out)
+2026-11-26 07:14:49 snapshot: SaveGame done in 1234 ms
+2026-11-26 07:14:49 lockstep: snapshot for player 1 at tick 15480: raw=20641013 bytes, packed=2840319 bytes (13.8%), save=1235 ms, pack=24 ms, 15 chunks sent; reloading it here too
+2026-11-26 07:14:50 curtain: shown (Синхронизация мира…), map 0, world view False
+2026-11-26 07:14:50 sleepremove: player 1 reloads without maps [1], keeps map 0
+2026-11-26 07:14:51 regionids: reset at load, bump=0
+2026-11-26 07:14:54 regionids: after load room=18 district=24 region=483
+2026-11-26 07:14:55 curtain: view restored — map 0, world view False
+2026-11-26 07:14:55 lockstep: snapshot loaded, tick 15480, serverTick=15480, perMapSim=True
+2026-11-26 07:14:57 watchdog: no tick advance for 300 frames at tick 15480: speed=Paused, paused=True, topWindow=ImmediateWindow, windows=3
+2026-11-26 07:15:55 lockstep: hold is over, requesting speed 3
+2026-11-26 07:15:55 resumed after snapshot reload at tick 15480, perMapSim=True
+2026-11-26 07:17:10 lockstep: notice 3: мир тик 42420: игрок 1 ≠ игрок 2
+2026-11-26 07:17:10 lockstep: desync reported, the server orders a common snapshot
+2026-11-26 07:17:10 lockstep: sleepremove — server healing snapshot #7 at tick 42424 skipped (no full world holder)
+2026-11-26 07:17:12 lockstep: notice 3: мир тик 43020: игрок 2 ≠ игрок 1
+2026-11-26 07:17:12 lockstep: sleepremove — server healing snapshot #8 at tick 43025 skipped (no full world holder)
+2026-11-26 07:17:13 lockstep: notice 3: мир тик 43620: игрок 1 ≠ игрок 2
+2026-11-26 07:17:13 lockstep: sleepremove — server healing snapshot #9 at tick 43625 skipped (no full world holder)
+2026-11-26 07:17:15 lockstep: notice 3: мир тик 44220: игрок 1 ≠ игрок 2
+2026-11-26 07:17:15 lockstep: sleepremove — server healing snapshot #10 at tick 44225 skipped (no full world holder)
+2026-11-26 07:17:17 lockstep: notice 3: мир тик 44820: игрок 2 ≠ игрок 1
+2026-11-26 07:17:17 lockstep: sleepremove — server healing snapshot #11 at tick 44829 skipped (no full world holder)
+2026-11-26 07:17:17 tick time: 29999 ticks, avg 0.635 ms, total 19.0 s
+2026-11-26 07:17:17 summary: map0 drafted=0 forbidden=56 plants=[]
+2026-11-26 07:17:17 summary: map0 jobs=[231:LayDown@(122, 0, 107),234:LayDown@(130, 0, 107),239:LayDown@(124, 0, 110)]
+2026-11-26 07:17:17 camera: this client moved its camera 195 times during the run
+2026-11-26 07:17:17 summary: map0 settings=29B89D30A34E3B1A
+2026-11-26 07:17:17 summary: maps=1 player settlements=2 caravans=0
+2026-11-26 07:17:17 summary: absence= offline=[]
+2026-11-26 07:17:17 summary: squads= rejected=0 drafted=[]
+2026-11-26 07:17:17 summary: map0 designations=0 blueprints=0 zones=0; commands sent=2 executed=3 failed=0
+2026-11-26 07:17:17 run finished: file=hash-c2-20261126-071439.txt
+2026-11-26 07:17:17 queue: finished
+2026-11-26 07:17:17 lockstep: disconnect: прогон завершён
+2026-11-26 07:17:17 quitting game
