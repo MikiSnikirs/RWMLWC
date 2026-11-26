@@ -28,6 +28,10 @@ public static class LetterChoices
 
     internal static void Remember(ChoiceLetter letter, DiaNode node)
     {
+        if (letter.GetType() == typeof(StandardLetter))
+        {
+            return; // только «закрыть» и «перейти» — интерфейс, не симуляция
+        }
         for (int i = 0; i < node.options.Count; i++)
         {
             tags.AddOrUpdate(node.options[i], new Tag { letterId = letter.ID, index = i });
@@ -59,17 +63,37 @@ public static class LetterChoices
             TestAutomation.Note($"letter choice: letter {letterId} not found (option {index}), dropped");
             return;
         }
-        DiaOption? option = letter.Choices.ElementAtOrDefault(index);
-        if (option == null || option.disabled)
+        // Варианты строим как игра; у игрока без карты письма (режим заглушки) это может упасть — тогда действие
+        // писем с сигналами (принять/отклонить: signalAccept/signalReject) исполняется напрямую, как в коде игры.
+        // Выключенность варианта не проверяем: её проверил нажавший (у него карта есть).
+        System.Action? act = null;
+        try
         {
-            TestAutomation.Note($"letter choice: letter {letterId} option {index} missing or disabled, dropped");
+            DiaOption? option = letter.Choices.ElementAtOrDefault(index);
+            act = option == null ? null : Traverse.Create(option).Field("action").GetValue<System.Action>();
+        }
+        catch (System.Exception)
+        {
+            act = null;
+        }
+        if (act == null)
+        {
+            string? field = index == 0 ? "signalAccept" : index == 1 ? "signalReject" : null;
+            string? signal = field == null ? null : Traverse.Create(letter).Field(field).GetValue<string>();
+            if (signal != null)
+            {
+                act = () => { Find.SignalManager.SendSignal(new Signal(signal)); Find.LetterStack.RemoveLetter(letter); };
+            }
+        }
+        if (act == null)
+        {
+            TestAutomation.Note($"letter choice: letter {letterId} option {index} has no action here, dropped");
             return;
         }
-        System.Action? act = Traverse.Create(option).Field("action").GetValue<System.Action>();
         Executing = true;
         try
         {
-            act?.Invoke();
+            act.Invoke();
         }
         finally
         {

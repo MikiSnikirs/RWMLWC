@@ -75,6 +75,8 @@ public static class QuestSync
     /// <summary>Идёт исполнение запроса создателем: TryFire задания пропускается насквозь.</summary>
     internal static bool Executing;
 
+    public static int ReporterOfWorldPublic() => ReporterOfWorld();
+
     internal static int ReporterOfWorld()
     {
         IEnumerable<int> online = RWMLWC.Client.SessionView.SessionUi.Players.Select(p => p.PlayerId).Where(RWMLWC.Client.Maps.PlayerPresence.IsOnline);
@@ -162,6 +164,7 @@ public static class QuestSync
         var pawns0 = new HashSet<int>(Find.WorldPawns.AllPawnsAliveOrDead.Select(p => p.thingIDNumber));
         var factions0 = new HashSet<int>(Find.FactionManager.AllFactionsListForReading.Select(f => f.loadID));
         var ships0 = new HashSet<TransportShip>(Find.TransportShipManager.AllTransportShips);
+        var letters0 = new HashSet<Letter>(Find.LetterStack.LettersListForReading);
         Map? prev = MapRandContext.Current;
         MapRandContext.Enter(null); // общий контекст: номера — из блока заданий, а не из блока карты
         Rand.PushState(Gen.HashCombineInt(Gen.HashCombineInt(request, Find.TickManager.TicksGame), 0x0E57));
@@ -187,6 +190,8 @@ public static class QuestSync
         c.heldPawns = pawns.Select(p => p.thingIDNumber).ToList();
         List<Faction> factions = Find.FactionManager.AllFactionsListForReading.Where(f => !factions0.Contains(f.loadID)).ToList();
         List<TransportShip> ships = Find.TransportShipManager.AllTransportShips.Where(x => !ships0.Contains(x)).ToList();
+        // Письма задания (в т. ч. с выбором «Принять»): иначе выбор есть только у создателя (sr27, 258250).
+        List<Letter> letters = Find.LetterStack.LettersListForReading.Where(l => !letters0.Contains(l)).ToList();
         c.heldShips = ships.Select(x => x.GetUniqueLoadID()).ToList();
         // Родственники созданных пешек, созданные тут же, но не попавшие в мир (у создателя — только ссылки).
         var have = new HashSet<int>(pawns.Select(p => p.thingIDNumber));
@@ -221,8 +226,11 @@ public static class QuestSync
         var shipsXml = new System.Text.StringBuilder("<ships>");
         foreach (TransportShip ship in ships) shipsXml.Append(Scribe.saver.DebugOutputFor(ship));
         shipsXml.Append("</ships>");
-        string xml = ok ? Serialize(quests, objs, pawns, factions, related).Replace("<pawns>", shipsXml + "<pawns>").Replace("</qs>", rels + "</qs>") : "";
-        TestAutomation.Note($"quest sync: request #{request} {defName} created by me: ok={ok}, quests [{string.Join(",", c.heldQuests)}], objects [{string.Join(",", c.heldObjects)}], pawns {c.heldPawns.Count}, ships {c.heldShips.Count}, factions {factions.Count}, related {related.Count}, xml {xml.Length} chars");
+        var lettersXml = new System.Text.StringBuilder("<letters>");
+        foreach (Letter l in letters) lettersXml.Append(Scribe.saver.DebugOutputFor(l));
+        lettersXml.Append("</letters>");
+        string xml = ok ? Serialize(quests, objs, pawns, factions, related).Replace("<pawns>", shipsXml + "<pawns>").Replace("</qs>", lettersXml + rels.ToString() + "</qs>") : "";
+        TestAutomation.Note($"quest sync: request #{request} {defName} created by me: ok={ok}, quests [{string.Join(",", c.heldQuests)}], objects [{string.Join(",", c.heldObjects)}], pawns {c.heldPawns.Count}, ships {c.heldShips.Count}, letters {letters.Count}, factions {factions.Count}, related {related.Count}, xml {xml.Length} chars");
         SendResult(request, xml, c.blockCounter);
     }
 
@@ -335,6 +343,7 @@ public static class QuestSync
         List<Pawn>? pawns = null;
         List<WorldObject>? objs = null;
         List<Quest>? quests = null;
+        List<Letter>? letters = null;
         try
         {
             XmlDocument doc = new XmlDocument();
@@ -347,6 +356,7 @@ public static class QuestSync
             Scribe_Collections.Look(ref pawns, "pawns", LookMode.Deep);
             Scribe_Collections.Look(ref objs, "objects", LookMode.Deep);
             Scribe_Collections.Look(ref quests, "quests", LookMode.Deep);
+            Scribe_Collections.Look(ref letters, "letters", LookMode.Deep);
             LoadedObjectDirectory dir = directoryRef(Scribe.loader.crossRefs);
             var mine = new HashSet<int>((pawns ?? new List<Pawn>()).Concat(related ?? new List<Pawn>()).Select(p => p.thingIDNumber));
             var newFactions = new HashSet<int>((factions ?? new List<Faction>()).Select(f => f.loadID));
@@ -402,7 +412,8 @@ public static class QuestSync
         foreach (Pawn p in pawns ?? new List<Pawn>()) { PawnClockShift.Shift(p, delay); Find.WorldPawns.PassToWorld(p, PawnDiscardDecideMode.KeepForever); }
         foreach (WorldObject o in objs ?? new List<WorldObject>()) { Shift(o, delay); Find.WorldObjects.Add(o); }
         foreach (Quest q in quests ?? new List<Quest>()) { Shift(q, delay); Find.QuestManager.Add(q); }
-        TestAutomation.Note($"quest sync: result #{request} restored: quests [{string.Join(",", (quests ?? new List<Quest>()).Select(q => q.id + ":" + q.root?.defName))}], objects {objs?.Count ?? 0}, ships {ships?.Count ?? 0}, pawns {pawns?.Count ?? 0}, factions {factions?.Count ?? 0}, related {related?.Count ?? 0}, delay {delay}");
+        foreach (Letter l in letters ?? new List<Letter>()) { PawnClockShift.ShiftObject(l, delay); Find.LetterStack.ReceiveLetter(l, null, 0, false); }
+        TestAutomation.Note($"quest sync: result #{request} restored: quests [{string.Join(",", (quests ?? new List<Quest>()).Select(q => q.id + ":" + q.root?.defName))}], objects {objs?.Count ?? 0}, ships {ships?.Count ?? 0}, pawns {pawns?.Count ?? 0}, letters {letters?.Count ?? 0}, factions {factions?.Count ?? 0}, related {related?.Count ?? 0}, delay {delay}");
     }
 
     public static void Execute(byte op, ref PacketReader r)

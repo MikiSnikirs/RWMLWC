@@ -975,6 +975,22 @@ public static class TestAutomation
         }
         TakeScheduledShots();
         // T-056, 11.4в (ключ questfire=1): задания в режиме заглушки — мировое и для своей колонии, как от рассказчика.
+        // Принять первое письмо «присоединиться» (как человек: открыть письмо, нажать первый вариант) — один игрок.
+        if (Current.Game != null && shotsStartTick >= 0 && questFireStep == 2 && RWMLWC.Client.World.CaravanSelfTest.ArmKey("questfire=1")
+            && Find.TickManager.TicksGame - shotsStartTick >= 16000 && LockstepClient.PlayerId == RWMLWC.Client.Sim.QuestSync.ReporterOfWorldPublic())
+        {
+            ChoiceLetter? letter = Find.LetterStack.LettersListForReading.OfType<ChoiceLetter>().FirstOrDefault(l => l.GetType().Name.Contains("AcceptJoiner"));
+            if (letter != null)
+            {
+                questFireStep = 3;
+                letter.OpenLetter();
+                Dialog_NodeTree? w = Find.WindowStack.Windows.OfType<Dialog_NodeTree>().LastOrDefault();
+                DiaNode? node = w == null ? null : HarmonyLib.Traverse.Create(w).Field("curNode").GetValue<DiaNode>();
+                DiaOption? first = node?.options.FirstOrDefault();
+                Note($"questfire: accepting letter {letter.ID} '{letter.Label}' (options {node?.options.Count ?? 0})");
+                if (first != null) HarmonyLib.Traverse.Create(first).Method("Activate").GetValue();
+            }
+        }
         if (Current.Game != null && shotsStartTick >= 0 && questFireStep < 2 && RWMLWC.Client.World.CaravanSelfTest.ArmKey("questfire=1"))
         {
             int el = Find.TickManager.TicksGame - shotsStartTick;
