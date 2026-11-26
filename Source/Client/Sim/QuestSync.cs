@@ -360,25 +360,7 @@ public static class QuestSync
             LoadedObjectDirectory dir = directoryRef(Scribe.loader.crossRefs);
             var mine = new HashSet<int>((pawns ?? new List<Pawn>()).Concat(related ?? new List<Pawn>()).Select(p => p.thingIDNumber));
             var newFactions = new HashSet<int>((factions ?? new List<Faction>()).Select(f => f.loadID));
-            foreach (Pawn p in PawnsFinder.All_AliveOrDead.Where(p => !mine.Contains(p.thingIDNumber))) dir.RegisterLoaded(p);
-            foreach (Faction f in Find.FactionManager.AllFactionsListForReading.Where(f => !newFactions.Contains(f.loadID))) dir.RegisterLoaded(f);
-            foreach (WorldObject o in Find.WorldObjects.AllWorldObjects) dir.RegisterLoaded(o);
-            foreach (Map m in Find.Maps) dir.RegisterLoaded(m);
-            if (ModsConfig.IdeologyActive)
-            {
-                foreach (Ideo i in Find.IdeoManager.IdeosListForReading)
-                {
-                    dir.RegisterLoaded(i);
-                    foreach (Precept pr in i.PreceptsListForReading) dir.RegisterLoaded(pr);
-                }
-            }
-            // Политики колонии (еда, лекарства, одежда, чтение): пешка ссылается на них (sr27: FoodPolicy, DrugPolicy).
-            Game g = Current.Game;
-            foreach (DrugPolicy x in g.drugPolicyDatabase.AllPolicies) dir.RegisterLoaded(x);
-            foreach (FoodPolicy x in g.foodRestrictionDatabase.AllFoodRestrictions) dir.RegisterLoaded(x);
-            foreach (ApparelPolicy x in g.outfitDatabase.AllOutfits) dir.RegisterLoaded(x);
-            foreach (ReadingPolicy x in g.readingPolicyDatabase.AllReadingPolicies) dir.RegisterLoaded(x);
-            foreach (Quest q in Find.QuestManager.QuestsListForReading) dir.RegisterLoaded(q);
+            MapEvents.RegisterGame(dir, mine, newFactions);
             Scribe.loader.FinalizeLoading();
         }
         catch (Exception ex)

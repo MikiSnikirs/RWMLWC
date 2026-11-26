@@ -610,25 +610,7 @@ public static class MapEvents
             Pawn? pawn = null;
             Scribe_Deep.Look(ref pawn, "saveable");
             LoadedObjectDirectory dir = directoryRef(Scribe.loader.crossRefs);
-            foreach (Pawn p in PawnsFinder.All_AliveOrDead)
-            {
-                dir.RegisterLoaded(p);
-            }
-            foreach (Faction f in Find.FactionManager.AllFactionsListForReading)
-            {
-                dir.RegisterLoaded(f);
-            }
-            if (ModsConfig.IdeologyActive)
-            {
-                foreach (Ideo ideo in Find.IdeoManager.IdeosListForReading)
-                {
-                    dir.RegisterLoaded(ideo);
-                }
-            }
-            foreach (WorldObject w in Find.WorldObjects.AllWorldObjects)
-            {
-                dir.RegisterLoaded(w);
-            }
+            RegisterGame(dir, null, null);
             Scribe.loader.FinalizeLoading();
             return pawn;
         }
@@ -639,6 +621,39 @@ public static class MapEvents
             Log.Error("[RWMLWC] событие карты: не удалось восстановить пешку: " + ex);
             return null;
         }
+    }
+
+    /// <summary>
+    /// Всё, на что могут ссылаться пешки, сказания и задания из данных события: пешки, фракции, идеологии с заповедями,
+    /// объекты мира, карты, задания, политики колонии (еда, лекарства, одежда, чтение). Без политик и заповедей
+    /// восстановленная пешка падала в PostLoadInit (sr27, sr30).
+    /// </summary>
+    internal static void RegisterGame(LoadedObjectDirectory dir, ICollection<int>? skipPawns, ICollection<int>? skipFactions)
+    {
+        foreach (Pawn p in PawnsFinder.All_AliveOrDead)
+        {
+            if (skipPawns == null || !skipPawns.Contains(p.thingIDNumber)) dir.RegisterLoaded(p);
+        }
+        foreach (Faction f in Find.FactionManager.AllFactionsListForReading)
+        {
+            if (skipFactions == null || !skipFactions.Contains(f.loadID)) dir.RegisterLoaded(f);
+        }
+        if (ModsConfig.IdeologyActive)
+        {
+            foreach (Ideo ideo in Find.IdeoManager.IdeosListForReading)
+            {
+                dir.RegisterLoaded(ideo);
+                foreach (Precept pr in ideo.PreceptsListForReading) dir.RegisterLoaded(pr);
+            }
+        }
+        foreach (WorldObject w in Find.WorldObjects.AllWorldObjects) dir.RegisterLoaded(w);
+        foreach (Map m in Find.Maps) dir.RegisterLoaded(m);
+        foreach (Quest q in Find.QuestManager.QuestsListForReading) dir.RegisterLoaded(q);
+        Game g = Current.Game;
+        foreach (DrugPolicy x in g.drugPolicyDatabase.AllPolicies) dir.RegisterLoaded(x);
+        foreach (FoodPolicy x in g.foodRestrictionDatabase.AllFoodRestrictions) dir.RegisterLoaded(x);
+        foreach (ApparelPolicy x in g.outfitDatabase.AllOutfits) dir.RegisterLoaded(x);
+        foreach (ReadingPolicy x in g.readingPolicyDatabase.AllReadingPolicies) dir.RegisterLoaded(x);
     }
 
     private static readonly AccessTools.FieldRef<CrossRefHandler, LoadedObjectDirectory> directoryRef =
@@ -656,21 +671,7 @@ public static class MapEvents
             Tale? tale = null;
             Scribe_Deep.Look(ref tale, "saveable");
             LoadedObjectDirectory dir = directoryRef(Scribe.loader.crossRefs);
-            foreach (Pawn p in PawnsFinder.All_AliveOrDead)
-            {
-                dir.RegisterLoaded(p);
-            }
-            foreach (Faction f in Find.FactionManager.AllFactionsListForReading)
-            {
-                dir.RegisterLoaded(f);
-            }
-            if (ModsConfig.IdeologyActive)
-            {
-                foreach (Ideo ideo in Find.IdeoManager.IdeosListForReading)
-                {
-                    dir.RegisterLoaded(ideo);
-                }
-            }
+            RegisterGame(dir, null, null);
             Scribe.loader.FinalizeLoading();
             return tale;
         }
