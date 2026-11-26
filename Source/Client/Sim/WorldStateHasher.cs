@@ -27,7 +27,7 @@ public static class WorldStateHasher
         foreach (Map map in Find.Maps) { m.Add(map.uniqueID); m.Add(map.Tile.tileId); }
         Fnv64 o = Fnv64.Create();
         tmp.Clear();
-        tmp.AddRange(Find.WorldObjects.AllWorldObjects);
+        tmp.AddRange(Find.WorldObjects.AllWorldObjects.Where(o => !QuestSync.IsHeldObject(o))); // удержанное заданием — только у создателя (11.4в)
         tmp.Sort((a, b) => a.ID.CompareTo(b.ID));
         foreach (WorldObject w in tmp)
         {
@@ -61,7 +61,7 @@ public static class WorldStateHasher
         }
 
         tmp.Clear();
-        tmp.AddRange(Find.WorldObjects.AllWorldObjects);
+        tmp.AddRange(Find.WorldObjects.AllWorldObjects.Where(o => !QuestSync.IsHeldObject(o))); // удержанное заданием — только у создателя (11.4в)
         tmp.Sort((a, b) => a.ID.CompareTo(b.ID));
         h.Add(tmp.Count);
         for (int i = 0; i < tmp.Count; i++)

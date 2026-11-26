@@ -954,6 +954,7 @@ public static class TestAutomation
     }
 
     private static bool autopilotSet;
+    private static int questFireStep;
 
     public static void SessionFrame()
     {
@@ -973,6 +974,34 @@ public static class TestAutomation
             }
         }
         TakeScheduledShots();
+        // T-056, 11.4в (ключ questfire=1): задания в режиме заглушки — мировое и для своей колонии, как от рассказчика.
+        if (Current.Game != null && shotsStartTick >= 0 && questFireStep < 2 && RWMLWC.Client.World.CaravanSelfTest.ArmKey("questfire=1"))
+        {
+            int el = Find.TickManager.TicksGame - shotsStartTick;
+            if (questFireStep == 0 && el >= 6000)
+            {
+                questFireStep = 1;
+                IncidentDef? d = DefDatabase<IncidentDef>.GetNamedSilentFail("GiveQuest_Random");
+                if (d != null)
+                {
+                    IncidentParms p = StorytellerUtility.DefaultParmsNow(d.category, Find.World);
+                    Find.Storyteller.TryFire(new FiringIncident(d, null, p));
+                    Note("questfire: world GiveQuest_Random fired locally");
+                }
+            }
+            else if (questFireStep == 1 && el >= 12000)
+            {
+                questFireStep = 2;
+                IncidentDef? d = DefDatabase<IncidentDef>.GetNamedSilentFail("WandererJoin");
+                Map? mine = Find.Maps.FirstOrDefault(m => m.Parent is RimWorld.Planet.Settlement st && RWMLWC.Client.World.Colonies.Component?.OwnerOf(st) == LockstepClient.PlayerId);
+                if (d != null && mine != null)
+                {
+                    IncidentParms p = StorytellerUtility.DefaultParmsNow(d.category, mine);
+                    Find.Storyteller.TryFire(new FiringIncident(d, null, p));
+                    Note($"questfire: map WandererJoin fired locally for map {mine.uniqueID}");
+                }
+            }
+        }
         PerMapSim.UpdateSleepForeign();
         SleepRemoveStep();
         if (sessionSteps.Count == 0 || Current.Game == null || Find.TickManager.TicksGame < sessionSteps.Peek().tick)

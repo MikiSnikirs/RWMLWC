@@ -132,28 +132,6 @@ internal static class Patch_QuestManager_Add_Log
 }
 
 /// <summary>
-/// T-056, режим заглушки (sleepremove), временное правило: рассказчик не выдаёт задания (IncidentWorker_GiveQuest).
-/// Задание порождается состоянием карт (своей — для события карты; колоний — для мирового), а карты у игроков в
-/// этом режиме разные: задание появлялось только у владельца карты (sr22: MonolithMigration на тике 25000), и мир
-/// расходился. Правильное решение — задания порождает один назначенный игрок и рассылает готовыми (11.3.4); до него
-/// в режиме заглушки заданий от рассказчика нет у всех одинаково. Обычная игра (все считают всё) не затронута.
-/// </summary>
-[HarmonyPatch(typeof(Storyteller), nameof(Storyteller.TryFire))]
-internal static class Patch_Storyteller_TryFire_NoQuestsInStubMode
-{
-    private static bool Prefix(FiringIncident fi, ref bool __result)
-    {
-        if (PerMapSim.SleepRemoveTest && LockstepClient.InSession && fi.def.Worker is IncidentWorker_GiveQuest)
-        {
-            TestAutomation.Note($"quest incident {fi.def.defName} for {(fi.parms.target is Map m ? "map" + m.uniqueID : fi.parms.target?.ToString())} skipped in stub mode at tick {Find.TickManager.TicksGame}");
-            __result = false;
-            return false;
-        }
-        return true;
-    }
-}
-
-/// <summary>
 /// T-056, режим заглушки: общая (ванильная) адаптация рассказчика не меняется из тика карты. Ранение и смерть
 /// колониста считает только владелец карты, и общий счётчик расходился (sr23: 33750, 0 против −6 → очередь событий
 /// → общий Rand на 39500). Адаптацию по поселению ведёт SettlementThreatsComponent (его постфикс на этом методе
