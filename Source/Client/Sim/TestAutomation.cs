@@ -955,6 +955,8 @@ public static class TestAutomation
 
     private static bool autopilotSet;
     private static int questFireStep;
+    private static ChoiceLetter? lateLetter;
+    private static DiaOption? lateOption;
 
     public static void SessionFrame()
     {
@@ -987,9 +989,27 @@ public static class TestAutomation
                 Dialog_NodeTree? w = Find.WindowStack.Windows.OfType<Dialog_NodeTree>().LastOrDefault();
                 DiaNode? node = w == null ? null : HarmonyLib.Traverse.Create(w).Field("curNode").GetValue<DiaNode>();
                 DiaOption? first = node?.options.FirstOrDefault();
-                Note($"questfire: accepting letter {letter.ID} '{letter.Label}' (options {node?.options.Count ?? 0})");
-                if (first != null) HarmonyLib.Traverse.Create(first).Method("Activate").GetValue();
+                if (RWMLWC.Client.World.CaravanSelfTest.ArmKey("questlate=1"))
+                {
+                    // Ключ questlate=1: окно письма открыто, нажатие — только после истечения предложения.
+                    lateLetter = letter;
+                    lateOption = first;
+                    Note($"questlate: letter {letter.ID} '{letter.Label}' opened, waiting for expiry (quest {letter.quest?.id})");
+                }
+                else
+                {
+                    Note($"questfire: accepting letter {letter.ID} '{letter.Label}' (options {node?.options.Count ?? 0})");
+                    if (first != null) HarmonyLib.Traverse.Create(first).Method("Activate").GetValue();
+                }
             }
+        }
+        if (lateLetter != null && Current.Game != null && RWMLWC.Client.Input.LetterChoices.Expired(lateLetter))
+        {
+            bool open = Find.WindowStack.Windows.OfType<Dialog_NodeTree>().Any();
+            Note($"questlate: quest {lateLetter.quest?.id} {lateLetter.quest?.State} at tick {Find.TickManager.TicksGame}, letter window open={open}; clicking the stale option");
+            if (lateOption != null) HarmonyLib.Traverse.Create(lateOption).Method("Activate").GetValue();
+            lateLetter = null;
+            lateOption = null;
         }
         if (Current.Game != null && shotsStartTick >= 0 && questFireStep < 2 && RWMLWC.Client.World.CaravanSelfTest.ArmKey("questfire=1"))
         {
