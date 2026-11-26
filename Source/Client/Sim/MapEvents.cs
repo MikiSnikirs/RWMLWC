@@ -4,6 +4,7 @@ using System.Linq;
 using System.Xml;
 using HarmonyLib;
 using RimWorld;
+using RimWorld.Planet;
 using RWMLWC.Shared.Protocol;
 using Verse;
 
@@ -26,6 +27,7 @@ public static class MapEvents
 {
     public const byte OpMapEvents = 40;
     private const byte KindTale = 1;
+    private const byte KindPawnDeath = 2;
     private const int DropAfterTicks = 5000;
     private const int MaxPerCommand = 32;
 
@@ -36,6 +38,11 @@ public static class MapEvents
         public int seq;
         public byte kind;
         public Tale? tale;
+        public Pawn? deadPawn; // смерть (шаг 4): у владельца уведомления уже исполнены в тике — своё не повторять
+        public string? dinfoDef;
+        public float dinfoAmount;
+        public int dinfoInstigator = -1;
+        public byte dinfoCategory;
         public string? xml; // снимается при отправке (вызывающий может дописать сказание после RecordTale: customLabel)
         public bool sent;
     }
@@ -76,6 +83,37 @@ public static class MapEvents
     }
 
     /// <summary>
+    /// Смерть пешки на карте (T-056, шаг 4 плана 11.4б): у спящего клиента карты нет, и мировые последствия
+    /// смерти (мёртвая пешка в WorldPawns, адаптация, уведомления фракций и заданий) без события не наступят.
+    /// Владелец исполняет их в тике как обычно; событие несёт XML пешки и контекст урона, спящий восстанавливает
+    /// пешку и исполняет уведомления под изолированным Rand (общий Rand не трогается).
+    /// </summary>
+    internal static void QueuePawnDeath(Map map, Pawn pawn, DamageInfo? dinfo)
+    {
+        int tick = Find.TickManager.TicksGame + StasisClock.Offset;
+        if (tick != seqTick)
+        {
+            seqTick = tick;
+            seqByMap.Clear();
+        }
+        seqByMap.TryGetValue(map.uniqueID, out int seq);
+        seqByMap[map.uniqueID] = seq + 1;
+        pending.Add(new Pending
+        {
+            map = map.uniqueID,
+            tick = tick,
+            seq = seq,
+            kind = KindPawnDeath,
+            deadPawn = pawn,
+            dinfoDef = dinfo?.Def?.defName,
+            dinfoAmount = dinfo?.Amount ?? 0f,
+            dinfoInstigator = dinfo?.Instigator?.thingIDNumber ?? -1,
+            dinfoCategory = (byte)(dinfo?.Category ?? DamageInfo.SourceCategory.ThingOrUnknown),
+        });
+        TestAutomation.Note($"map events: pawn death {pawn.def.defName} #{pawn.thingIDNumber} on map {map.uniqueID} queued at tick {tick}.{seq}");
+    }
+
+    /// <summary>
     /// После загрузки (снимок, вход): объекты в очереди — из прежней игры. Данные остаются: неотправленное докладчик
     /// отправит, а при исполнении все восстановят объект из данных (отложенного нет в сейве, его не было в мире).
     /// </summary>
@@ -87,7 +125,12 @@ public static class MapEvents
             {
                 p.xml = Scribe.saver.DebugOutputFor(p.tale); // ссылки — по номерам, годятся и для новой игры
             }
+            if (p.xml == null && p.deadPawn != null)
+            {
+                p.xml = Scribe.saver.DebugOutputFor(p.deadPawn);
+            }
             p.tale = null;
+            p.deadPawn = null;
         }
         seqTick = -1;
         seqByMap.Clear();
@@ -125,10 +168,13 @@ public static class MapEvents
             {
                 continue;
             }
-            List<Pending> items = group.OrderBy(p => p.tick).ThenBy(p => p.seq).Take(MaxPerCommand).ToList();
+            // XML пешки велик (десятки КБ) — смерть шлём меньшими пачками, чтобы команда влезла в кадр (4 МБ).
+            int take = group.Any(p => p.kind == KindPawnDeath) ? 8 : MaxPerCommand;
+            List<Pending> items = group.OrderBy(p => p.tick).ThenBy(p => p.seq).Take(take).ToList();
             foreach (Pending p in items)
             {
-                p.xml ??= p.tale != null ? Scribe.saver.DebugOutputFor(p.tale) : "";
+                p.xml ??= p.tale != null ? Scribe.saver.DebugOutputFor(p.tale)
+                    : p.deadPawn != null ? Scribe.saver.DebugOutputFor(p.deadPawn) : "";
             }
             RWMLWC.Client.Input.WorldCommands.SendMapEvents(w =>
             {
@@ -139,7 +185,18 @@ public static class MapEvents
                     w.WriteInt32(p.tick);
                     w.WriteInt32(p.seq);
                     w.WriteByte(p.kind);
-                    w.WriteString(p.xml ?? "");
+                    if (p.kind == KindPawnDeath)
+                    {
+                        w.WriteBytes(System.Text.Encoding.UTF8.GetBytes(p.xml ?? ""));
+                        w.WriteString(p.dinfoDef ?? "");
+                        w.WriteInt32(BitConverter.SingleToInt32Bits(p.dinfoAmount));
+                        w.WriteInt32(p.dinfoInstigator);
+                        w.WriteByte(p.dinfoCategory);
+                    }
+                    else
+                    {
+                        w.WriteString(p.xml ?? "");
+                    }
                 }
             });
             foreach (Pending p in items)
@@ -167,7 +224,23 @@ public static class MapEvents
             int tick = r.ReadInt32();
             int seq = r.ReadInt32();
             byte kind = r.ReadByte();
-            string xml = r.ReadString();
+            string xml;
+            string dinfoDef = "";
+            float dinfoAmount = 0f;
+            int dinfoInstigator = -1;
+            byte dinfoCategory = 0;
+            if (kind == KindPawnDeath)
+            {
+                xml = System.Text.Encoding.UTF8.GetString(r.ReadBytes());
+                dinfoDef = r.ReadString();
+                dinfoAmount = BitConverter.Int32BitsToSingle(r.ReadInt32());
+                dinfoInstigator = r.ReadInt32();
+                dinfoCategory = r.ReadByte();
+            }
+            else
+            {
+                xml = r.ReadString();
+            }
             int lastTick;
             int lastSeq;
             if (state != null)
@@ -216,6 +289,104 @@ public static class MapEvents
                     TestAutomation.Note($"map events: tale #{tale.id} {tale.def.defName} applied at tick {Find.TickManager.TicksGame} ({(mine != null ? "own" : "restored")}, map {mapId}{(map == null ? " absent" : "")})");
                 }
             }
+            else if (kind == KindPawnDeath)
+            {
+                ApplyPawnDeath(xml, dinfoDef, dinfoAmount, dinfoInstigator, dinfoCategory, mapId, tick, seq, own: mine != null);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Спящий клиент: восстановить мёртвую пешку из XML в WorldPawns и исполнить мировые уведомления смерти.
+    /// Владелец (own) уже исполнил их в тике карты — не повторять. Уведомления идут под изолированным Rand:
+    /// у владельца они считались в Rand карты, общий Rand спящего не должен измениться.
+    /// Известный пробел (записан в 11.4б): goodwill фракции при map=null не меняется (блок Notify_MemberDied
+    /// требует карту), регенерация лидера фракции даёт другую пешку — синхронизировать данными в следующей итерации.
+    /// </summary>
+    private static void ApplyPawnDeath(string xml, string dinfoDef, float amount, int instigatorId, byte category, int mapId, int tick, int seq, bool own)
+    {
+        if (own)
+        {
+            return;
+        }
+        Pawn? pawn = LoadPawn(xml);
+        if (pawn == null || Find.WorldPawns.AllPawnsAliveOrDead.Any(p => p.thingIDNumber == pawn.thingIDNumber))
+        {
+            return;
+        }
+        DamageInfo? dinfo = null;
+        if (dinfoDef.Length > 0)
+        {
+            DamageDef? def = DefDatabase<DamageDef>.GetNamedSilentFail(dinfoDef);
+            if (def != null)
+            {
+                Thing? instigator = instigatorId >= 0 ? PawnsFinder.All_AliveOrDead.FirstOrDefault(p => p.thingIDNumber == instigatorId) : null;
+                dinfo = new DamageInfo(def, amount, instigator: instigator, category: (DamageInfo.SourceCategory)category);
+            }
+        }
+        applying = true;
+        Rand.PushState(Gen.HashCombineInt(mapId, tick, seq, pawn.thingIDNumber));
+        try
+        {
+            Find.WorldPawns.PassToWorld(pawn);
+            Find.Storyteller.Notify_PawnEvent(pawn, AdaptationEvent.Died);
+            pawn.HomeFaction?.Notify_MemberDied(pawn, dinfo, wasWorldPawn: false, wasGuilty: false, map: null);
+            Find.QuestManager.Notify_PawnKilled(pawn, dinfo);
+            Find.FactionManager.Notify_PawnKilled(pawn);
+            Find.IdeoManager.Notify_PawnKilled(pawn);
+            TestAutomation.Note($"map events: pawn death {pawn.def.defName} #{pawn.thingIDNumber} applied at tick {Find.TickManager.TicksGame} (restored, map {mapId} absent)");
+        }
+        catch (Exception ex)
+        {
+            TestAutomation.Note("map events: pawn death apply FAILED: " + ex.Message);
+            Log.Error("[RWMLWC] событие смерти пешки: " + ex);
+        }
+        finally
+        {
+            Rand.PopState();
+            applying = false;
+        }
+    }
+
+    private static Pawn? LoadPawn(string xml)
+    {
+        try
+        {
+            XmlDocument doc = new XmlDocument();
+            doc.LoadXml("<root>" + xml + "</root>");
+            Scribe.loader.curXmlParent = doc.DocumentElement;
+            Scribe.mode = LoadSaveMode.LoadingVars;
+            Pawn? pawn = null;
+            Scribe_Deep.Look(ref pawn, "saveable");
+            LoadedObjectDirectory dir = directoryRef(Scribe.loader.crossRefs);
+            foreach (Pawn p in PawnsFinder.All_AliveOrDead)
+            {
+                dir.RegisterLoaded(p);
+            }
+            foreach (Faction f in Find.FactionManager.AllFactionsListForReading)
+            {
+                dir.RegisterLoaded(f);
+            }
+            if (ModsConfig.IdeologyActive)
+            {
+                foreach (Ideo ideo in Find.IdeoManager.IdeosListForReading)
+                {
+                    dir.RegisterLoaded(ideo);
+                }
+            }
+            foreach (WorldObject w in Find.WorldObjects.AllWorldObjects)
+            {
+                dir.RegisterLoaded(w);
+            }
+            Scribe.loader.FinalizeLoading();
+            return pawn;
+        }
+        catch (Exception ex)
+        {
+            Scribe.ForceStop();
+            TestAutomation.Note("map events: pawn restore FAILED: " + ex.Message);
+            Log.Error("[RWMLWC] событие карты: не удалось восстановить пешку: " + ex);
+            return null;
         }
     }
 
@@ -277,6 +448,28 @@ internal static class Patch_TaleManager_Add_MapEvent
         }
         MapEvents.QueueTale(map, tale);
         return false;
+    }
+}
+
+/// <summary>
+/// Смерть пешки в тике карты (T-056, шаг 4): после исполнения поставить событие карты для спящих клиентов.
+/// Только sleepremove: в остальных режимах карту считают все, и мировые последствия наступают у всех сами.
+/// </summary>
+[HarmonyPatch(typeof(Pawn), nameof(Pawn.Kill))]
+internal static class Patch_Pawn_Kill_MapEvent
+{
+    private static void Postfix(Pawn __instance, DamageInfo? dinfo)
+    {
+        if (!PerMapSim.SleepRemoveTest || !LockstepClient.InSession || !MapRandContext.InTick || __instance == null)
+        {
+            return;
+        }
+        Map? map = MapRandContext.Current;
+        if (map == null)
+        {
+            return;
+        }
+        MapEvents.QueuePawnDeath(map, __instance, dinfo);
     }
 }
 
