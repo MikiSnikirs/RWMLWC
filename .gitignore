@@ -13,3 +13,6 @@ Waylith*.dll
 UnityStubs.dll
 0Harmony.dll
 build.log
+
+# Временные файлы Qwen Code
+.qwen/
