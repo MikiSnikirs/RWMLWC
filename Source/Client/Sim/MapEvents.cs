@@ -601,6 +601,35 @@ public static class MapEvents
 
     private static Pawn? LoadPawn(string xml)
     {
+        // Прежняя копия этой пешки у этого игрока (мировая: задание восстановило её в мир, а у владельца она ушла на
+        // карту, которой здесь нет) — убрать, иначе два объекта с одним номером (sr32: Nanami).
+        int id = -1;
+        System.Text.RegularExpressions.Match mt = System.Text.RegularExpressions.Regex.Match(xml, "<id>[^<0-9]*([0-9]+)</id>");
+        if (mt.Success)
+        {
+            int.TryParse(mt.Groups[1].Value, out id);
+        }
+        Pawn? stale = id < 0 ? null : Find.WorldPawns.AllPawnsAliveOrDead.FirstOrDefault(p => p.thingIDNumber == id);
+        if (stale != null && !stale.Spawned)
+        {
+            Find.WorldPawns.RemovePawn(stale);
+            TestAutomation.Note($"map events: stale world copy of pawn {id} removed before restore");
+        }
+        skipPawnId = id;
+        try
+        {
+            return AsLoading(() => LoadPawnInner(xml));
+        }
+        finally
+        {
+            skipPawnId = -1;
+        }
+    }
+
+    private static int skipPawnId = -1;
+
+    private static Pawn? LoadPawnInner(string xml)
+    {
         try
         {
             XmlDocument doc = new XmlDocument();
@@ -610,7 +639,7 @@ public static class MapEvents
             Pawn? pawn = null;
             Scribe_Deep.Look(ref pawn, "saveable");
             LoadedObjectDirectory dir = directoryRef(Scribe.loader.crossRefs);
-            RegisterGame(dir, null, null);
+            RegisterGame(dir, skipPawnId >= 0 ? new[] { skipPawnId } : null, null);
             Scribe.loader.FinalizeLoading();
             return pawn;
         }
@@ -620,6 +649,25 @@ public static class MapEvents
             TestAutomation.Note("map events: pawn restore FAILED: " + ex.Message);
             Log.Error("[RWMLWC] событие карты: не удалось восстановить пешку: " + ex);
             return null;
+        }
+    }
+
+    /// <summary>
+    /// Загрузка объектов из данных события посреди игры — в том же состоянии программы, что и обычная загрузка сейва:
+    /// часть кода игры при <c>ProgramState.Playing</c> идёт дальше и падает на недогруженной пешке
+    /// (LifeStageWorker_HumanlikeAdult.Notify_LifeStageStarted в PostLoadInit, sr31).
+    /// </summary>
+    internal static T AsLoading<T>(Func<T> load)
+    {
+        ProgramState prev = Current.ProgramState;
+        Current.ProgramState = ProgramState.MapInitializing;
+        try
+        {
+            return load();
+        }
+        finally
+        {
+            Current.ProgramState = prev;
         }
     }
 
@@ -660,7 +708,9 @@ public static class MapEvents
         AccessTools.FieldRefAccess<CrossRefHandler, LoadedObjectDirectory>("loadedObjectDirectory");
 
     /// <summary>Сказание из XML (<c>DebugOutputFor</c>); ссылки — на пешек, фракции и идеологии этой игры.</summary>
-    private static Tale? LoadTale(string xml)
+    private static Tale? LoadTale(string xml) => AsLoading(() => LoadTaleInner(xml));
+
+    private static Tale? LoadTaleInner(string xml)
     {
         try
         {

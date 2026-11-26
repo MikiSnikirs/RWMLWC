@@ -337,6 +337,7 @@ public static class QuestSync
 
     private static void RestoreInner(string xml, int delay, int request)
     {
+        ProgramState programState = Current.ProgramState;
         List<Faction>? factions = null;
         List<Pawn>? related = null;
         List<TransportShip>? ships = null;
@@ -346,6 +347,7 @@ public static class QuestSync
         List<Letter>? letters = null;
         try
         {
+            Current.ProgramState = ProgramState.MapInitializing; // как при загрузке сейва (sr31: PostLoadInit падал при Playing)
             XmlDocument doc = new XmlDocument();
             doc.LoadXml(xml.Replace("<saveable", "<li").Replace("</saveable>", "</li>"));
             Scribe.loader.curXmlParent = doc.DocumentElement;
@@ -369,6 +371,10 @@ public static class QuestSync
             TestAutomation.Note("quest sync: restore FAILED: " + ex.Message);
             Log.Error("[RWMLWC] задание: не удалось восстановить: " + ex);
             return;
+        }
+        finally
+        {
+            Current.ProgramState = programState;
         }
         foreach (Faction f in factions ?? new List<Faction>()) { Find.FactionManager.Add(f); }
         try
