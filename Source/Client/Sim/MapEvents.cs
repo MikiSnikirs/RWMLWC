@@ -32,6 +32,7 @@ public static class MapEvents
     private const byte KindTaleRemove = 4;
     private const byte KindPawnDiscard = 5;
     private const byte KindPawnEnter = 6; // мировая пешка пришла на карту: у игрока без карты её мировая копия уходит
+    private const byte KindPawnToWorld = 7; // живая пешка ушла в мир не с карты (создана в тике карты: родственник и т.п.)
     private const int DropAfterTicks = 5000;
     private const int MaxPerCommand = 32;
     private const int WorldLevelMap = -1; // события мира (удаление сказаний): докладчик — младший игрок в сети
@@ -156,6 +157,30 @@ public static class MapEvents
         });
         TestAutomation.Note($"map events: pawn leave {pawn.def.defName} #{pawn.thingIDNumber} from map {map.uniqueID} queued at tick {tick}.{seq} (freed={freed})");
     }
+
+    /// <summary>
+    /// Пешка передана в мир в тике карты, но не уходом с карты (T-056, sr34): создана при событии карты (родственники
+    /// пешек набега или гостей, пешки заданий карты) и сразу ушла в мировые пешки. Она есть только у считающего карту:
+    /// у второго её нет, а сборщик мусора у считающего убрать её не может (исполняются удаления докладчика) — состав
+    /// мировых пешек расходился навсегда (sr34: c2 на 2 живые пешки больше со 150000). Событие несёт XML пешки,
+    /// игрок без карты добавляет её в мировые пешки без уведомлений.
+    /// </summary>
+    internal static void QueuePawnToWorld(Map map, Pawn pawn)
+    {
+        int tick = Find.TickManager.TicksGame + StasisClock.Offset;
+        if (tick != seqTick)
+        {
+            seqTick = tick;
+            seqByMap.Clear();
+        }
+        seqByMap.TryGetValue(map.uniqueID, out int seq);
+        seqByMap[map.uniqueID] = seq + 1;
+        pending.Add(new Pending { map = map.uniqueID, tick = tick, seq = seq, kind = KindPawnToWorld, leftPawn = pawn });
+        TestAutomation.Note($"map events: pawn to world {pawn.def.defName} #{pawn.thingIDNumber} from map {map.uniqueID} context queued at tick {tick}.{seq}");
+    }
+
+    /// <summary>Идёт Pawn.ExitMap: передачу в мир покрывает событие ухода.</summary>
+    internal static int InExitMap;
 
     private static readonly HashSet<int> taleRemovalsQueued = new HashSet<int>();
 
@@ -291,7 +316,7 @@ public static class MapEvents
                 continue;
             }
             // XML пешки велик (десятки КБ) — события пешек шлём меньшими пачками, чтобы команда влезла в кадр (4 МБ).
-            int take = group.Any(p => p.kind == KindPawnDeath || p.kind == KindPawnLeave) ? 8 : MaxPerCommand;
+            int take = group.Any(p => p.kind == KindPawnDeath || p.kind == KindPawnLeave || p.kind == KindPawnToWorld) ? 8 : MaxPerCommand;
             List<Pending> items = group.OrderBy(p => p.tick).ThenBy(p => p.seq).Take(take).ToList();
             foreach (Pending p in items)
             {
@@ -329,7 +354,7 @@ public static class MapEvents
                         }
                         w.WriteBytes(System.Text.Encoding.UTF8.GetBytes(leaderXml));
                     }
-                    else if (p.kind == KindPawnLeave)
+                    else if (p.kind == KindPawnLeave || p.kind == KindPawnToWorld)
                     {
                         w.WriteBytes(System.Text.Encoding.UTF8.GetBytes(p.xml ?? ""));
                         w.WriteBool(p.leaveFreed);
@@ -395,7 +420,7 @@ public static class MapEvents
                 leaderChanged = r.ReadBool();
                 leaderXml = System.Text.Encoding.UTF8.GetString(r.ReadBytes());
             }
-            else if (kind == KindPawnLeave)
+            else if (kind == KindPawnLeave || kind == KindPawnToWorld)
             {
                 xml = System.Text.Encoding.UTF8.GetString(r.ReadBytes());
                 leaveFreed = r.ReadBool();
@@ -466,6 +491,10 @@ public static class MapEvents
             {
                 ApplyPawnLeave(xml, leaveFreed, mapId, tick, seq, own: mine != null);
             }
+            else if (kind == KindPawnToWorld)
+            {
+                ApplyPawnToWorld(xml, mapId, own: mine != null);
+            }
             else if (kind == KindTaleRemove)
             {
                 // Применяют все, включая постановщика: локальное удаление было отложено префиксом RemoveTale.
@@ -521,6 +550,34 @@ public static class MapEvents
     /// Goodwill за уход считается без карты (в отличие от смерти) — синхронизируется полностью.
     /// Владелец (own) уже исполнил уведомления в тике — не повторять.
     /// </summary>
+    private static void ApplyPawnToWorld(string xml, int mapId, bool own)
+    {
+        if (own)
+        {
+            return;
+        }
+        Pawn? pawn = LoadPawn(xml);
+        if (pawn == null || Find.WorldPawns.AllPawnsAliveOrDead.Any(p => p.thingIDNumber == pawn.thingIDNumber))
+        {
+            return;
+        }
+        applying = true;
+        try
+        {
+            Find.WorldPawns.PassToWorld(pawn);
+            TestAutomation.Note($"map events: pawn to world {pawn.def.defName} #{pawn.thingIDNumber} applied at tick {Find.TickManager.TicksGame} (restored, map {mapId} absent)");
+        }
+        catch (Exception ex)
+        {
+            TestAutomation.Note("map events: pawn to world apply FAILED: " + ex.Message);
+            Log.Error("[RWMLWC] событие передачи пешки в мир: " + ex);
+        }
+        finally
+        {
+            applying = false;
+        }
+    }
+
     private static void ApplyPawnLeave(string xml, bool freed, int mapId, int tick, int seq, bool own)
     {
         if (own)
@@ -835,6 +892,10 @@ internal static class Patch_Pawn_Kill_MapEvent
 [HarmonyPatch(typeof(Pawn), nameof(Pawn.ExitMap))]
 internal static class Patch_Pawn_ExitMap_MapEvent
 {
+    private static void Prefix() => MapEvents.InExitMap++;
+
+    private static void Finalizer() => MapEvents.InExitMap--;
+
     private static void Postfix(Pawn __instance)
     {
         if (!PerMapSim.SleepRemoveTest || !LockstepClient.InSession || !MapRandContext.InTick || __instance == null)
@@ -897,6 +958,29 @@ internal static class Patch_Pawn_SpawnSetup_EnterEvent
         if (__state && map != null)
         {
             MapEvents.QueuePawnEnter(map, __instance.thingIDNumber);
+        }
+    }
+}
+
+/// <summary>Передача живой пешки в мир в тике карты, не уходом с карты — событие для игроков без карты (sr34).</summary>
+[HarmonyPatch(typeof(WorldPawns), nameof(WorldPawns.PassToWorld))]
+internal static class Patch_WorldPawns_PassToWorld_Event
+{
+    private static void Prefix(Pawn pawn, out Map? __state)
+    {
+        __state = null;
+        if (PerMapSim.SleepRemoveTest && MapEvents.InExitMap == 0 && pawn != null && !pawn.Dead && !pawn.Spawned
+            && MapEvents.ShouldDefer(out Map? map) && !Find.WorldPawns.Contains(pawn))
+        {
+            __state = map;
+        }
+    }
+
+    private static void Postfix(Pawn pawn, Map? __state)
+    {
+        if (__state != null && Find.WorldPawns.Contains(pawn))
+        {
+            MapEvents.QueuePawnToWorld(__state, pawn);
         }
     }
 }
