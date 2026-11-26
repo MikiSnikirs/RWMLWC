@@ -18,6 +18,8 @@
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Принятые архитектурные решения. |
 | [docs/TESTS.md](docs/TESTS.md) | План тестов и их результаты. |
 
+Памятка игрокам — что есть в сетевой игре и где это нажимать: [`docs/PLAYERS.md`](docs/PLAYERS.md).
+
 ## Правовые ограничения
 
 - Код RimWorld Together (CC BY-NC-ND 4.0) и Multiplayer (rwmt) не копируем. Смотреть подходы можно, переносить код нельзя.
