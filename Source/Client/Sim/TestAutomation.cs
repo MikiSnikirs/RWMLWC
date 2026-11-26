@@ -643,6 +643,15 @@ public static class TestAutomation
             // хозяин принимает. Роли — по состоянию игры, не по номеру клиента.
             Pawn? MyGuest() => Find.Maps.SelectMany(m => m.mapPawns.AllPawnsSpawned)
                 .Where(p => RWMLWC.Client.Maps.GuestsComponent.Component?.GuestPlayer(p) == LockstepClient.PlayerId).OrderBy(p => p.thingIDNumber).FirstOrDefault();
+            if (RWMLWC.Client.World.CaravanSelfTest.ArmKey("tradeclaim=1"))
+            {
+                // Хозяин колонии занимает её карту («Карты и права»): у гостя прав нет.
+                sessionSteps.Enqueue((startTick + 2000, "trade: owner claims map", () =>
+                {
+                    Map? own = Find.Maps.FirstOrDefault(mm => mm.Parent is RimWorld.Planet.Settlement st && RWMLWC.Client.World.Colonies.Component?.OwnerOf(st) == LockstepClient.PlayerId && mm.uniqueID != 0);
+                    if (own != null) { RWMLWC.Client.Maps.MapAccess.Claim(own); Note("trade: owner claims map " + own.uniqueID); }
+                }));
+            }
             stepGates["trade: give guest steel"] = () => MyGuest() != null || (RWMLWC.Client.World.PlayerTrade.Component?.offers.Count ?? 0) > 0 || Find.TickManager.TicksGame > startTick + 40000;
             sessionSteps.Enqueue((startTick + 3000, "trade: give guest steel", () =>
             {
@@ -667,8 +676,12 @@ public static class TestAutomation
                 var o = RWMLWC.Client.World.PlayerTrade.Component!.offers[0];
                 Map? m = Find.Maps.FirstOrDefault(x => x.uniqueID == o.mapId);
                 Pawn? g = MyGuest();
-                if (m != null && RWMLWC.Client.World.PlayerTrade.MayAccept(m, LockstepClient.PlayerId)) Find.WindowStack.Add(new RWMLWC.Client.World.Dialog_TradeOffers(m));
-                else if (g != null) Find.WindowStack.Add(new RWMLWC.Client.World.Dialog_PlayerTrade(g));
+                // Как игрок: нажатие кнопки на гостевой пешке (LocalCommand_Action — на месте, без команды и прав).
+                Pawn? guestPawn = g ?? m?.mapPawns.AllPawnsSpawned.FirstOrDefault(p => (RWMLWC.Client.Maps.GuestsComponent.Component?.GuestPlayer(p) ?? 0) != 0);
+                string label = g != null ? "Предложить обмен" : "Сделки";
+                Gizmo? button = guestPawn?.GetGizmos().FirstOrDefault(x => x is Command_Action a && a.defaultLabel == label);
+                button?.ProcessInput(new UnityEngine.Event());
+                Note($"trade: pressed '{label}' (found {button != null}), my level on map {m?.uniqueID}: {(m != null ? RWMLWC.Client.Maps.MapAccess.MyLevel(m.uniqueID).ToString() : "-")}, windows: offers={Find.WindowStack.IsOpen<RWMLWC.Client.World.Dialog_TradeOffers>()}, trade={Find.WindowStack.IsOpen<RWMLWC.Client.World.Dialog_PlayerTrade>()}");
             }));
             sessionSteps.Enqueue((startTick + 3180, "trade: screenshot", () =>
             {
