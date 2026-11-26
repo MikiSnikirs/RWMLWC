@@ -1,0 +1,44 @@
+2026-11-26 06:40:58 autoload: loading save 'tst014'
+2026-11-26 06:41:07 lockstep: connecting to 127.0.0.1:59645 as 'c2'
+2026-11-26 06:41:07 regionids: after load room=18 district=24 region=483
+2026-11-26 06:41:09 lockstep: connected to quic:127.0.0.1:59645, Hello sent
+2026-11-26 06:41:09 mapinterface postfix: alive (diag T-076)
+2026-11-26 06:41:09 lockstep: Welcome, playerId=2, serverTick=14998, seed=7
+2026-11-26 06:41:09 presence: player 2 online
+2026-11-26 06:41:09 colonies diag: me=2, tick=14998, anyOwner=False, lowestOnline=False
+2026-11-26 06:41:11 watchdog: no tick advance for 300 frames at tick 14998: speed=Paused, paused=True, topWindow=ImmediateWindow, windows=3
+2026-11-26 06:42:09 lockstep: hold is over, requesting speed 3
+2026-11-26 06:42:09 regionids: run start room=18 district=24 region=483
+2026-11-26 06:42:09 run started: #0, tick=14998, scenario=none, ticks=180000, trace=False, quit=True, file=hash-c2-20261126-064209.txt
+2026-11-26 06:42:13 colonies: player 1 is the host, settlements claimed: 1
+2026-11-26 06:42:13 colonies: auto choice — new colony at 54598,0
+2026-11-26 06:42:15 colonies: new colony for player 2 at 54598,0: 3 colonists, 10 item stacks
+2026-11-26 06:42:15 colonies: settlement 253 belongs to player 2
+2026-11-26 06:42:15 long event 'GeneratingMap' start, maps 1
+2026-11-26 06:42:33 long event 'GeneratingMap' done, maps 2
+2026-11-26 06:42:33 map 1 after 'GeneratingMap': Pawn=16,Item=1040,Building=12282,Plant=5351,Filth=2842; pawns Vulture#64634@(143, 0, 199),Iguana#64635@(1, 0, 204),MonitorLizard#64636@(15, 0, 217),Boomrat#64637@(144, 0, 186),Dromedary#64638@(209, 0, 110),Dromedary#64639@(207, 0, 114),Dromedary#64640@(208, 0, 111),Dromedary#64641@(208, 0, 111),Rat#64642@(187, 0, 2),Quail#64643@(240, 0, 125),Quail#64644@(241, 0, 127),Quail#64645@(238, 0, 126),Quail#64646@(239, 0, 125),Rhinoceros#64647@(110, 0, 71),Rhinoceros#64648@(110, 0, 71),Rhinoceros#64649@(109, 0, 72); rand 0000081EFB25C5A1
+2026-11-26 06:42:34 sleepremove: both colony maps present, requesting common snapshot
+2026-11-26 06:42:34 long event 'SpawningColonists' start, maps 2
+2026-11-26 06:42:34 long event 'SpawningColonists' done, maps 2
+2026-11-26 06:42:34 map 1 after 'SpawningColonists': Pawn=20,Item=1057,Building=12282,Plant=5351,Filth=2842; pawns Human#41747@(135, 0, 114),Human#41750@(131, 0, 114),Human#41754@(133, 0, 112),Cat#41767@(133, 0, 116),Vulture#64634@(143, 0, 199),Iguana#64635@(1, 0, 204),MonitorLizard#64636@(15, 0, 217),Boomrat#64637@(144, 0, 186),Dromedary#64638@(209, 0, 110),Dromedary#64639@(207, 0, 114),Dromedary#64640@(208, 0, 111),Dromedary#64641@(208, 0, 111),Rat#64642@(187, 0, 2),Quail#64643@(240, 0, 125),Quail#64644@(241, 0, 127),Quail#64645@(238, 0, 126),Quail#64646@(239, 0, 125),Rhinoceros#64647@(110, 0, 71),Rhinoceros#64648@(110, 0, 71),Rhinoceros#64649@(109, 0, 72); rand 00000977FB25C5A1
+2026-11-26 06:42:34 snapshot: SaveGame start (RWMLWC-snapshot-out)
+2026-11-26 06:42:35 snapshot: SaveGame done in 1412 ms
+2026-11-26 06:42:35 lockstep: snapshot for player 1 at tick 15420: raw=19390908 bytes, packed=2793324 bytes (14.4%), save=1412 ms, pack=25 ms, 14 chunks sent; reloading it here too
+2026-11-26 06:42:35 curtain: shown (c1 подключается — синхронизация мира…), map 1, world view False
+2026-11-26 06:42:36 sleepremove: player 2 reloads without maps [0], keeps map 1
+2026-11-26 06:42:36 regionids: reset at load, bump=0
+2026-11-26 06:42:40 regionids: after load room=2 district=5 region=447
+2026-11-26 06:42:40 curtain: view restored — map 1, world view False
+2026-11-26 06:42:40 lockstep: snapshot loaded, tick 15420, serverTick=15480, perMapSim=True
+2026-11-26 06:42:40 resumed after snapshot reload at tick 15420, perMapSim=True
+2026-11-26 06:42:40 snapshot: SaveGame start (RWMLWC-snapshot-out)
+2026-11-26 06:42:41 snapshot: SaveGame done in 400 ms
+2026-11-26 06:42:41 lockstep: snapshot for player 2 at tick 15480: raw=6471342 bytes, packed=2022912 bytes (31.3%), save=400 ms, pack=11 ms, 11 chunks sent; reloading it here too
+2026-11-26 06:42:41 curtain: shown (Синхронизация мира…), map 1, world view False
+2026-11-26 06:42:41 regionids: reset at load, bump=0
+2026-11-26 06:42:43 regionids: after load room=2 district=5 region=447
+2026-11-26 06:42:43 curtain: view restored — map 1, world view False
+2026-11-26 06:42:43 lockstep: snapshot loaded, tick 15480, serverTick=15480, perMapSim=True
+2026-11-26 06:42:45 watchdog: no tick advance for 300 frames at tick 15480: speed=Paused, paused=True, topWindow=ImmediateWindow, windows=3
+2026-11-26 06:43:43 lockstep: hold is over, requesting speed 3
+2026-11-26 06:43:43 resumed after snapshot reload at tick 15480, perMapSim=True

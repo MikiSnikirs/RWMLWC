@@ -1,0 +1,44 @@
+2026-11-26 06:45:41 autoload: loading save 'tst014'
+2026-11-26 06:45:51 lockstep: connecting to 127.0.0.1:50248 as 'c2'
+2026-11-26 06:45:51 regionids: after load room=18 district=24 region=483
+2026-11-26 06:45:53 lockstep: connected to quic:127.0.0.1:50248, Hello sent
+2026-11-26 06:45:53 mapinterface postfix: alive (diag T-076)
+2026-11-26 06:45:53 lockstep: Welcome, playerId=2, serverTick=14998, seed=7
+2026-11-26 06:45:53 presence: player 2 online
+2026-11-26 06:45:53 colonies diag: me=2, tick=14998, anyOwner=False, lowestOnline=False
+2026-11-26 06:45:55 watchdog: no tick advance for 300 frames at tick 14998: speed=Paused, paused=True, topWindow=ImmediateWindow, windows=3
+2026-11-26 06:46:53 lockstep: hold is over, requesting speed 3
+2026-11-26 06:46:53 regionids: run start room=18 district=24 region=483
+2026-11-26 06:46:53 run started: #0, tick=14998, scenario=none, ticks=180000, trace=False, quit=True, file=hash-c2-20261126-064653.txt
+2026-11-26 06:46:57 colonies: player 1 is the host, settlements claimed: 1
+2026-11-26 06:46:57 colonies: auto choice — new colony at 208627,0
+2026-11-26 06:46:58 colonies: new colony for player 2 at 208627,0: 3 colonists, 10 item stacks
+2026-11-26 06:46:58 colonies: settlement 253 belongs to player 2
+2026-11-26 06:46:58 long event 'GeneratingMap' start, maps 1
+2026-11-26 06:47:22 long event 'GeneratingMap' done, maps 2
+2026-11-26 06:47:22 map 1 after 'GeneratingMap': Pawn=58,Item=1712,Building=2917,Plant=27008,Filth=4593; pawns Ibex#80072@(59, 0, 27),Ibex#80073@(58, 0, 27),Ibex#80074@(61, 0, 28),Rat#80075@(67, 0, 27),WildBoar#80076@(161, 0, 92),WildBoar#80077@(161, 0, 89),WildBoar#80078@(163, 0, 88),WildBoar#80079@(163, 0, 89),WildBoar#80080@(162, 0, 91),WildBoar#80081@(164, 0, 88),WildBoar#80082@(162, 0, 85),WildBoar#80083@(160, 0, 90),WildBoar#80084@(163, 0, 89),Squirrel#80085@(234, 0, 100),Ibex#80086@(237, 0, 58),Ibex#80087@(238, 0, 60),Ibex#80088@(237, 0, 59),Raccoon#80089@(172, 0, 191),Warg#80090@(38, 0, 99),Rat#80091@(142, 0, 135),Rat#80092@(106, 0, 64),Raccoon#80093@(14, 0, 29),GuineaPig#80094@(115, 0, 237),GuineaPig#80095@(114, 0, 236),GuineaPig#80096@(111, 0, 234),Crow#80097@(54, 0, 70),Crow#80098@(53, 0, 69),Tortoise#80099@(237, 0, 128),Boomrat#80100@(164, 0, 118),Megasloth#80101@(44, 0, 202),Sparrow#80102@(35, 0, 15),Sparrow#80103@(34, 0, 14),Sparrow#80104@(29, 0, 15),Alpaca#80105@(30, 0, 191),Alpaca#80106@(30, 0, 191),Warg#80107@(181, 0, 226),Squirrel#80108@(249, 0, 139),Deer#80109@(200, 0, 203),Deer#80110@(198, 0, 203),Deer#80111@(199, 0, 206),Deer#80112@(198, 0, 204),Deer#80113@(200, 0, 203),Deer#80114@(200, 0, 202),Ibex#80115@(1, 0, 140),Ibex#80116@(4, 0, 139),Ibex#80117@(3, 0, 138),Hare#80118@(146, 0, 93),Hare#80119@(195, 0, 169),Rat#80120@(13, 0, 54),Crow#80121@(21, 0, 188),Crow#80122@(20, 0, 185),Crow#80123@(18, 0, 187),Hare#80124@(35, 0, 132),GuineaPig#80125@(128, 0, 211),GuineaPig#80126@(127, 0, 216),GuineaPig#80127@(127, 0, 216),GuineaPig#80128@(126, 0, 213),Rat#80129@(56, 0, 205); rand 0000081EFB25C5A1
+2026-11-26 06:47:23 long event 'SpawningColonists' start, maps 2
+2026-11-26 06:47:23 long event 'SpawningColonists' done, maps 2
+2026-11-26 06:47:23 map 1 after 'SpawningColonists': Pawn=62,Item=1729,Building=2917,Plant=27008,Filth=4593; pawns Human#41747@(135, 0, 114),Human#41750@(131, 0, 114),Human#41754@(133, 0, 112),Cat#41767@(133, 0, 116),Ibex#80072@(59, 0, 27),Ibex#80073@(58, 0, 27),Ibex#80074@(61, 0, 28),Rat#80075@(67, 0, 27),WildBoar#80076@(161, 0, 92),WildBoar#80077@(161, 0, 89),WildBoar#80078@(163, 0, 88),WildBoar#80079@(163, 0, 89),WildBoar#80080@(162, 0, 91),WildBoar#80081@(164, 0, 88),WildBoar#80082@(162, 0, 85),WildBoar#80083@(160, 0, 90),WildBoar#80084@(163, 0, 89),Squirrel#80085@(234, 0, 100),Ibex#80086@(237, 0, 58),Ibex#80087@(238, 0, 60),Ibex#80088@(237, 0, 59),Raccoon#80089@(172, 0, 191),Warg#80090@(38, 0, 99),Rat#80091@(142, 0, 135),Rat#80092@(106, 0, 64),Raccoon#80093@(14, 0, 29),GuineaPig#80094@(115, 0, 237),GuineaPig#80095@(114, 0, 236),GuineaPig#80096@(111, 0, 234),Crow#80097@(54, 0, 70),Crow#80098@(53, 0, 69),Tortoise#80099@(237, 0, 128),Boomrat#80100@(164, 0, 118),Megasloth#80101@(44, 0, 202),Sparrow#80102@(35, 0, 15),Sparrow#80103@(34, 0, 14),Sparrow#80104@(29, 0, 15),Alpaca#80105@(30, 0, 191),Alpaca#80106@(30, 0, 191),Warg#80107@(181, 0, 226),Squirrel#80108@(249, 0, 139),Deer#80109@(200, 0, 203),Deer#80110@(198, 0, 203),Deer#80111@(199, 0, 206),Deer#80112@(198, 0, 204),Deer#80113@(200, 0, 203),Deer#80114@(200, 0, 202),Ibex#80115@(1, 0, 140),Ibex#80116@(4, 0, 139),Ibex#80117@(3, 0, 138),Hare#80118@(146, 0, 93),Hare#80119@(195, 0, 169),Rat#80120@(13, 0, 54),Crow#80121@(21, 0, 188),Crow#80122@(20, 0, 185),Crow#80123@(18, 0, 187),Hare#80124@(35, 0, 132),GuineaPig#80125@(128, 0, 211),GuineaPig#80126@(127, 0, 216),GuineaPig#80127@(127, 0, 216),GuineaPig#80128@(126, 0, 213),Rat#80129@(56, 0, 205); rand 00000977FB25C5A1
+2026-11-26 06:47:23 lockstep: player 1 asked for a snapshot at tick 15458; waiting for it
+2026-11-26 06:47:24 lockstep: snapshot 5 received, 3373466 bytes; loading
+2026-11-26 06:47:24 curtain: shown (c1 подключается — синхронизация мира…), map 1, world view False
+2026-11-26 06:47:25 sleepremove: player 2 reloads without maps [0], keeps map 1
+2026-11-26 06:47:26 regionids: reset at load, bump=0
+2026-11-26 06:47:30 regionids: after load room=26 district=35 region=504
+2026-11-26 06:47:30 curtain: view restored — map 1, world view False
+2026-11-26 06:47:30 lockstep: snapshot loaded, tick 15458, serverTick=15480, perMapSim=True
+2026-11-26 06:47:30 resumed after snapshot reload at tick 15458, perMapSim=True
+2026-11-26 06:47:32 watchdog: no tick advance for 300 frames at tick 15480: speed=Paused, paused=True, topWindow=ImmediateWindow, windows=3
+2026-11-26 06:48:30 lockstep: hold is over, requesting speed 3
+2026-11-26 06:48:32 lockstep: notice 3: мир тик 16020: игрок 1 ≠ игрок 2
+2026-11-26 06:48:32 lockstep: desync reported, the server orders a common snapshot
+2026-11-26 06:48:32 lockstep: player 0 asked for a snapshot at tick 16025; waiting for it
+2026-11-26 06:48:32 lockstep: snapshot 6 received, 2574632 bytes; loading
+2026-11-26 06:48:32 curtain: shown (Синхронизация мира…), map 1, world view False
+2026-11-26 06:48:33 regionids: reset at load, bump=0
+2026-11-26 06:48:35 regionids: after load room=18 district=24 region=483
+2026-11-26 06:48:35 curtain: view restored — map -1, world view False
+2026-11-26 06:48:35 lockstep: snapshot loaded, tick 16025, serverTick=16034, perMapSim=True
+2026-11-26 06:48:35 resumed after snapshot reload at tick 16025, perMapSim=True
+2026-11-26 06:48:37 watchdog: no tick advance for 300 frames at tick 16034: speed=Paused, paused=True, topWindow=ImmediateWindow, windows=3
