@@ -49,3 +49,16 @@ internal static class Patch_WorldPawnGC_Relationships_SleepRemove
         return !PerMapSim.SleepRemoveTest;
     }
 }
+
+/// <summary>Диагностика sleepremove: кого убирает сбор мусора мировых пешек (список входит в симметрию Rand).</summary>
+[HarmonyPatch(typeof(WorldPawns), nameof(WorldPawns.RemoveAndDiscardPawnViaGC))]
+internal static class Patch_WorldPawns_Discard_Diag
+{
+    private static void Prefix(Pawn p)
+    {
+        if (PerMapSim.SleepRemoveTest && p != null)
+        {
+            TestAutomation.Note($"worldpawn gc: discarding {p.def.defName} #{p.thingIDNumber} (dead={p.Dead}, colonist={RimWorld.PawnUtility.EverBeenColonistOrTameAnimal(p)}) at tick {Find.TickManager.TicksGame}");
+        }
+    }
+}
