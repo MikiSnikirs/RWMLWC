@@ -42,12 +42,17 @@ public static class WorldStateHasher
     public static ulong Compute()
     {
         Fnv64 h = Fnv64.Create();
-        List<Map> maps = Find.Maps;
-        h.Add(maps.Count);
-        for (int i = 0; i < maps.Count; i++)
+        // sleepremove (T-056, 11.4б): карт чужих колоний у игрока нет, список карт у каждого свой.
+        // Поселения всё равно проверяются — они в объектах мира ниже. Список карт для диагностики — pMaps в Parts().
+        if (!PerMapSim.SleepRemoveTest)
         {
-            h.Add(maps[i].uniqueID);
-            h.Add(maps[i].Tile.tileId);
+            List<Map> maps = Find.Maps;
+            h.Add(maps.Count);
+            for (int i = 0; i < maps.Count; i++)
+            {
+                h.Add(maps[i].uniqueID);
+                h.Add(maps[i].Tile.tileId);
+            }
         }
 
         tmp.Clear();

@@ -86,4 +86,60 @@ public static class PerMapSim
         MapSimState? state = MapSimState.For(map);
         return state != null && state.frozen;
     }
+
+    /// <summary>
+    /// Тестовый режим sleepremove (T-056, план 11.4б шаг 1, вариант (б)): чужой колонии у игрока нет вовсе —
+    /// заглушка без карты. После появления обеих колоний TestAutomation просит общий снимок, и каждый клиент
+    /// перед загрузкой вырезает из него карты чужих колоний (<see cref="StripForeignMaps"/>). Мир при этом
+    /// один и тот же; хеш мира не включает список карт этого процесса (<see cref="WorldStateHasher"/>).
+    /// </summary>
+    public static bool SleepRemoveTest;
+
+    /// <summary>
+    /// Снимок всей игры к загрузке в режиме sleepremove: без карт колоний других игроков.
+    /// Вызывается между тиками, до <c>GameSnapshot.Apply</c>; владельцы читаются из текущей игры
+    /// (она в том же тике, что и снимок). Без режима или без чужих карт — снимок как был.
+    /// </summary>
+    public static byte[] StripForeignMaps(byte[] packed)
+    {
+        if (!SleepRemoveTest || Current.Game == null)
+        {
+            return packed;
+        }
+        RWMLWC.Client.World.ColoniesComponent? colonies = RWMLWC.Client.World.Colonies.Component;
+        if (colonies == null)
+        {
+            return packed;
+        }
+        System.Collections.Generic.List<int> remove = new System.Collections.Generic.List<int>();
+        foreach (Map m in Find.Maps)
+        {
+            int owner = m.Parent is RimWorld.Planet.Settlement st ? colonies.OwnerOf(st) : 0;
+            if (owner != 0 && owner != LockstepClient.PlayerId)
+            {
+                remove.Add(m.uniqueID);
+            }
+        }
+        if (remove.Count == 0)
+        {
+            return packed;
+        }
+        int keep = Find.CurrentMap?.uniqueID ?? -1;
+        if (keep < 0 || remove.Contains(keep))
+        {
+            keep = -1;
+            foreach (Map m in Find.Maps)
+            {
+                if (!remove.Contains(m.uniqueID))
+                {
+                    keep = m.uniqueID;
+                    break;
+                }
+            }
+        }
+        byte[] raw = RWMLWC.Client.Maps.GameSnapshot.Unpack(packed);
+        byte[] stripped = RWMLWC.Client.Maps.MapSnapshot.RemoveMaps(raw, remove, keep);
+        TestAutomation.Note($"sleepremove: player {LockstepClient.PlayerId} reloads without maps [{string.Join(",", remove)}], keeps map {keep}");
+        return RWMLWC.Client.Maps.GameSnapshot.Pack(stripped);
+    }
 }

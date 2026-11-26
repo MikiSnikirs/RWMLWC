@@ -291,6 +291,9 @@ public static class TestAutomation
                 case "sleepforeign":
                     PerMapSim.SleepForeignTest = value == "1";
                     break;
+                case "sleepremove":
+                    PerMapSim.SleepRemoveTest = value == "1";
+                    break;
                 case "worldwrites":
                     WorldWriteProbe.Enabled = value == "1";
                     break;
@@ -971,6 +974,7 @@ public static class TestAutomation
         }
         TakeScheduledShots();
         PerMapSim.UpdateSleepForeign();
+        SleepRemoveStep();
         if (sessionSteps.Count == 0 || Current.Game == null || Find.TickManager.TicksGame < sessionSteps.Peek().tick)
         {
             return;
@@ -988,6 +992,42 @@ public static class TestAutomation
         {
             Note("step '" + name + "' FAILED: " + ex);
             Log.Error("[RWMLWC] шаг сценария " + name + " упал: " + ex);
+        }
+    }
+
+    private static bool sleepRemoveRequested;
+
+    // T-056 (11.4б шаг 1, ключ sleepremove=1): когда у обеих колоний есть карты, просим общий снимок.
+    // Каждый клиент загружает его без карт чужих колоний (PerMapSim.StripForeignMaps) — заглушка без карты.
+    private static void SleepRemoveStep()
+    {
+        if (!PerMapSim.SleepRemoveTest || sleepRemoveRequested || Current.Game == null || LockstepClient.PlayerId <= 0)
+        {
+            return;
+        }
+        RWMLWC.Client.World.ColoniesComponent? colonies = RWMLWC.Client.World.Colonies.Component;
+        if (colonies == null)
+        {
+            return;
+        }
+        bool mine = false, foreign = false;
+        foreach (Map m in Find.Maps)
+        {
+            int owner = m.Parent is RimWorld.Planet.Settlement st ? colonies.OwnerOf(st) : 0;
+            if (owner == LockstepClient.PlayerId)
+            {
+                mine = true;
+            }
+            else if (owner != 0)
+            {
+                foreign = true;
+            }
+        }
+        if (mine && foreign)
+        {
+            sleepRemoveRequested = true;
+            Note("sleepremove: both colony maps present, requesting common snapshot");
+            LockstepClient.RequestCommonSnapshot();
         }
     }
 

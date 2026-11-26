@@ -51,4 +51,44 @@ public class MapSnapshotTests
         byte[] guest = Save(Map(0, "<things>mine</things>"));
         Assert.Null(MapSnapshot.Splice(guest, 5, Map(5, "<x/>")));
     }
+
+    // T-056 (11.4б шаг 1): сейв без карт чужих колоний — заглушка без карты.
+
+    [Fact]
+    public void RemoveMapsDropsOnlyThoseAndKeepsOrderAndWorld()
+    {
+        byte[] save = Save(Map(0, "<things>a</things>") + Map(1, "<things>b</things>") + Map(2, "<things>c</things>"),
+            "<currentMapIndex>1</currentMapIndex><tickManager><ticksGame>500</ticksGame></tickManager>");
+        byte[] stripped = MapSnapshot.RemoveMaps(save, new[] { 1 }, currentMapId: 2);
+
+        XmlDocument doc = new XmlDocument();
+        doc.LoadXml(Encoding.UTF8.GetString(stripped).TrimStart('﻿'));
+        XmlNodeList maps = doc.SelectNodes("/savegame/game/maps/li")!;
+        Assert.Equal(2, maps.Count);
+        Assert.Equal("0", maps[0]!["uniqueID"]!.InnerText);
+        Assert.Equal("a", maps[0]!["things"]!.InnerText);
+        Assert.Equal("2", maps[1]!["uniqueID"]!.InnerText);
+        Assert.Equal("c", maps[1]!["things"]!.InnerText);
+        Assert.Equal("1", doc.SelectSingleNode("/savegame/game/world/x")!.InnerText);
+        Assert.Equal("500", doc.SelectSingleNode("/savegame/game/tickManager/ticksGame")!.InnerText);
+        // currentMapIndex — индекс оставшейся карты 2 в новом списке, а не прежний индекс удалённой.
+        Assert.Equal("1", doc.SelectSingleNode("/savegame/game/currentMapIndex")!.InnerText);
+    }
+
+    [Fact]
+    public void RemoveMapsOfMissingIdsReturnsSameBytes()
+    {
+        byte[] save = Save(Map(0, "<x/>"));
+        Assert.Same(save, MapSnapshot.RemoveMaps(save, new[] { 5 }));
+    }
+
+    [Fact]
+    public void RemoveMapsPointsCurrentToFirstWhenKeepNotFound()
+    {
+        byte[] save = Save(Map(0, "<x/>") + Map(1, "<y/>"), "<currentMapIndex>1</currentMapIndex>");
+        byte[] stripped = MapSnapshot.RemoveMaps(save, new[] { 1 }, currentMapId: 9);
+        XmlDocument doc = new XmlDocument();
+        doc.LoadXml(Encoding.UTF8.GetString(stripped).TrimStart('﻿'));
+        Assert.Equal("0", doc.SelectSingleNode("/savegame/game/currentMapIndex")!.InnerText);
+    }
 }
