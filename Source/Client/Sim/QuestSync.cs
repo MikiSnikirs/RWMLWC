@@ -501,3 +501,22 @@ internal static class Patch_TransportShip_Tick_Held
 {
     private static bool Prefix(TransportShip __instance) => !(QuestSync.Active && QuestSync.Component?.heldShips.Contains(__instance.GetUniqueLoadID()) == true);
 }
+
+/// <summary>
+/// В режиме заглушки задание не перенацеливается на другую карту. У игрока без карты колонии, к которой привязано
+/// задание (её считает владелец), игра «находила новую подходящую карту» — свою колонию — и ставила туда пешку:
+/// принятая странница оказывалась в обеих колониях (sr33, Nanami). Владелец свою карту видит, ему перенацеливание не нужно.
+/// </summary>
+[HarmonyPatch(typeof(Quest), nameof(Quest.TryFindNewSuitableMapParentForRetarget))]
+internal static class Patch_Quest_Retarget_StubMode
+{
+    private static bool Prefix(ref MapParent? __result)
+    {
+        if (!QuestSync.Active)
+        {
+            return true;
+        }
+        __result = null;
+        return false;
+    }
+}
