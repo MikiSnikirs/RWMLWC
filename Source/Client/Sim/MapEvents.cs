@@ -30,6 +30,7 @@ public static class MapEvents
     private const byte KindPawnDeath = 2;
     private const byte KindPawnLeave = 3;
     private const byte KindTaleRemove = 4;
+    private const byte KindPawnDiscard = 5;
     private const int DropAfterTicks = 5000;
     private const int MaxPerCommand = 32;
     private const int WorldLevelMap = -1; // события мира (удаление сказаний): докладчик — младший игрок в сети
@@ -46,9 +47,13 @@ public static class MapEvents
         public float dinfoAmount;
         public int dinfoInstigator = -1;
         public byte dinfoCategory;
+        public int factionLoadId = -1; // смерть: дельта goodwill и новый лидер — данными (у спящего нет карты)
+        public int goodwillDelta;
+        public bool leaderChanged;
         public Pawn? leftPawn; // уход (шаг 4): у владельца уведомления уже исполнены в тике — своё не повторять
         public bool leaveFreed; // освобождённый пленник/раб (goodwill за освобождение)
         public int removeTaleId = -1; // удаление сказания: все применяют по номеру (список сказаний общий)
+        public int discardPawnId = -1; // уборка мировой пешки сборщиком: все применяют по номеру
         public string? xml; // снимается при отправке (вызывающий может дописать сказание после RecordTale: customLabel)
         public bool sent;
     }
@@ -94,7 +99,7 @@ public static class MapEvents
     /// Владелец исполняет их в тике как обычно; событие несёт XML пешки и контекст урона, спящий восстанавливает
     /// пешку и исполняет уведомления под изолированным Rand (общий Rand не трогается).
     /// </summary>
-    internal static void QueuePawnDeath(Map map, Pawn pawn, DamageInfo? dinfo)
+    internal static void QueuePawnDeath(Map map, Pawn pawn, DamageInfo? dinfo, int factionLoadId, int goodwillDelta, bool leaderChanged)
     {
         int tick = Find.TickManager.TicksGame + StasisClock.Offset;
         if (tick != seqTick)
@@ -115,8 +120,11 @@ public static class MapEvents
             dinfoAmount = dinfo?.Amount ?? 0f,
             dinfoInstigator = dinfo?.Instigator?.thingIDNumber ?? -1,
             dinfoCategory = (byte)(dinfo?.Category ?? DamageInfo.SourceCategory.ThingOrUnknown),
+            factionLoadId = factionLoadId,
+            goodwillDelta = goodwillDelta,
+            leaderChanged = leaderChanged,
         });
-        TestAutomation.Note($"map events: pawn death {pawn.def.defName} #{pawn.thingIDNumber} on map {map.uniqueID} queued at tick {tick}.{seq}");
+        TestAutomation.Note($"map events: pawn death {pawn.def.defName} #{pawn.thingIDNumber} on map {map.uniqueID} queued at tick {tick}.{seq} (goodwillDelta={goodwillDelta}, leaderChanged={leaderChanged})");
     }
 
     /// <summary>
@@ -174,6 +182,32 @@ public static class MapEvents
         TestAutomation.Note($"map events: tale remove #{taleId} queued at tick {tick}.{seq}");
     }
 
+    private static readonly HashSet<int> pawnDiscardsQueued = new HashSet<int>();
+
+    /// <summary>
+    /// Уборка мировой пешки сборщиком (T-056, шаг 5): в режиме заглушки удаления откладываются в событие
+    /// мира и применяются у всех по номеру. Иначе сборщик убирает пешек по-разному (несимметричные причины
+    /// и разные списки), состав мировых пешек расходится (sr16: 25 против 16 удалений; sr18: мёртвых 4/8).
+    /// Модель докладчика: исполняются только команды младшего в сети — список эволюционирует одинаково.
+    /// </summary>
+    internal static void QueuePawnDiscard(int thingId)
+    {
+        if (!pawnDiscardsQueued.Add(thingId))
+        {
+            return;
+        }
+        int tick = Find.TickManager.TicksGame + StasisClock.Offset;
+        if (tick != seqTick)
+        {
+            seqTick = tick;
+            seqByMap.Clear();
+        }
+        seqByMap.TryGetValue(WorldLevelMap, out int seq);
+        seqByMap[WorldLevelMap] = seq + 1;
+        pending.Add(new Pending { map = WorldLevelMap, tick = tick, seq = seq, kind = KindPawnDiscard, discardPawnId = thingId });
+        TestAutomation.Note($"map events: pawn discard #{thingId} queued at tick {tick}.{seq}");
+    }
+
     /// <summary>
     /// После загрузки (снимок, вход): объекты в очереди — из прежней игры. Данные остаются: неотправленное докладчик
     /// отправит, а при исполнении все восстановят объект из данных (отложенного нет в сейве, его не было в мире).
@@ -202,6 +236,7 @@ public static class MapEvents
         seqByMap.Clear();
         lastAppliedAbsent.Clear();
         taleRemovalsQueued.Clear();
+        pawnDiscardsQueued.Clear();
     }
 
     /// <summary>Докладчик карты: владелец колонии в сети, иначе младший игрок в сети.</summary>
@@ -260,6 +295,19 @@ public static class MapEvents
                         w.WriteInt32(BitConverter.SingleToInt32Bits(p.dinfoAmount));
                         w.WriteInt32(p.dinfoInstigator);
                         w.WriteByte(p.dinfoCategory);
+                        w.WriteInt32(p.factionLoadId);
+                        w.WriteInt32(p.goodwillDelta);
+                        w.WriteBool(p.leaderChanged);
+                        string leaderXml = "";
+                        if (p.leaderChanged && p.factionLoadId >= 0)
+                        {
+                            Faction? f = Find.FactionManager.AllFactionsListForReading.FirstOrDefault(x => x.loadID == p.factionLoadId);
+                            if (f?.leader != null)
+                            {
+                                leaderXml = Scribe.saver.DebugOutputFor(f.leader);
+                            }
+                        }
+                        w.WriteBytes(System.Text.Encoding.UTF8.GetBytes(leaderXml));
                     }
                     else if (p.kind == KindPawnLeave)
                     {
@@ -269,6 +317,10 @@ public static class MapEvents
                     else if (p.kind == KindTaleRemove)
                     {
                         w.WriteInt32(p.removeTaleId);
+                    }
+                    else if (p.kind == KindPawnDiscard)
+                    {
+                        w.WriteInt32(p.discardPawnId);
                     }
                     else
                     {
@@ -307,6 +359,10 @@ public static class MapEvents
             int dinfoInstigator = -1;
             byte dinfoCategory = 0;
             bool leaveFreed = false;
+            int factionLoadId = -1;
+            int goodwillDelta = 0;
+            bool leaderChanged = false;
+            string leaderXml = "";
             if (kind == KindPawnDeath)
             {
                 xml = System.Text.Encoding.UTF8.GetString(r.ReadBytes());
@@ -314,13 +370,17 @@ public static class MapEvents
                 dinfoAmount = BitConverter.Int32BitsToSingle(r.ReadInt32());
                 dinfoInstigator = r.ReadInt32();
                 dinfoCategory = r.ReadByte();
+                factionLoadId = r.ReadInt32();
+                goodwillDelta = r.ReadInt32();
+                leaderChanged = r.ReadBool();
+                leaderXml = System.Text.Encoding.UTF8.GetString(r.ReadBytes());
             }
             else if (kind == KindPawnLeave)
             {
                 xml = System.Text.Encoding.UTF8.GetString(r.ReadBytes());
                 leaveFreed = r.ReadBool();
             }
-            else if (kind == KindTaleRemove)
+            else if (kind == KindTaleRemove || kind == KindPawnDiscard)
             {
                 xml = "";
             }
@@ -329,6 +389,7 @@ public static class MapEvents
                 xml = r.ReadString();
             }
             int removeTaleId = kind == KindTaleRemove ? r.ReadInt32() : -1;
+            int discardPawnId = kind == KindPawnDiscard ? r.ReadInt32() : -1;
             int lastTick;
             int lastSeq;
             if (state != null)
@@ -379,7 +440,7 @@ public static class MapEvents
             }
             else if (kind == KindPawnDeath)
             {
-                ApplyPawnDeath(xml, dinfoDef, dinfoAmount, dinfoInstigator, dinfoCategory, mapId, tick, seq, own: mine != null);
+                ApplyPawnDeath(xml, dinfoDef, dinfoAmount, dinfoInstigator, dinfoCategory, factionLoadId, goodwillDelta, leaderChanged, leaderXml, mapId, tick, seq, own: mine != null);
             }
             else if (kind == KindPawnLeave)
             {
@@ -400,6 +461,24 @@ public static class MapEvents
                 finally
                 {
                     applying = false;
+                }
+            }
+            else if (kind == KindPawnDiscard)
+            {
+                // Применяют все, включая постановщика: локальная уборка была отложена префиксом.
+                Pawn? pawn = Find.WorldPawns.AllPawnsAliveOrDead.FirstOrDefault(p => p.thingIDNumber == discardPawnId);
+                if (pawn != null)
+                {
+                    applying = true;
+                    try
+                    {
+                        Find.WorldPawns.RemoveAndDiscardPawnViaGC(pawn);
+                        TestAutomation.Note($"map events: pawn discard {pawn.def.defName} #{discardPawnId} applied at tick {Find.TickManager.TicksGame} ({(mine != null ? "own" : "remote")})");
+                    }
+                    finally
+                    {
+                        applying = false;
+                    }
                 }
             }
         }
@@ -449,13 +528,13 @@ public static class MapEvents
     }
 
     /// <summary>
-    /// Спящий клиент: восстановить мёртвую пешку из XML в WorldPawns и исполнить мировые уведомления смерти.
-    /// Владелец (own) уже исполнил их в тике карты — не повторять. Уведомления идут под изолированным Rand:
-    /// у владельца они считались в Rand карты, общий Rand спящего не должен измениться.
-    /// Известный пробел (записан в 11.4б): goodwill фракции при map=null не меняется (блок Notify_MemberDied
-    /// требует карту), регенерация лидера фракции даёт другую пешку — синхронизировать данными в следующей итерации.
+    /// Спящий клиент: восстановить мёртвую пешку из XML в WorldPawns и исполнить мировые последствия смерти.
+    /// Владелец (own) уже исполнил их в тике карты — не повторять. Goodwill и новый лидер фракции приходят
+    /// данными события (дельта и XML): блок Notify_MemberDied требует карту, которой у спящего нет, а
+    /// регенерация лидера под другим Rand дала бы другую пешку (sr20: goodwill 35, задание 1/0 на 164000).
+    /// Остальные уведомления идут под изолированным Rand — общий Rand спящего не меняется.
     /// </summary>
-    private static void ApplyPawnDeath(string xml, string dinfoDef, float amount, int instigatorId, byte category, int mapId, int tick, int seq, bool own)
+    private static void ApplyPawnDeath(string xml, string dinfoDef, float amount, int instigatorId, byte category, int factionLoadId, int goodwillDelta, bool leaderChanged, string leaderXml, int mapId, int tick, int seq, bool own)
     {
         if (own)
         {
@@ -482,11 +561,31 @@ public static class MapEvents
         {
             Find.WorldPawns.PassToWorld(pawn);
             Find.Storyteller.Notify_PawnEvent(pawn, AdaptationEvent.Died);
-            pawn.HomeFaction?.Notify_MemberDied(pawn, dinfo, wasWorldPawn: false, wasGuilty: false, map: null);
+            Faction? f = factionLoadId >= 0 ? Find.FactionManager.AllFactionsListForReading.FirstOrDefault(x => x.loadID == factionLoadId) : null;
+            if (f != null)
+            {
+                if (goodwillDelta != 0)
+                {
+                    Faction.OfPlayer.TryAffectGoodwillWith(f, goodwillDelta, canSendMessage: false, canSendHostilityLetter: false);
+                }
+                if (leaderChanged && leaderXml.Length > 0)
+                {
+                    Pawn? leader = LoadPawn(leaderXml);
+                    if (leader != null)
+                    {
+                        if (!Find.WorldPawns.AllPawnsAliveOrDead.Any(p => p.thingIDNumber == leader.thingIDNumber))
+                        {
+                            Find.WorldPawns.PassToWorld(leader, PawnDiscardDecideMode.KeepForever);
+                        }
+                        f.leader = leader;
+                        QuestUtility.SendQuestTargetSignals(pawn.questTags, "NoLongerFactionLeader", pawn.Named("SUBJECT"), leader.Named("NEWFACTIONLEADER"));
+                    }
+                }
+            }
             Find.QuestManager.Notify_PawnKilled(pawn, dinfo);
             Find.FactionManager.Notify_PawnKilled(pawn);
             Find.IdeoManager.Notify_PawnKilled(pawn);
-            TestAutomation.Note($"map events: pawn death {pawn.def.defName} #{pawn.thingIDNumber} applied at tick {Find.TickManager.TicksGame} (restored, map {mapId} absent)");
+            TestAutomation.Note($"map events: pawn death {pawn.def.defName} #{pawn.thingIDNumber} applied at tick {Find.TickManager.TicksGame} (restored, map {mapId} absent, goodwillDelta={goodwillDelta}, leaderChanged={leaderChanged})");
         }
         catch (Exception ex)
         {
@@ -610,7 +709,23 @@ internal static class Patch_TaleManager_Add_MapEvent
 [HarmonyPatch(typeof(Pawn), nameof(Pawn.Kill))]
 internal static class Patch_Pawn_Kill_MapEvent
 {
-    private static void Postfix(Pawn __instance, DamageInfo? dinfo)
+    // Снимок до смерти: goodwill и лидер фракции. После смерти дельта и новый лидер уходят данными события —
+    // у спящего нет карты, и блок Notify_MemberDied (требует карту) у него не исполнился бы.
+    private static void Prefix(Pawn __instance, ref (int loadId, int goodwill, int leaderId) __state)
+    {
+        __state = (-1, 0, -1);
+        if (!PerMapSim.SleepRemoveTest || !LockstepClient.InSession || !MapRandContext.InTick || __instance == null)
+        {
+            return;
+        }
+        Faction? f = __instance.HomeFaction;
+        if (f != null && !f.IsPlayer)
+        {
+            __state = (f.loadID, f.GoodwillWith(Faction.OfPlayer), f.leader?.thingIDNumber ?? -1);
+        }
+    }
+
+    private static void Postfix(Pawn __instance, DamageInfo? dinfo, (int loadId, int goodwill, int leaderId) __state)
     {
         if (!PerMapSim.SleepRemoveTest || !LockstepClient.InSession || !MapRandContext.InTick || __instance == null)
         {
@@ -621,7 +736,15 @@ internal static class Patch_Pawn_Kill_MapEvent
         {
             return;
         }
-        MapEvents.QueuePawnDeath(map, __instance, dinfo);
+        int delta = 0;
+        bool leaderChanged = false;
+        Faction? f = __state.loadId >= 0 ? Find.FactionManager.AllFactionsListForReading.FirstOrDefault(x => x.loadID == __state.loadId) : null;
+        if (f != null)
+        {
+            delta = f.GoodwillWith(Faction.OfPlayer) - __state.goodwill;
+            leaderChanged = (f.leader?.thingIDNumber ?? -1) != __state.leaderId;
+        }
+        MapEvents.QueuePawnDeath(map, __instance, dinfo, __state.loadId, delta, leaderChanged);
     }
 }
 
@@ -662,12 +785,12 @@ internal static class Patch_TaleManager_RemoveTale_Diag
         {
             return true;
         }
-        if (PerMapSim.SleepRemoveTest && !MapEvents.Applying)
+        if (PerMapSim.SleepRemoveTest)
         {
             if (LockstepClient.InSession)
             {
                 MapEvents.QueueTaleRemove(tale.id);
-                return false; // удаление применится командой у всех
+                return false; // удаление применится командой у всех (в т.ч. при уборке пешки — тайминг общий)
             }
             string caller = new System.Diagnostics.StackTrace(1).ToString();
             if (caller.Length > 600)

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using HarmonyLib;
 using RimWorld;
 using Verse;
@@ -113,5 +114,19 @@ internal static class Patch_Storyteller_TryFire_MissingMap
             return false;
         }
         return true;
+    }
+}
+
+/// <summary>Диагностика T-056 (режим sleepremove): каждое созданное задание — тик, корень, контекст Rand, источник.</summary>
+[HarmonyPatch(typeof(QuestManager), nameof(QuestManager.Add))]
+internal static class Patch_QuestManager_Add_Log
+{
+    private static void Postfix(Quest quest)
+    {
+        if (PerMapSim.SleepRemoveTest && LockstepClient.InSession && quest != null)
+        {
+            Map? ctx = MapRandContext.Current;
+            TestAutomation.Note($"quest added: #{quest.id} root={quest.root?.defName} at tick {Find.TickManager.TicksGame}, context {(MapRandContext.InTick ? (ctx != null ? "map" + ctx.uniqueID : "global") : "out of tick")}\n{new System.Diagnostics.StackTrace(1, false).ToString().Split('\n').Take(8).Aggregate((a, b) => a + "\n" + b)}");
+        }
     }
 }
