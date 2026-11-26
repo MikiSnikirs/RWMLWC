@@ -31,6 +31,7 @@ public static class MapEvents
     private const byte KindPawnLeave = 3;
     private const byte KindTaleRemove = 4;
     private const byte KindPawnDiscard = 5;
+    private const byte KindPawnEnter = 6; // мировая пешка пришла на карту: у игрока без карты её мировая копия уходит
     private const int DropAfterTicks = 5000;
     private const int MaxPerCommand = 32;
     private const int WorldLevelMap = -1; // события мира (удаление сказаний): докладчик — младший игрок в сети
@@ -182,6 +183,25 @@ public static class MapEvents
         TestAutomation.Note($"map events: tale remove #{taleId} queued at tick {tick}.{seq}");
     }
 
+    /// <summary>
+    /// Мировая пешка вошла на карту (T-056: принятый странник, гость, пленник): у владельца она ушла из мира
+    /// (Pawn.SpawnSetup → WorldPawns.RemovePawn), у игрока без этой карты её мировая копия осталась бы (sr32: Nanami).
+    /// Событие карты с номером пешки; у владельца — ничего, у остальных — копия убирается из мира.
+    /// </summary>
+    internal static void QueuePawnEnter(Map map, int thingId)
+    {
+        int tick = Find.TickManager.TicksGame + StasisClock.Offset;
+        if (tick != seqTick)
+        {
+            seqTick = tick;
+            seqByMap.Clear();
+        }
+        seqByMap.TryGetValue(map.uniqueID, out int seq);
+        seqByMap[map.uniqueID] = seq + 1;
+        pending.Add(new Pending { map = map.uniqueID, tick = tick, seq = seq, kind = KindPawnEnter, discardPawnId = thingId });
+        TestAutomation.Note($"map events: pawn enter #{thingId} on map {map.uniqueID} queued at tick {tick}.{seq}");
+    }
+
     private static readonly HashSet<int> pawnDiscardsQueued = new HashSet<int>();
 
     /// <summary>
@@ -318,7 +338,7 @@ public static class MapEvents
                     {
                         w.WriteInt32(p.removeTaleId);
                     }
-                    else if (p.kind == KindPawnDiscard)
+                    else if (p.kind == KindPawnDiscard || p.kind == KindPawnEnter)
                     {
                         w.WriteInt32(p.discardPawnId);
                     }
@@ -380,7 +400,7 @@ public static class MapEvents
                 xml = System.Text.Encoding.UTF8.GetString(r.ReadBytes());
                 leaveFreed = r.ReadBool();
             }
-            else if (kind == KindTaleRemove || kind == KindPawnDiscard)
+            else if (kind == KindTaleRemove || kind == KindPawnDiscard || kind == KindPawnEnter)
             {
                 xml = "";
             }
@@ -389,7 +409,7 @@ public static class MapEvents
                 xml = r.ReadString();
             }
             int removeTaleId = kind == KindTaleRemove ? r.ReadInt32() : -1;
-            int discardPawnId = kind == KindPawnDiscard ? r.ReadInt32() : -1;
+            int discardPawnId = kind == KindPawnDiscard || kind == KindPawnEnter ? r.ReadInt32() : -1;
             int lastTick;
             int lastSeq;
             if (state != null)
@@ -461,6 +481,15 @@ public static class MapEvents
                 finally
                 {
                     applying = false;
+                }
+            }
+            else if (kind == KindPawnEnter)
+            {
+                Pawn? copy = Find.WorldPawns.AllPawnsAliveOrDead.FirstOrDefault(p => p.thingIDNumber == discardPawnId);
+                if (copy != null && !copy.Spawned)
+                {
+                    Find.WorldPawns.RemovePawn(copy);
+                    TestAutomation.Note($"map events: pawn enter #{discardPawnId} applied at tick {Find.TickManager.TicksGame} — world copy removed (map {mapId} absent)");
                 }
             }
             else if (kind == KindPawnDiscard)
@@ -851,5 +880,23 @@ internal static class Patch_TaleManager_RemoveTale_Diag
             TestAutomation.Note($"tale diag: removing #{tale.id} {tale.def?.defName} (uses={tale.Uses}, pawn={(tale.DominantPawn == null ? "null" : tale.DominantPawn.thingIDNumber.ToString())}) by {caller.Replace("\n", " | ")}");
         }
         return true;
+    }
+}
+
+
+[HarmonyPatch(typeof(Pawn), nameof(Pawn.SpawnSetup))]
+internal static class Patch_Pawn_SpawnSetup_EnterEvent
+{
+    private static void Prefix(Pawn __instance, bool respawningAfterLoad, out bool __state)
+    {
+        __state = !respawningAfterLoad && PerMapSim.SleepRemoveTest && LockstepClient.InSession && Find.WorldPawns.Contains(__instance);
+    }
+
+    private static void Postfix(Pawn __instance, Map map, bool __state)
+    {
+        if (__state && map != null)
+        {
+            MapEvents.QueuePawnEnter(map, __instance.thingIDNumber);
+        }
     }
 }
