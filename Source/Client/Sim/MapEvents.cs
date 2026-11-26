@@ -47,6 +47,8 @@ public static class MapEvents
 
     public static int Queued => pending.Count;
 
+    internal static bool Applying => applying;
+
     /// <summary>Запись надо отложить: идёт тик карты в сессии (не исполнение события).</summary>
     internal static bool ShouldDefer(out Map? map)
     {
@@ -267,7 +269,7 @@ internal static class Patch_TaleManager_Add_MapEvent
     {
         if (!MapEvents.ShouldDefer(out Map? map) || map == null)
         {
-            if (PerMapSim.SleepRemoveTest && LockstepClient.InSession && tale != null)
+            if (PerMapSim.SleepRemoveTest && !MapEvents.Applying && LockstepClient.InSession && tale != null)
             {
                 TestAutomation.Note($"tale diag: added #{tale.id} {tale.def?.defName} outside map context (tick {Find.TickManager.TicksGame})");
             }
@@ -286,13 +288,12 @@ internal static class Patch_TaleManager_RemoveTale_Diag
     {
         if (PerMapSim.SleepRemoveTest && tale != null)
         {
-            string caller = new System.Diagnostics.StackTrace(2).ToString();
-            int nl = caller.IndexOf('\n');
-            if (nl >= 0)
+            string caller = new System.Diagnostics.StackTrace(1).ToString();
+            if (caller.Length > 600)
             {
-                caller = caller.Substring(0, nl);
+                caller = caller.Substring(0, 600);
             }
-            TestAutomation.Note($"tale diag: removing #{tale.id} {tale.def?.defName} (uses={tale.Uses}, pawn={(tale.DominantPawn == null ? "null" : tale.DominantPawn.thingIDNumber.ToString())}) by {caller.Trim()}");
+            TestAutomation.Note($"tale diag: removing #{tale.id} {tale.def?.defName} (uses={tale.Uses}, pawn={(tale.DominantPawn == null ? "null" : tale.DominantPawn.thingIDNumber.ToString())}) by {caller.Replace("\n", " | ")}");
         }
     }
 }
