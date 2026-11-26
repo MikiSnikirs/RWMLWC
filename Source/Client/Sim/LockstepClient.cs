@@ -476,6 +476,14 @@ public static class LockstepClient
             CommandOrderedMessage command = pendingCommands.Dequeue();
             if (command.Kind == RequestSnapshotKind)
             {
+                // sleepremove (T-056, 11.4б): лечебный снимок от сервера (игрок 0) никто не может отдать
+                // целиком — у каждого только свои карты. Пропускаем и измеряем расхождение файлом хешей;
+                // сбор полного сейва из карт владельцев — шаг 3 плана (сервер).
+                if (PerMapSim.SleepRemoveTest && command.PlayerId == 0)
+                {
+                    TestAutomation.Note($"lockstep: sleepremove — server healing snapshot #{command.Seq} at tick {command.Tick} skipped (no full world holder)");
+                    continue;
+                }
                 BeginSnapshotRound(command);
                 continue; // состояние сменилось: цикл остановится, остальные команды — после загрузки
             }
