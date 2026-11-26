@@ -50,17 +50,44 @@ public static class LetterChoices
         return false;
     }
 
+    /// <summary>
+    /// Предложение письма истекло: задание письма уже не идёт (у «Пополнения» срок 60000 тиков, после — провал).
+    /// В одиночной игре окно письма ставит игру на паузу и истечь при открытом окне предложение не может; в сети игра
+    /// идёт, и нажатое после срока «Принять» отправляло сигнал завершённому заданию — пешка не приходила, а игрок не
+    /// понимал почему. Состояние задания общее у всех, поэтому проверка детерминирована.
+    /// </summary>
+    internal static bool Expired(ChoiceLetter letter)
+    {
+        Quest? q = letter.quest;
+        return q != null && q.State != QuestState.Ongoing && q.State != QuestState.NotYetAccepted;
+    }
+
+    internal static ChoiceLetter? Find(int letterId) =>
+        Verse.Find.LetterStack.LettersListForReading.OfType<ChoiceLetter>().FirstOrDefault(l => l.ID == letterId)
+        ?? Verse.Find.Archive.ArchivablesListForReading.OfType<ChoiceLetter>().FirstOrDefault(l => l.ID == letterId);
+
+    internal static void ExpiredMessage(ChoiceLetter letter) =>
+        Messages.Message($"RWMLWC: предложение «{letter.Label}» уже истекло — выбор не принят", MessageTypeDefOf.RejectInput, false);
+
     internal static void Send(int letterId, int index) => WorldCommands.SendOp(OpChoice, w => { w.WriteInt32(letterId); w.WriteInt32(index); });
 
     public static void Execute(ref PacketReader r)
     {
         int letterId = r.ReadInt32();
         int index = r.ReadInt32();
-        ChoiceLetter? letter = Find.LetterStack.LettersListForReading.OfType<ChoiceLetter>().FirstOrDefault(l => l.ID == letterId)
-            ?? Find.Archive.ArchivablesListForReading.OfType<ChoiceLetter>().FirstOrDefault(l => l.ID == letterId);
+        ChoiceLetter? letter = Find(letterId);
         if (letter == null)
         {
             TestAutomation.Note($"letter choice: letter {letterId} not found (option {index}), dropped");
+            return;
+        }
+        if (Expired(letter))
+        {
+            TestAutomation.Note($"letter choice: letter {letterId} '{letter.Label}' option {index} by player {CommandBus.CurrentPlayerId} at tick {Verse.Find.TickManager.TicksGame}: quest {letter.quest.id} already {letter.quest.State}, dropped");
+            if (CommandBus.CurrentPlayerId == LockstepClient.PlayerId)
+            {
+                ExpiredMessage(letter);
+            }
             return;
         }
         // Варианты строим как игра; у игрока без карты письма (режим заглушки) это может упасть — тогда действие
@@ -82,7 +109,7 @@ public static class LetterChoices
             string? signal = field == null ? null : Traverse.Create(letter).Field(field).GetValue<string>();
             if (signal != null)
             {
-                act = () => { Find.SignalManager.SendSignal(new Signal(signal)); Find.LetterStack.RemoveLetter(letter); };
+                act = () => { Verse.Find.SignalManager.SendSignal(new Signal(signal)); Verse.Find.LetterStack.RemoveLetter(letter); };
             }
         }
         if (act == null)
@@ -99,9 +126,9 @@ public static class LetterChoices
         {
             Executing = false;
         }
-        TestAutomation.Note($"letter choice: letter {letterId} '{letter.Label}' option {index} by player {CommandBus.CurrentPlayerId} at tick {Find.TickManager.TicksGame}");
+        TestAutomation.Note($"letter choice: letter {letterId} '{letter.Label}' option {index} by player {CommandBus.CurrentPlayerId} at tick {Verse.Find.TickManager.TicksGame}");
         // Окно письма у других закрыть: выбор сделан.
-        foreach (Dialog_NodeTree w in Find.WindowStack.Windows.OfType<Dialog_NodeTree>().ToList())
+        foreach (Dialog_NodeTree w in Verse.Find.WindowStack.Windows.OfType<Dialog_NodeTree>().ToList())
         {
             DiaNode? node = Traverse.Create(w).Field("curNode").GetValue<DiaNode>();
             if (node != null && node.options.Any(o => TryGet(o, out int id, out _) && id == letterId))
@@ -144,6 +171,12 @@ internal static class Patch_DiaOption_Activate_Letter
         Traverse t = Traverse.Create(__instance).Field("action");
         __state = t.GetValue<System.Action>();
         t.SetValue(null);
+        ChoiceLetter? letter = LetterChoices.Find(letterId);
+        if (letter != null && LetterChoices.Expired(letter))
+        {
+            LetterChoices.ExpiredMessage(letter);
+            return;
+        }
         LetterChoices.Send(letterId, index);
     }
 
@@ -178,6 +211,31 @@ internal static class Patch_ChoiceLetter_OpenLetter_MissingMap
         {
             TestAutomation.Note($"letter {__instance.ID} '{__instance.Label}' not opened here: its choices need a map this player does not have");
             return false;
+        }
+    }
+}
+
+[HarmonyPatch(typeof(Window), nameof(Window.WindowUpdate))]
+internal static class Patch_Window_WindowUpdate_LetterExpired
+{
+    // Открытое окно письма, чьё предложение истекло, пока окно было открыто (игра в сети не на паузе), закрывается
+    // с сообщением — как исчезает само письмо.
+    private static void Postfix(Window __instance)
+    {
+        if (!LockstepClient.InSession || __instance is not Dialog_NodeTree w || Current.Game == null)
+        {
+            return;
+        }
+        DiaNode? node = Traverse.Create(w).Field("curNode").GetValue<DiaNode>();
+        if (node == null || node.options.Count == 0 || !LetterChoices.TryGet(node.options[0], out int id, out _))
+        {
+            return;
+        }
+        ChoiceLetter? letter = LetterChoices.Find(id);
+        if (letter != null && LetterChoices.Expired(letter))
+        {
+            w.Close(doCloseSound: false);
+            LetterChoices.ExpiredMessage(letter);
         }
     }
 }
