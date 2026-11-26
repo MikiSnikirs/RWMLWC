@@ -22,5 +22,6 @@
   <ItemGroup>
     <!-- Файлы клиента без зависимостей от игры (только System.Xml): вшивание карты в сейв, T-030. -->
     <Compile Include="../Client/Maps/MapSnapshot.cs" Link="Client/MapSnapshot.cs" />
+    <Compile Include="../Client/Sim/SplitCompose.cs" Link="Client/SplitCompose.cs" />
   </ItemGroup>
 </Project>
