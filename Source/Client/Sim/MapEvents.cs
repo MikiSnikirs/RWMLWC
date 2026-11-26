@@ -28,6 +28,7 @@ public static class MapEvents
     public const byte OpMapEvents = 40;
     private const byte KindTale = 1;
     private const byte KindPawnDeath = 2;
+    private const byte KindPawnLeave = 3;
     private const int DropAfterTicks = 5000;
     private const int MaxPerCommand = 32;
 
@@ -43,6 +44,8 @@ public static class MapEvents
         public float dinfoAmount;
         public int dinfoInstigator = -1;
         public byte dinfoCategory;
+        public Pawn? leftPawn; // уход (шаг 4): у владельца уведомления уже исполнены в тике — своё не повторять
+        public bool leaveFreed; // освобождённый пленник/раб (goodwill за освобождение)
         public string? xml; // снимается при отправке (вызывающий может дописать сказание после RecordTale: customLabel)
         public bool sent;
     }
@@ -114,6 +117,35 @@ public static class MapEvents
     }
 
     /// <summary>
+    /// Уход пешки с карты (T-056, шаг 4): пешка уходит в мировые пешки, фракция получает уведомление
+    /// (goodwill за здорового гостя / освобождение), задания — сигнал LeftMap. У спящего карты нет —
+    /// событие несёт XML пешки и флаг освобождения; спящий восстанавливает пешку и исполняет уведомления
+    /// под изолированным Rand. Goodwill при уходе считается без карты — синхронизируется полностью.
+    /// Пробел первой итерации: создание/вступление в караван при уходе (новый объект мира) не синхронизировано.
+    /// </summary>
+    internal static void QueuePawnLeave(Map map, Pawn pawn, bool freed)
+    {
+        int tick = Find.TickManager.TicksGame + StasisClock.Offset;
+        if (tick != seqTick)
+        {
+            seqTick = tick;
+            seqByMap.Clear();
+        }
+        seqByMap.TryGetValue(map.uniqueID, out int seq);
+        seqByMap[map.uniqueID] = seq + 1;
+        pending.Add(new Pending
+        {
+            map = map.uniqueID,
+            tick = tick,
+            seq = seq,
+            kind = KindPawnLeave,
+            leftPawn = pawn,
+            leaveFreed = freed,
+        });
+        TestAutomation.Note($"map events: pawn leave {pawn.def.defName} #{pawn.thingIDNumber} from map {map.uniqueID} queued at tick {tick}.{seq} (freed={freed})");
+    }
+
+    /// <summary>
     /// После загрузки (снимок, вход): объекты в очереди — из прежней игры. Данные остаются: неотправленное докладчик
     /// отправит, а при исполнении все восстановят объект из данных (отложенного нет в сейве, его не было в мире).
     /// </summary>
@@ -129,8 +161,13 @@ public static class MapEvents
             {
                 p.xml = Scribe.saver.DebugOutputFor(p.deadPawn);
             }
+            if (p.xml == null && p.leftPawn != null)
+            {
+                p.xml = Scribe.saver.DebugOutputFor(p.leftPawn);
+            }
             p.tale = null;
             p.deadPawn = null;
+            p.leftPawn = null;
         }
         seqTick = -1;
         seqByMap.Clear();
@@ -168,13 +205,14 @@ public static class MapEvents
             {
                 continue;
             }
-            // XML пешки велик (десятки КБ) — смерть шлём меньшими пачками, чтобы команда влезла в кадр (4 МБ).
-            int take = group.Any(p => p.kind == KindPawnDeath) ? 8 : MaxPerCommand;
+            // XML пешки велик (десятки КБ) — события пешек шлём меньшими пачками, чтобы команда влезла в кадр (4 МБ).
+            int take = group.Any(p => p.kind == KindPawnDeath || p.kind == KindPawnLeave) ? 8 : MaxPerCommand;
             List<Pending> items = group.OrderBy(p => p.tick).ThenBy(p => p.seq).Take(take).ToList();
             foreach (Pending p in items)
             {
                 p.xml ??= p.tale != null ? Scribe.saver.DebugOutputFor(p.tale)
-                    : p.deadPawn != null ? Scribe.saver.DebugOutputFor(p.deadPawn) : "";
+                    : p.deadPawn != null ? Scribe.saver.DebugOutputFor(p.deadPawn)
+                    : p.leftPawn != null ? Scribe.saver.DebugOutputFor(p.leftPawn) : "";
             }
             RWMLWC.Client.Input.WorldCommands.SendMapEvents(w =>
             {
@@ -192,6 +230,11 @@ public static class MapEvents
                         w.WriteInt32(BitConverter.SingleToInt32Bits(p.dinfoAmount));
                         w.WriteInt32(p.dinfoInstigator);
                         w.WriteByte(p.dinfoCategory);
+                    }
+                    else if (p.kind == KindPawnLeave)
+                    {
+                        w.WriteBytes(System.Text.Encoding.UTF8.GetBytes(p.xml ?? ""));
+                        w.WriteBool(p.leaveFreed);
                     }
                     else
                     {
@@ -229,6 +272,7 @@ public static class MapEvents
             float dinfoAmount = 0f;
             int dinfoInstigator = -1;
             byte dinfoCategory = 0;
+            bool leaveFreed = false;
             if (kind == KindPawnDeath)
             {
                 xml = System.Text.Encoding.UTF8.GetString(r.ReadBytes());
@@ -236,6 +280,11 @@ public static class MapEvents
                 dinfoAmount = BitConverter.Int32BitsToSingle(r.ReadInt32());
                 dinfoInstigator = r.ReadInt32();
                 dinfoCategory = r.ReadByte();
+            }
+            else if (kind == KindPawnLeave)
+            {
+                xml = System.Text.Encoding.UTF8.GetString(r.ReadBytes());
+                leaveFreed = r.ReadBool();
             }
             else
             {
@@ -293,6 +342,50 @@ public static class MapEvents
             {
                 ApplyPawnDeath(xml, dinfoDef, dinfoAmount, dinfoInstigator, dinfoCategory, mapId, tick, seq, own: mine != null);
             }
+            else if (kind == KindPawnLeave)
+            {
+                ApplyPawnLeave(xml, leaveFreed, mapId, tick, seq, own: mine != null);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Спящий клиент: восстановить ушедшую пешку из XML в WorldPawns и исполнить мировые уведомления ухода.
+    /// Goodwill за уход считается без карты (в отличие от смерти) — синхронизируется полностью.
+    /// Владелец (own) уже исполнил уведомления в тике — не повторять.
+    /// </summary>
+    private static void ApplyPawnLeave(string xml, bool freed, int mapId, int tick, int seq, bool own)
+    {
+        if (own)
+        {
+            return;
+        }
+        Pawn? pawn = LoadPawn(xml);
+        if (pawn == null || Find.WorldPawns.AllPawnsAliveOrDead.Any(p => p.thingIDNumber == pawn.thingIDNumber))
+        {
+            return;
+        }
+        applying = true;
+        Rand.PushState(Gen.HashCombineInt(mapId, tick, seq, pawn.thingIDNumber));
+        try
+        {
+            Find.WorldPawns.PassToWorld(pawn);
+            pawn.Ideo?.Notify_MemberLost(pawn, null);
+            pawn.Faction?.Notify_MemberExitedMap(pawn, freed);
+            QuestUtility.SendQuestTargetSignals(pawn.questTags, "LeftMap", pawn.Named("SUBJECT"));
+            Find.FactionManager.Notify_PawnLeftMap(pawn);
+            Find.IdeoManager.Notify_PawnLeftMap(pawn);
+            TestAutomation.Note($"map events: pawn leave {pawn.def.defName} #{pawn.thingIDNumber} applied at tick {Find.TickManager.TicksGame} (restored, map {mapId} absent, freed={freed})");
+        }
+        catch (Exception ex)
+        {
+            TestAutomation.Note("map events: pawn leave apply FAILED: " + ex.Message);
+            Log.Error("[RWMLWC] событие ухода пешки: " + ex);
+        }
+        finally
+        {
+            Rand.PopState();
+            applying = false;
         }
     }
 
@@ -470,6 +563,28 @@ internal static class Patch_Pawn_Kill_MapEvent
             return;
         }
         MapEvents.QueuePawnDeath(map, __instance, dinfo);
+    }
+}
+
+/// <summary>
+/// Уход пешки с карты в тике карты (T-056, шаг 4): после исполнения поставить событие карты для спящих.
+/// Только sleepremove. Уход из исполнения команды (караван и т.п.) идёт у всех одинаково — событие не нужно.
+/// </summary>
+[HarmonyPatch(typeof(Pawn), nameof(Pawn.ExitMap))]
+internal static class Patch_Pawn_ExitMap_MapEvent
+{
+    private static void Postfix(Pawn __instance)
+    {
+        if (!PerMapSim.SleepRemoveTest || !LockstepClient.InSession || !MapRandContext.InTick || __instance == null)
+        {
+            return;
+        }
+        Map? map = MapRandContext.Current;
+        if (map == null)
+        {
+            return;
+        }
+        MapEvents.QueuePawnLeave(map, __instance, __instance.guest?.Released ?? false);
     }
 }
 
