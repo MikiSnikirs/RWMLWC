@@ -22,6 +22,14 @@ namespace RWMLWC.Client.Input;
 /// Если нажатие открывает меню или прицеливание, они продолжаются командами MenuOption и
 /// TargetPicked (см. VirtualUi).
 /// </summary>
+/// <summary>
+/// Кнопка только интерфейса (открыть окно): исполняется на месте, командой не идёт и прав на карту не требует.
+/// Действие не должно менять состояние игры — изменения делаются своими командами из окна.
+/// </summary>
+public class LocalCommand_Action : Command_Action
+{
+}
+
 public static class GizmoCommands
 {
     private const byte SourceOwn = 0;      // кнопка из GetGizmos() объекта
@@ -56,7 +64,7 @@ public static class GizmoCommands
     /// <summary>Из префиксов ProcessInput и ProcessGroupInput. true — выполнить оригинал на месте.</summary>
     public static bool Intercept(Gizmo gizmo)
     {
-        if (!CommandBus.CaptureActive || gizmo is Designator)
+        if (!CommandBus.CaptureActive || gizmo is Designator || gizmo is LocalCommand_Action)
         {
             // Выбор инструмента разметки — только интерфейс; сама разметка перехватывается отдельно.
             return true;

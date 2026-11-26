@@ -366,8 +366,9 @@ public sealed class Dialog_TradeOffers : Window
 [HarmonyLib.HarmonyPatch(typeof(Pawn), nameof(Pawn.GetGizmos))]
 internal static class Patch_Pawn_GetGizmos_PlayerTrade
 {
-    // Кнопки — у всех клиентов одинаковые (зависят только от состояния игры: номер кнопки у всех один);
-    // нажатие идёт командой, окно открывается только у нажавшего и только если ему можно.
+    // Кнопки — у всех клиентов одинаковые (зависят только от состояния игры: номера других кнопок у всех одни).
+    // Они только открывают окно и исполняются на месте (LocalCommand_Action): занятая хозяином карта им не мешает,
+    // а сделки идут своими командами, права проверяются при исполнении.
     private static IEnumerable<Gizmo> Postfix(IEnumerable<Gizmo> __result, Pawn __instance)
     {
         foreach (Gizmo g in __result)
@@ -379,30 +380,27 @@ internal static class Patch_Pawn_GetGizmos_PlayerTrade
         {
             yield break;
         }
-        yield return new Command_Action
+        yield return new LocalCommand_Action
         {
             defaultLabel = "Предложить обмен",
             defaultDesc = "RWMLWC: обмен с колонией, где гостит пешка: вещи из её инвентаря на вещи этой колонии. Хозяин колонии примет или отклонит.",
             icon = LetterDefOf.PositiveEvent.Icon,
             action = () =>
             {
-                if (!CommandBus.ExecutingRemote && GuestsComponent.Component?.GuestPlayer(pawn) == LockstepClient.PlayerId)
+                if (GuestsComponent.Component?.GuestPlayer(pawn) == LockstepClient.PlayerId)
                 {
                     Find.WindowStack.Add(new Dialog_PlayerTrade(pawn));
                 }
             },
         };
-        yield return new Command_Action
+        yield return new LocalCommand_Action
         {
             defaultLabel = "Сделки",
             defaultDesc = "RWMLWC: предложения обмена на этой карте — принять, отклонить или отозвать.",
             icon = LetterDefOf.NeutralEvent.Icon,
             action = () =>
             {
-                if (!CommandBus.ExecutingRemote)
-                {
-                    Find.WindowStack.Add(new Dialog_TradeOffers(pawn.MapHeld));
-                }
+                Find.WindowStack.Add(new Dialog_TradeOffers(pawn.MapHeld));
             },
         };
     }
