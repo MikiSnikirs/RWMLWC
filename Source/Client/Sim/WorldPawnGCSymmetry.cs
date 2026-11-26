@@ -24,7 +24,7 @@ internal static class Patch_WorldPawnGC_Reason_SleepRemove
 {
     private static void Postfix(ref string __result)
     {
-        if (!PerMapSim.SleepRemoveTest)
+        if (!PerMapSim.Split)
         {
             return;
         }
@@ -46,7 +46,7 @@ internal static class Patch_WorldPawnGC_Relationships_SleepRemove
 {
     private static bool Prefix()
     {
-        return !PerMapSim.SleepRemoveTest;
+        return !PerMapSim.Split;
     }
 }
 
@@ -61,7 +61,7 @@ internal static class Patch_WorldPawns_Discard_SleepRemove
 {
     private static bool Prefix(Pawn p)
     {
-        if (!PerMapSim.SleepRemoveTest || p == null)
+        if (!PerMapSim.Split || p == null)
         {
             return true;
         }

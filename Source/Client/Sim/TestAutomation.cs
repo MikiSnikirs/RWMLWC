@@ -1040,6 +1040,7 @@ public static class TestAutomation
         }
         PerMapSim.UpdateSleepForeign();
         SleepRemoveStep();
+        VisitStep();
         if (sessionSteps.Count == 0 || Current.Game == null || Find.TickManager.TicksGame < sessionSteps.Peek().tick)
         {
             return;
@@ -1066,7 +1067,8 @@ public static class TestAutomation
     // Каждый клиент загружает его без карт чужих колоний (PerMapSim.StripForeignMaps) — заглушка без карты.
     private static void SleepRemoveStep()
     {
-        if (!PerMapSim.SleepRemoveTest || sleepRemoveRequested || Current.Game == null || LockstepClient.PlayerId <= 0)
+        bool realMode = RWMLWC.Client.World.CaravanSelfTest.ArmKey("splitmode=1");
+        if (!(PerMapSim.Split || realMode) || sleepRemoveRequested || Current.Game == null || LockstepClient.PlayerId <= 0)
         {
             return;
         }
@@ -1103,8 +1105,87 @@ public static class TestAutomation
         if (mine && foreign && firstOwner == LockstepClient.PlayerId)
         {
             sleepRemoveRequested = true;
-            Note("sleepremove: both colony maps present, requesting common snapshot");
-            LockstepClient.RequestCommonSnapshot();
+            if (realMode)
+            {
+                // Настоящий режим (T-056): включение командой, как из меню; перезагрузку просит исполнивший.
+                Note("splitmode: both colony maps present, turning split colonies on");
+                SplitColonies.SendMode(true);
+            }
+            else
+            {
+                Note("sleepremove: both colony maps present, requesting common snapshot");
+                LockstepClient.RequestCommonSnapshot();
+            }
+        }
+    }
+
+    private static int visitStep;
+    private static int visitAt = -1;
+
+    // T-057 (ключ visittest=1): игрок 2 приходит в гости в колонию игрока 1, через 12000 тиков уходит.
+    // Ожидание: сервер сравнивает хеши этой карты у владельца и гостя (молчит), после ухода у гостя карты снова нет.
+    private static void VisitStep()
+    {
+        if (!RWMLWC.Client.World.CaravanSelfTest.ArmKey("visittest=1") || !PerMapSim.Split || Current.Game == null
+            || LockstepClient.CurrentState != LockstepClient.State.InSession || LockstepClient.PlayerId != 2)
+        {
+            return;
+        }
+        RWMLWC.Client.World.ColoniesComponent? colonies = RWMLWC.Client.World.Colonies.Component;
+        RimWorld.Planet.Settlement? target = colonies == null ? null
+            : Find.WorldObjects.Settlements.Where(st => colonies.OwnerOf(st) == 1).OrderBy(st => st.ID).FirstOrDefault();
+        if (target == null)
+        {
+            return;
+        }
+        int now = Find.TickManager.TicksGame;
+        bool visiting = SplitColonies.Component?.Visits(target.ID, 2) ?? false;
+        if (visitStep == 0)
+        {
+            if (visitAt < 0)
+            {
+                visitAt = now + 6000;
+            }
+            if (now >= visitAt && !target.HasMap)
+            {
+                visitStep = 1;
+                Note($"visittest: visiting colony {target.LabelCap} (settlement {target.ID}) at tick {now}");
+                SplitColonies.SendVisit(target, true);
+            }
+        }
+        else if (visitStep == 1 && visiting && target.HasMap)
+        {
+            visitStep = 2;
+            visitAt = now + 12000;
+            Note($"visittest: guest holds the map of {target.LabelCap} (map {target.Map.uniqueID}) at tick {now}; maps here [{string.Join(",", Find.Maps.Select(m => m.uniqueID))}]");
+        }
+        else if (visitStep == 2 && now >= visitAt)
+        {
+            visitStep = 3;
+            Note($"visittest: leaving colony {target.LabelCap} at tick {now}");
+            SplitColonies.SendVisit(target, false);
+        }
+        else if (visitStep == 3 && !visiting && !target.HasMap)
+        {
+            visitStep = 4;
+            Note($"visittest: left, map gone here at tick {now}; maps here [{string.Join(",", Find.Maps.Select(m => m.uniqueID))}]");
+        }
+        else if (visitStep == 4 && RWMLWC.Client.World.CaravanSelfTest.ArmKey("splitleave=1"))
+        {
+            // Ключ splitleave=1: после визита игрок 2 выпадает из сессии (как при вылете). У игрока 1 его колония
+            // должна появиться из последней копии (SplitColonies.OnPresence → сборка с копией и стазисом).
+            if (visitAt < now)
+            {
+                visitAt = now + 6000;
+            }
+            visitStep = 5;
+        }
+        else if (visitStep == 5 && now >= visitAt)
+        {
+            visitStep = 6;
+            Note($"splitleave: player 2 drops out at tick {now}");
+            LockstepClient.Disconnect("игрок вылетел (тест splitleave)");
+            Root.Shutdown();
         }
     }
 

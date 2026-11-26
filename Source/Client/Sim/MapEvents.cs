@@ -828,7 +828,7 @@ internal static class Patch_TaleManager_Add_MapEvent
     {
         if (!MapEvents.ShouldDefer(out Map? map) || map == null)
         {
-            if (PerMapSim.SleepRemoveTest && !MapEvents.Applying && LockstepClient.InSession && tale != null)
+            if (PerMapSim.Split && !MapEvents.Applying && LockstepClient.InSession && tale != null)
             {
                 TestAutomation.Note($"tale diag: added #{tale.id} {tale.def?.defName} outside map context (tick {Find.TickManager.TicksGame})");
             }
@@ -851,7 +851,7 @@ internal static class Patch_Pawn_Kill_MapEvent
     private static void Prefix(Pawn __instance, ref (int loadId, int goodwill, int leaderId) __state)
     {
         __state = (-1, 0, -1);
-        if (!PerMapSim.SleepRemoveTest || !LockstepClient.InSession || !MapRandContext.InTick || __instance == null)
+        if (!PerMapSim.Split || !LockstepClient.InSession || !MapRandContext.InTick || __instance == null)
         {
             return;
         }
@@ -864,7 +864,7 @@ internal static class Patch_Pawn_Kill_MapEvent
 
     private static void Postfix(Pawn __instance, DamageInfo? dinfo, (int loadId, int goodwill, int leaderId) __state)
     {
-        if (!PerMapSim.SleepRemoveTest || !LockstepClient.InSession || !MapRandContext.InTick || __instance == null)
+        if (!PerMapSim.Split || !LockstepClient.InSession || !MapRandContext.InTick || __instance == null)
         {
             return;
         }
@@ -898,7 +898,7 @@ internal static class Patch_Pawn_ExitMap_MapEvent
 
     private static void Postfix(Pawn __instance)
     {
-        if (!PerMapSim.SleepRemoveTest || !LockstepClient.InSession || !MapRandContext.InTick || __instance == null)
+        if (!PerMapSim.Split || !LockstepClient.InSession || !MapRandContext.InTick || __instance == null)
         {
             return;
         }
@@ -926,7 +926,7 @@ internal static class Patch_TaleManager_RemoveTale_Diag
         {
             return true;
         }
-        if (PerMapSim.SleepRemoveTest)
+        if (PerMapSim.Split)
         {
             if (LockstepClient.InSession)
             {
@@ -950,7 +950,7 @@ internal static class Patch_Pawn_SpawnSetup_EnterEvent
 {
     private static void Prefix(Pawn __instance, bool respawningAfterLoad, out bool __state)
     {
-        __state = !respawningAfterLoad && PerMapSim.SleepRemoveTest && LockstepClient.InSession && Find.WorldPawns.Contains(__instance);
+        __state = !respawningAfterLoad && PerMapSim.Split && LockstepClient.InSession && Find.WorldPawns.Contains(__instance);
     }
 
     private static void Postfix(Pawn __instance, Map map, bool __state)
@@ -969,7 +969,7 @@ internal static class Patch_WorldPawns_PassToWorld_Event
     private static void Prefix(Pawn pawn, out Map? __state)
     {
         __state = null;
-        if (PerMapSim.SleepRemoveTest && MapEvents.InExitMap == 0 && pawn != null && !pawn.Dead && !pawn.Spawned
+        if (PerMapSim.Split && MapEvents.InExitMap == 0 && pawn != null && !pawn.Dead && !pawn.Spawned
             && MapEvents.ShouldDefer(out Map? map) && !Find.WorldPawns.Contains(pawn))
         {
             __state = map;

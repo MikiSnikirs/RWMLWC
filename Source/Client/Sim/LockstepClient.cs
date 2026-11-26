@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading.Tasks;
 using HarmonyLib;
 using RimWorld;
@@ -292,6 +293,7 @@ public static class LockstepClient
         {
             FinishSnapshotLoad(tickManager);
         }
+        ComposeTick();
 
         if (state == State.InSession && tickManager != null)
         {
@@ -476,14 +478,8 @@ public static class LockstepClient
             CommandOrderedMessage command = pendingCommands.Dequeue();
             if (command.Kind == RequestSnapshotKind)
             {
-                // sleepremove (T-056, 11.4б): лечебный снимок от сервера (игрок 0) никто не может отдать
-                // целиком — у каждого только свои карты. Пропускаем и измеряем расхождение файлом хешей;
-                // сбор полного сейва из карт владельцев — шаг 3 плана (сервер).
-                if (PerMapSim.SleepRemoveTest && command.PlayerId == 0)
-                {
-                    TestAutomation.Note($"lockstep: sleepremove — server healing snapshot #{command.Seq} at tick {command.Tick} skipped (no full world holder)");
-                    continue;
-                }
+                // Раздельный счёт колоний (T-056): полного мира нет ни у кого — снимок собирается из частей
+                // (SplitColonies). Лечебный снимок сервера (игрок 0) тоже собирается так.
                 BeginSnapshotRound(command);
                 continue; // состояние сменилось: цикл остановится, остальные команды — после загрузки
             }
@@ -499,6 +495,7 @@ public static class LockstepClient
                 if (presence.HasValue)
                 {
                     RWMLWC.Client.Maps.PlayerPresence.Component?.Apply(presence.Value.playerId, presence.Value.online);
+                    SplitColonies.OnPresence(presence.Value.playerId, presence.Value.online);
                 }
                 continue;
             }
@@ -585,9 +582,15 @@ public static class LockstepClient
         RequestSpeed(0);
         state = State.WaitingSnapshot;
         HashRecorder.Instance?.SuspendForSnapshotReload();
+        // Ради кого перезагрузка: входящий, гость, включивший режим (у всех одинаково — номер из команды).
+        SplitColonies.RoundPlayer = request.PlayerId > 0 ? request.PlayerId : 0;
         if (!IAmWorldSender(request))
         {
             TestAutomation.Note($"lockstep: player {request.PlayerId} asked for a snapshot at tick {tickManager.TicksGame}; waiting for it");
+            if (PerMapSim.Split && connection != null && SplitColonies.ShouldSendBundle())
+            {
+                SplitColonies.SendBundle(connection, SplitColonies.BundleId(expectedSnapshotId), tickManager.TicksGame);
+            }
             TryLoadExpectedSnapshot(); // куски могли прийти раньше
             return;
         }
@@ -596,13 +599,31 @@ public static class LockstepClient
             return;
         }
         byte[] packed = GameSnapshot.Take(out GameSnapshot.Stats stats);
+        if (PerMapSim.Split)
+        {
+            // Сборка: ждём сейвы владельцев в сети (Frame → ComposeTick), потом шлём и загружаем.
+            compose = new Composition
+            {
+                snapshotId = expectedSnapshotId,
+                bundleId = SplitColonies.BundleId(expectedSnapshotId),
+                packed = packed,
+                tick = tickManager.TicksGame,
+                expected = SplitColonies.ExpectedBundles(SplitColonies.RoundPlayer),
+                started = Stopwatch.StartNew(),
+                autosave = false,
+                label = $"snapshot for player {request.PlayerId}",
+            };
+            TestAutomation.Note($"split: composing snapshot {expectedSnapshotId} at tick {compose.tick}, waiting bundles from [{string.Join(",", compose.expected)}]");
+            ComposeTick();
+            return;
+        }
         int count = SendWorldChunks(expectedSnapshotId, packed, tickManager.TicksGame);
         TestAutomation.Note($"lockstep: snapshot for player {request.PlayerId} at tick {tickManager.TicksGame}: {stats}, {count} chunks sent; reloading it here too");
         // Отправитель загружает тот же снимок, что и остальные — под застывшим кадром (SyncCurtain).
         // В режиме sleepremove каждый вырезает из снимка карты чужих колоний (T-056, 11.4б шаг 1).
         state = State.Loading;
         gameLoadedPending = false;
-        RWMLWC.Client.SessionView.SyncCurtain.BeforeReload(true, curtainText, () => GameSnapshot.Apply(PerMapSim.StripForeignMaps(packed)));
+        RWMLWC.Client.SessionView.SyncCurtain.BeforeReload(true, curtainText, () => GameSnapshot.Apply(SplitColonies.StripForeignMaps(packed)));
     }
 
     /// <summary>
@@ -646,6 +667,78 @@ public static class LockstepClient
         return count;
     }
 
+    // ---------- раздельный счёт колоний: сборка полного сейва (SplitColonies) ----------
+
+    private sealed class Composition
+    {
+        public int snapshotId;
+        public int bundleId;
+        public byte[] packed = Array.Empty<byte>();
+        public int tick;
+        public HashSet<int> expected = new HashSet<int>();
+        public Stopwatch started = new Stopwatch();
+        public bool autosave;
+        public string label = "";
+    }
+
+    private static Composition? compose;
+
+    /// <summary>Сколько ждать сейвы владельцев. Дольше — снимок не собирается (неполный мир никому не уходит).</summary>
+    private const int ComposeTimeoutMs = 90_000;
+
+    private static void ComposeTick()
+    {
+        Composition? c = compose;
+        if (c == null)
+        {
+            return;
+        }
+        Dictionary<int, byte[]> bundles = SplitColonies.BundlesFor(c.bundleId);
+        bool all = c.expected.All(bundles.ContainsKey);
+        if (!all && c.started.ElapsedMilliseconds < ComposeTimeoutMs)
+        {
+            return;
+        }
+        compose = null;
+        SplitColonies.ForgetBundles(c.bundleId);
+        if (!all)
+        {
+            string missing = string.Join(",", c.expected.Where(p => !bundles.ContainsKey(p)));
+            TestAutomation.Note($"split: {c.label}: no bundle from [{missing}] in {ComposeTimeoutMs} ms — not composed");
+            if (c.autosave)
+            {
+                return; // неполный мир на сервер не уходит; следующее автосохранение попробует снова
+            }
+            // Перезагрузка ждать не может: колонии молчащих берутся из последней копии (как у ушедшего владельца).
+        }
+        byte[] full;
+        try
+        {
+            full = SplitColonies.Compose(c.packed, bundles, c.tick, out string report);
+            TestAutomation.Note($"split: {c.label} composed at tick {c.tick} in {c.started.ElapsedMilliseconds} ms: {report}");
+        }
+        catch (Exception ex)
+        {
+            TestAutomation.Note($"split: {c.label} compose FAILED: {ex}");
+            Log.Error("[RWMLWC] сборка общего снимка: " + ex);
+            if (!c.autosave)
+            {
+                Disconnect("сборка общего снимка не удалась");
+            }
+            return;
+        }
+        int count = SendWorldChunks(c.snapshotId, full, c.tick);
+        if (c.autosave)
+        {
+            TestAutomation.Note($"lockstep: {c.label} at tick {c.tick}: composed world, {count} chunks sent to the server");
+            return;
+        }
+        TestAutomation.Note($"lockstep: {c.label} at tick {c.tick}: composed world, {count} chunks sent; reloading it here too");
+        state = State.Loading;
+        gameLoadedPending = false;
+        RWMLWC.Client.SessionView.SyncCurtain.BeforeReload(true, curtainText, () => GameSnapshot.Apply(SplitColonies.StripForeignMaps(full)));
+    }
+
     /// <summary>
     /// v4, автосохранение: сервер поставил в общий порядок «сохранить мир». Отдающий снимает мир и шлёт серверу;
     /// никто ничего не перезагружает, игра не останавливается.
@@ -654,11 +747,32 @@ public static class LockstepClient
     {
         if (!IAmWorldSender(command))
         {
+            if (PerMapSim.Split && connection != null && SplitColonies.ShouldSendBundle())
+            {
+                SplitColonies.SendBundle(connection, SplitColonies.BundleId(WorldSnapshotOrder.SnapshotId(command.Seq)), Find.TickManager.TicksGame);
+            }
             return;
         }
         int tick = Find.TickManager.TicksGame;
         TestAutomation.Note($"lockstep: autosave #{command.Seq} at tick {tick}: taking world snapshot");
         byte[] packed = GameSnapshot.Take(out GameSnapshot.Stats stats);
+        if (PerMapSim.Split)
+        {
+            compose = new Composition
+            {
+                snapshotId = WorldSnapshotOrder.SnapshotId(command.Seq),
+                bundleId = SplitColonies.BundleId(WorldSnapshotOrder.SnapshotId(command.Seq)),
+                packed = packed,
+                tick = tick,
+                expected = SplitColonies.ExpectedBundles(0),
+                started = Stopwatch.StartNew(),
+                autosave = true,
+                label = $"autosave #{command.Seq}",
+            };
+            TestAutomation.Note($"split: composing autosave #{command.Seq} at tick {tick}, waiting bundles from [{string.Join(",", compose.expected)}]");
+            ComposeTick();
+            return;
+        }
         TestAutomation.Note($"lockstep: autosave #{command.Seq}: snapshot taken, sending {packed.Length} bytes");
         int count = SendWorldChunks(WorldSnapshotOrder.SnapshotId(command.Seq), packed, tick);
         TestAutomation.Note($"lockstep: autosave #{command.Seq} at tick {tick}: {stats}, {count} chunks sent to the server");
@@ -667,6 +781,12 @@ public static class LockstepClient
     // Куски копятся при любом состоянии: отстающий клиент может получить их раньше, чем дойдёт до просьбы в общем порядке.
     private static void OnSnapshotChunk(SnapshotChunkMessage chunk)
     {
+        if (chunk.MapId <= SplitColonies.BundleMapBase)
+        {
+            SplitColonies.OnBundleChunk(chunk); // сейв владельца для сборки (раздельный счёт колоний)
+            ComposeTick();
+            return;
+        }
         if (chunk.MapId != ProtocolIds.WorldMapId)
         {
             return; // пересылка одной карты — T-034
@@ -725,7 +845,7 @@ public static class LockstepClient
         {
             try
             {
-                GameSnapshot.Apply(PerMapSim.StripForeignMaps(packed));
+                GameSnapshot.Apply(SplitColonies.StripForeignMaps(packed));
             }
             catch (Exception ex)
             {

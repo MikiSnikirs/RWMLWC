@@ -27,6 +27,9 @@ public sealed class PlayerPresenceComponent : GameComponent
         online ??= new Dictionary<int, bool>();
     }
 
+    /// <summary>Игроки, отмеченные «в сети» (по возрастанию номера).</summary>
+    public System.Collections.Generic.IEnumerable<int> OnlinePlayers() => online.Where(p => p.Value).Select(p => p.Key).OrderBy(p => p).ToList();
+
     public bool IsOnline(int playerId) => !online.TryGetValue(playerId, out bool value) || value;
 
     public void Apply(int playerId, bool isOnline)

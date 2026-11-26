@@ -36,6 +36,14 @@ internal static class SessionMenu
         }
         if (Current.ProgramState != ProgramState.Playing) yield break;
 
+        if (st == LockstepClient.State.InSession)
+        {
+            bool on = SplitColonies.ModeOn;
+            yield return new ListableOption(on ? "Раздельный счёт колоний: выключить" : "Раздельный счёт колоний: включить", () => Confirm(on
+                ? "Выключить раздельный счёт? Каждый компьютер снова будет считать все колонии. Игра у всех ненадолго остановится."
+                : "Включить раздельный счёт колоний? Каждый компьютер будет считать только свою колонию (и те, куда зашёл гостем); колонии игроков не в сети считают все. Игра у всех ненадолго остановится.",
+                () => SplitColonies.SendMode(!on)));
+        }
         if (HostedSession.Running)
             yield return new ListableOption("Остановить сессию", () => Confirm("Остановить сессию? Друзья будут отключены.", HostedSession.StopAndLeave));
         else if (st != LockstepClient.State.Off)

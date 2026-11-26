@@ -67,7 +67,7 @@ public static class QuestSync
 
     public static QuestSyncComponent? Component => Current.Game?.GetComponent<QuestSyncComponent>();
 
-    public static bool Active => PerMapSim.SleepRemoveTest && LockstepClient.InSession;
+    public static bool Active => PerMapSim.Split && LockstepClient.InSession;
 
     /// <summary>Идёт создание у создателя: номера — из блока заданий.</summary>
     internal static bool Generating;

@@ -34,7 +34,7 @@ internal static class Patch_Storyteller_StorytellerTick_PerMap
 
     private static bool Prefix(Storyteller __instance)
     {
-        if (!PerMapSim.SleepRemoveTest || !PerMapSim.Enabled || !LockstepClient.InSession)
+        if (!PerMapSim.Split || !PerMapSim.Enabled || !LockstepClient.InSession)
         {
             return true;
         }
@@ -108,7 +108,7 @@ internal static class Patch_Storyteller_TryFire_MissingMap
 {
     private static bool Prefix(FiringIncident fi, ref bool __result)
     {
-        if (PerMapSim.SleepRemoveTest && fi.parms.target is Map map && !Find.Maps.Contains(map))
+        if (PerMapSim.Split && fi.parms.target is Map map && !Find.Maps.Contains(map))
         {
             __result = false;
             return false;
@@ -123,7 +123,7 @@ internal static class Patch_QuestManager_Add_Log
 {
     private static void Postfix(Quest quest)
     {
-        if (PerMapSim.SleepRemoveTest && LockstepClient.InSession && quest != null)
+        if (PerMapSim.Split && LockstepClient.InSession && quest != null)
         {
             Map? ctx = MapRandContext.Current;
             TestAutomation.Note($"quest added: #{quest.id} root={quest.root?.defName} at tick {Find.TickManager.TicksGame}, context {(MapRandContext.InTick ? (ctx != null ? "map" + ctx.uniqueID : "global") : "out of tick")}\n{new System.Diagnostics.StackTrace(1, false).ToString().Split('\n').Take(8).Aggregate((a, b) => a + "\n" + b)}");
@@ -143,7 +143,7 @@ internal static class Patch_Adaptation_PawnEvent_StubMode
     [HarmonyPriority(Priority.First)]
     private static bool Prefix()
     {
-        return !(PerMapSim.SleepRemoveTest && LockstepClient.InSession && MapRandContext.InTick && MapRandContext.Current != null);
+        return !(PerMapSim.Split && LockstepClient.InSession && MapRandContext.InTick && MapRandContext.Current != null);
     }
 }
 
@@ -160,7 +160,7 @@ internal static class Patch_Storyteller_TryFire_MapContext
     private static void Prefix(FiringIncident fi, out (bool entered, Map? prev) __state)
     {
         __state = (false, null);
-        if (PerMapSim.SleepRemoveTest && PerMapSim.Enabled && LockstepClient.InSession && MapRandContext.InTick
+        if (PerMapSim.Split && PerMapSim.Enabled && LockstepClient.InSession && MapRandContext.InTick
             && fi.parms.target is Map map && Find.Maps.Contains(map) && MapRandContext.Current != map)
         {
             __state = (true, MapRandContext.Current);
@@ -183,7 +183,7 @@ internal static class Patch_IncidentQueue_Add_Log
 {
     private static void Postfix(QueuedIncident qi, bool __result)
     {
-        if (PerMapSim.SleepRemoveTest && LockstepClient.InSession && qi?.FiringIncident != null)
+        if (PerMapSim.Split && LockstepClient.InSession && qi?.FiringIncident != null)
         {
             Map? ctx = MapRandContext.Current;
             TestAutomation.Note($"incident queued: {qi.FiringIncident.def?.defName} for {(qi.FiringIncident.parms.target is Map m ? "map" + m.uniqueID : "world")} fire at {qi.FireTick}, added={__result} at tick {Find.TickManager.TicksGame}, context {(MapRandContext.InTick ? (ctx != null ? "map" + ctx.uniqueID : "global") : "out of tick")}");
