@@ -1,0 +1,66 @@
+2026-11-26 07:47:18 autoload: loading save 'tst014'
+2026-11-26 07:47:26 lockstep: connecting to 127.0.0.1:57029 as 'c1'
+2026-11-26 07:47:26 regionids: after load room=18 district=24 region=483
+2026-11-26 07:47:28 lockstep: connected to quic:127.0.0.1:57029, Hello sent
+2026-11-26 07:47:28 mapinterface postfix: alive (diag T-076)
+2026-11-26 07:47:29 lockstep: Welcome, playerId=2, serverTick=14998, seed=7
+2026-11-26 07:47:29 presence: player 2 online
+2026-11-26 07:47:29 colonies diag: me=2, tick=14998, anyOwner=False, lowestOnline=False
+2026-11-26 07:47:30 watchdog: no tick advance for 300 frames at tick 14998: speed=Paused, paused=True, topWindow=ImmediateWindow, windows=3
+2026-11-26 07:48:29 lockstep: hold is over, requesting speed 3
+2026-11-26 07:48:29 regionids: run start room=18 district=24 region=483
+2026-11-26 07:48:29 run started: #0, tick=14998, scenario=none, ticks=82000, trace=False, quit=True, file=hash-c1-20261126-074829.txt
+2026-11-26 07:48:32 colonies: player 1 is the host, settlements claimed: 1
+2026-11-26 07:48:32 colonies: auto choice — new colony at 230170,0
+2026-11-26 07:48:33 colonies: new colony for player 2 at 230170,0: 3 colonists, 10 item stacks
+2026-11-26 07:48:33 tale diag: added #5 TileSettled outside map context (tick 15300)
+2026-11-26 07:48:33 colonies: settlement 253 belongs to player 2
+2026-11-26 07:48:34 long event 'GeneratingMap' start, maps 1
+2026-11-26 07:48:38 long event 'GeneratingMap' done, maps 2
+2026-11-26 07:48:38 map 1 after 'GeneratingMap': Pawn=14,Item=1528,Building=3774,Plant=285,Filth=4078,Ethereal=2; pawns Human#45490@(-1000, -1000, -1000),Human#45497@(-1000, -1000, -1000),Human#45506@(-1000, -1000, -1000),Human#45513@(-1000, -1000, -1000),Human#45522@(-1000, -1000, -1000),Human#45529@(-1000, -1000, -1000),Iguana#52486@(82, 0, 48),MonitorLizard#52487@(67, 0, 167),Vulture#52488@(241, 0, 7),Iguana#52489@(210, 0, 5),Boomalope#52490@(174, 0, 39),Boomalope#52491@(171, 0, 37),Boomalope#52492@(169, 0, 37),Boomalope#52493@(170, 0, 41),Boomalope#52494@(169, 0, 39); rand 00000928FB25C5A1
+2026-11-26 07:48:39 long event 'SpawningColonists' start, maps 2
+2026-11-26 07:48:39 long event 'SpawningColonists' done, maps 2
+2026-11-26 07:48:39 map 1 after 'SpawningColonists': Pawn=18,Item=1544,Building=3774,Plant=285,Filth=4078,Ethereal=2; pawns Human#41747@(127, 0, 131),Human#41750@(125, 0, 130),Human#41753@(124, 0, 133),Warg#41766@(126, 0, 129),Human#45490@(-1000, -1000, -1000),Human#45497@(-1000, -1000, -1000),Human#45506@(-1000, -1000, -1000),Human#45513@(-1000, -1000, -1000),Human#45522@(-1000, -1000, -1000),Human#45529@(-1000, -1000, -1000),Iguana#52486@(82, 0, 48),MonitorLizard#52487@(67, 0, 167),Vulture#52488@(241, 0, 7),Iguana#52489@(210, 0, 5),Boomalope#52490@(174, 0, 39),Boomalope#52491@(171, 0, 37),Boomalope#52492@(169, 0, 37),Boomalope#52493@(170, 0, 41),Boomalope#52494@(169, 0, 39); rand 00000951FB25C5A1
+2026-11-26 07:48:39 lockstep: player 1 asked for a snapshot at tick 15447; waiting for it
+2026-11-26 07:48:40 lockstep: snapshot 5 received, 2698050 bytes; loading
+2026-11-26 07:48:40 curtain: shown (c2 подключается — синхронизация мира…), map 1, world view False
+2026-11-26 07:48:41 sleepremove: player 2 reloads without maps [0], keeps map 1
+2026-11-26 07:48:41 regionids: reset at load, bump=0
+2026-11-26 07:48:43 regionids: after load room=15 district=16 region=481
+2026-11-26 07:48:44 curtain: view restored — map 1, world view False
+2026-11-26 07:48:44 lockstep: snapshot loaded, tick 15447, serverTick=15485, perMapSim=True
+2026-11-26 07:48:44 resumed after snapshot reload at tick 15447, perMapSim=True
+2026-11-26 07:48:46 watchdog: no tick advance for 300 frames at tick 15485: speed=Paused, paused=True, topWindow=ImmediateWindow, windows=3
+2026-11-26 07:49:44 lockstep: hold is over, requesting speed 3
+2026-11-26 07:51:34 map events: tale Meditated #200000000 on map 1 queued at tick 54839.0
+2026-11-26 07:51:34 map events: sent 1 for map 1
+2026-11-26 07:51:34 map events: tale #200000000 Meditated applied at tick 54844 (own, map 1)
+2026-11-26 07:52:42 map events: tale Wounded #200000001 on map 1 queued at tick 79188.0
+2026-11-26 07:52:42 map events: tale Wounded #200000002 on map 1 queued at tick 79188.1
+2026-11-26 07:52:42 map events: sent 2 for map 1
+2026-11-26 07:52:42 map events: tale #200000001 Wounded applied at tick 79199 (own, map 1)
+2026-11-26 07:52:42 map events: tale #200000002 Wounded applied at tick 79199 (own, map 1)
+2026-11-26 07:52:42 map events: tale Wounded #200000003 on map 1 queued at tick 79368.0
+2026-11-26 07:52:42 map events: sent 1 for map 1
+2026-11-26 07:52:42 map events: tale #200000003 Wounded applied at tick 79381 (own, map 1)
+2026-11-26 07:52:43 map events: tale Wounded #200000004 on map 1 queued at tick 79458.0
+2026-11-26 07:52:43 map events: sent 1 for map 1
+2026-11-26 07:52:43 map events: tale #200000004 Wounded applied at tick 79458 (own, map 1)
+2026-11-26 07:52:43 map events: tale Wounded #200000005 on map 1 queued at tick 79548.0
+2026-11-26 07:52:43 map events: sent 1 for map 1
+2026-11-26 07:52:43 map events: tale #200000005 Wounded applied at tick 79552 (own, map 1)
+2026-11-26 07:52:44 map events: tale Wounded #200000006 on map 1 queued at tick 79818.0
+2026-11-26 07:52:44 map events: sent 1 for map 1
+2026-11-26 07:52:44 map events: tale #200000006 Wounded applied at tick 79827 (own, map 1)
+2026-11-26 07:53:31 tick time: 81999 ticks, avg 0.286 ms, total 23.4 s
+2026-11-26 07:53:31 summary: map1 drafted=0 forbidden=4 plants=[]
+2026-11-26 07:53:31 summary: map1 jobs=[41747:LayDown@(101, 0, 137),41750:LayDown@(97, 0, 147),41753:LayDown@(110, 0, 143)]
+2026-11-26 07:53:31 summary: map1 settings=0431F5E6919865E5
+2026-11-26 07:53:31 summary: maps=1 player settlements=2 caravans=0
+2026-11-26 07:53:31 summary: absence= offline=[]
+2026-11-26 07:53:31 summary: squads= rejected=0 drafted=[]
+2026-11-26 07:53:31 summary: map1 designations=0 blueprints=0 zones=0; commands sent=7 executed=8 failed=0
+2026-11-26 07:53:31 run finished: file=hash-c1-20261126-074829.txt
+2026-11-26 07:53:31 queue: finished
+2026-11-26 07:53:31 lockstep: disconnect: прогон завершён
+2026-11-26 07:53:31 quitting game
