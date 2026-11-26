@@ -50,15 +50,28 @@ internal static class Patch_WorldPawnGC_Relationships_SleepRemove
     }
 }
 
-/// <summary>Диагностика sleepremove: кого убирает сбор мусора мировых пешек (список входит в симметрию Rand).</summary>
+/// <summary>
+/// Уборка мировой пешки сборщиком в режиме заглушки (T-056, шаг 5): не исполнять на месте, а поставить
+/// событием мира — применят все по номеру (модель докладчика: команды младшего в сети). Иначе сборщик
+/// убирает по-разному и состав мировых пешек расходится (sr16: 25/16, sr18: мёртвых 4/8, Rand +2 на 258250).
+/// Пометку markedForDiscard (её ставит PawnGCPass перед уборкой) снимаем, чтобы локальные пометки не расходились.
+/// </summary>
 [HarmonyPatch(typeof(WorldPawns), nameof(WorldPawns.RemoveAndDiscardPawnViaGC))]
-internal static class Patch_WorldPawns_Discard_Diag
+internal static class Patch_WorldPawns_Discard_SleepRemove
 {
-    private static void Prefix(Pawn p)
+    private static bool Prefix(Pawn p)
     {
-        if (PerMapSim.SleepRemoveTest && p != null)
+        if (!PerMapSim.SleepRemoveTest || p == null)
         {
-            TestAutomation.Note($"worldpawn gc: discarding {p.def.defName} #{p.thingIDNumber} (dead={p.Dead}, colonist={RimWorld.PawnUtility.EverBeenColonistOrTameAnimal(p)}) at tick {Find.TickManager.TicksGame}");
+            return true;
         }
+        TestAutomation.Note($"worldpawn gc: discarding {p.def.defName} #{p.thingIDNumber} (dead={p.Dead}, colonist={RimWorld.PawnUtility.EverBeenColonistOrTameAnimal(p)}) at tick {Find.TickManager.TicksGame}");
+        if (LockstepClient.InSession && !MapEvents.Applying)
+        {
+            p.markedForDiscard = false;
+            MapEvents.QueuePawnDiscard(p.thingIDNumber);
+            return false; // уборка применится командой у всех
+        }
+        return true;
     }
 }
