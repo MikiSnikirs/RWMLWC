@@ -28,6 +28,10 @@ public static class LetterChoices
 
     internal static void Remember(ChoiceLetter letter, DiaNode node)
     {
+        if (letter.GetType() == typeof(StandardLetter))
+        {
+            return; // только «закрыть» и «перейти» — интерфейс, не симуляция
+        }
         for (int i = 0; i < node.options.Count; i++)
         {
             tags.AddOrUpdate(node.options[i], new Tag { letterId = letter.ID, index = i });
@@ -59,17 +63,37 @@ public static class LetterChoices
             TestAutomation.Note($"letter choice: letter {letterId} not found (option {index}), dropped");
             return;
         }
-        DiaOption? option = letter.Choices.ElementAtOrDefault(index);
-        if (option == null || option.disabled)
+        // Варианты строим как игра; у игрока без карты письма (режим заглушки) это может упасть — тогда действие
+        // писем с сигналами (принять/отклонить: signalAccept/signalReject) исполняется напрямую, как в коде игры.
+        // Выключенность варианта не проверяем: её проверил нажавший (у него карта есть).
+        System.Action? act = null;
+        try
         {
-            TestAutomation.Note($"letter choice: letter {letterId} option {index} missing or disabled, dropped");
+            DiaOption? option = letter.Choices.ElementAtOrDefault(index);
+            act = option == null ? null : Traverse.Create(option).Field("action").GetValue<System.Action>();
+        }
+        catch (System.Exception)
+        {
+            act = null;
+        }
+        if (act == null)
+        {
+            string? field = index == 0 ? "signalAccept" : index == 1 ? "signalReject" : null;
+            string? signal = field == null ? null : Traverse.Create(letter).Field(field).GetValue<string>();
+            if (signal != null)
+            {
+                act = () => { Find.SignalManager.SendSignal(new Signal(signal)); Find.LetterStack.RemoveLetter(letter); };
+            }
+        }
+        if (act == null)
+        {
+            TestAutomation.Note($"letter choice: letter {letterId} option {index} has no action here, dropped");
             return;
         }
-        System.Action? act = Traverse.Create(option).Field("action").GetValue<System.Action>();
         Executing = true;
         try
         {
-            act?.Invoke();
+            act.Invoke();
         }
         finally
         {
@@ -128,6 +152,32 @@ internal static class Patch_DiaOption_Activate_Letter
         if (__state != null)
         {
             Traverse.Create(__instance).Field("action").SetValue(__state);
+        }
+    }
+}
+
+[HarmonyPatch(typeof(ChoiceLetter), nameof(ChoiceLetter.OpenLetter))]
+internal static class Patch_ChoiceLetter_OpenLetter_MissingMap
+{
+    // Письмо, чьи варианты не строятся у этого игрока (режим заглушки: письмо задания для чужой колонии, её карты нет —
+    // ChoiceLetter_AcceptJoiner.MapToUse падал в LetterStackTick → OpenAutomaticLetters, sr29), не открывается:
+    // выбор делает владелец колонии.
+    [HarmonyPriority(Priority.First)]
+    private static bool Prefix(ChoiceLetter __instance)
+    {
+        if (!LockstepClient.InSession)
+        {
+            return true;
+        }
+        try
+        {
+            _ = __instance.Choices.ToList();
+            return true;
+        }
+        catch (System.Exception)
+        {
+            TestAutomation.Note($"letter {__instance.ID} '{__instance.Label}' not opened here: its choices need a map this player does not have");
+            return false;
         }
     }
 }

@@ -57,6 +57,15 @@ internal static class VisualRandIsolation
         // там), а смена карты берёт Rand (звуки, музыка). Посадка на существующую карту давала расхождение
         // общего Rand на 3 вызова (t081-g8, g10, g11, g13). См. docs/research/sim.md, 6ф.
         ("Verse.CameraJumper", "*"),
+
+        // Окна названия фракции и поселения: игра открывает их из Faction.FactionTick, а конструктор берёт общий Rand
+        // (GenCollection.RandomElement для подсказки имени). Открытие зависит от карты поселения — в режиме заглушки
+        // её есть не у всех: общий Rand расходился на 2 вызова (t056-sr27/sr28 на 258250, трассировка sr29).
+        ("RimWorld.Dialog_GiveName", ".ctor"),
+        ("RimWorld.Dialog_NamePlayerFactionAndSettlement", ".ctor"),
+        ("RimWorld.Dialog_NamePlayerFaction", ".ctor"),
+        ("RimWorld.Dialog_NamePlayerSettlement", ".ctor"),
+        ("Verse.Window", "PostOpen"),
     };
 
     /// <summary>Сейчас выполняется изолированный визуальный код (вложенность). Для SimCamera.</summary>

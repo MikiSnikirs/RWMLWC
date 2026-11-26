@@ -601,6 +601,35 @@ public static class MapEvents
 
     private static Pawn? LoadPawn(string xml)
     {
+        // Прежняя копия этой пешки у этого игрока (мировая: задание восстановило её в мир, а у владельца она ушла на
+        // карту, которой здесь нет) — убрать, иначе два объекта с одним номером (sr32: Nanami).
+        int id = -1;
+        System.Text.RegularExpressions.Match mt = System.Text.RegularExpressions.Regex.Match(xml, "<id>[^<0-9]*([0-9]+)</id>");
+        if (mt.Success)
+        {
+            int.TryParse(mt.Groups[1].Value, out id);
+        }
+        Pawn? stale = id < 0 ? null : Find.WorldPawns.AllPawnsAliveOrDead.FirstOrDefault(p => p.thingIDNumber == id);
+        if (stale != null && !stale.Spawned)
+        {
+            Find.WorldPawns.RemovePawn(stale);
+            TestAutomation.Note($"map events: stale world copy of pawn {id} removed before restore");
+        }
+        skipPawnId = id;
+        try
+        {
+            return AsLoading(() => LoadPawnInner(xml));
+        }
+        finally
+        {
+            skipPawnId = -1;
+        }
+    }
+
+    private static int skipPawnId = -1;
+
+    private static Pawn? LoadPawnInner(string xml)
+    {
         try
         {
             XmlDocument doc = new XmlDocument();
@@ -610,25 +639,7 @@ public static class MapEvents
             Pawn? pawn = null;
             Scribe_Deep.Look(ref pawn, "saveable");
             LoadedObjectDirectory dir = directoryRef(Scribe.loader.crossRefs);
-            foreach (Pawn p in PawnsFinder.All_AliveOrDead)
-            {
-                dir.RegisterLoaded(p);
-            }
-            foreach (Faction f in Find.FactionManager.AllFactionsListForReading)
-            {
-                dir.RegisterLoaded(f);
-            }
-            if (ModsConfig.IdeologyActive)
-            {
-                foreach (Ideo ideo in Find.IdeoManager.IdeosListForReading)
-                {
-                    dir.RegisterLoaded(ideo);
-                }
-            }
-            foreach (WorldObject w in Find.WorldObjects.AllWorldObjects)
-            {
-                dir.RegisterLoaded(w);
-            }
+            RegisterGame(dir, skipPawnId >= 0 ? new[] { skipPawnId } : null, null);
             Scribe.loader.FinalizeLoading();
             return pawn;
         }
@@ -641,11 +652,65 @@ public static class MapEvents
         }
     }
 
+    /// <summary>
+    /// Загрузка объектов из данных события посреди игры — в том же состоянии программы, что и обычная загрузка сейва:
+    /// часть кода игры при <c>ProgramState.Playing</c> идёт дальше и падает на недогруженной пешке
+    /// (LifeStageWorker_HumanlikeAdult.Notify_LifeStageStarted в PostLoadInit, sr31).
+    /// </summary>
+    internal static T AsLoading<T>(Func<T> load)
+    {
+        ProgramState prev = Current.ProgramState;
+        Current.ProgramState = ProgramState.MapInitializing;
+        try
+        {
+            return load();
+        }
+        finally
+        {
+            Current.ProgramState = prev;
+        }
+    }
+
+    /// <summary>
+    /// Всё, на что могут ссылаться пешки, сказания и задания из данных события: пешки, фракции, идеологии с заповедями,
+    /// объекты мира, карты, задания, политики колонии (еда, лекарства, одежда, чтение). Без политик и заповедей
+    /// восстановленная пешка падала в PostLoadInit (sr27, sr30).
+    /// </summary>
+    internal static void RegisterGame(LoadedObjectDirectory dir, ICollection<int>? skipPawns, ICollection<int>? skipFactions)
+    {
+        foreach (Pawn p in PawnsFinder.All_AliveOrDead)
+        {
+            if (skipPawns == null || !skipPawns.Contains(p.thingIDNumber)) dir.RegisterLoaded(p);
+        }
+        foreach (Faction f in Find.FactionManager.AllFactionsListForReading)
+        {
+            if (skipFactions == null || !skipFactions.Contains(f.loadID)) dir.RegisterLoaded(f);
+        }
+        if (ModsConfig.IdeologyActive)
+        {
+            foreach (Ideo ideo in Find.IdeoManager.IdeosListForReading)
+            {
+                dir.RegisterLoaded(ideo);
+                foreach (Precept pr in ideo.PreceptsListForReading) dir.RegisterLoaded(pr);
+            }
+        }
+        foreach (WorldObject w in Find.WorldObjects.AllWorldObjects) dir.RegisterLoaded(w);
+        foreach (Map m in Find.Maps) dir.RegisterLoaded(m);
+        foreach (Quest q in Find.QuestManager.QuestsListForReading) dir.RegisterLoaded(q);
+        Game g = Current.Game;
+        foreach (DrugPolicy x in g.drugPolicyDatabase.AllPolicies) dir.RegisterLoaded(x);
+        foreach (FoodPolicy x in g.foodRestrictionDatabase.AllFoodRestrictions) dir.RegisterLoaded(x);
+        foreach (ApparelPolicy x in g.outfitDatabase.AllOutfits) dir.RegisterLoaded(x);
+        foreach (ReadingPolicy x in g.readingPolicyDatabase.AllReadingPolicies) dir.RegisterLoaded(x);
+    }
+
     private static readonly AccessTools.FieldRef<CrossRefHandler, LoadedObjectDirectory> directoryRef =
         AccessTools.FieldRefAccess<CrossRefHandler, LoadedObjectDirectory>("loadedObjectDirectory");
 
     /// <summary>Сказание из XML (<c>DebugOutputFor</c>); ссылки — на пешек, фракции и идеологии этой игры.</summary>
-    private static Tale? LoadTale(string xml)
+    private static Tale? LoadTale(string xml) => AsLoading(() => LoadTaleInner(xml));
+
+    private static Tale? LoadTaleInner(string xml)
     {
         try
         {
@@ -656,21 +721,7 @@ public static class MapEvents
             Tale? tale = null;
             Scribe_Deep.Look(ref tale, "saveable");
             LoadedObjectDirectory dir = directoryRef(Scribe.loader.crossRefs);
-            foreach (Pawn p in PawnsFinder.All_AliveOrDead)
-            {
-                dir.RegisterLoaded(p);
-            }
-            foreach (Faction f in Find.FactionManager.AllFactionsListForReading)
-            {
-                dir.RegisterLoaded(f);
-            }
-            if (ModsConfig.IdeologyActive)
-            {
-                foreach (Ideo ideo in Find.IdeoManager.IdeosListForReading)
-                {
-                    dir.RegisterLoaded(ideo);
-                }
-            }
+            RegisterGame(dir, null, null);
             Scribe.loader.FinalizeLoading();
             return tale;
         }
