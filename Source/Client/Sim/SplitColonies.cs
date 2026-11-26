@@ -216,8 +216,7 @@ public static class SplitColonies
     // ---------- сборка полного сейва ----------
 
     /// <summary>
-    /// Игроки, чей сейв нужен отдающему мир для сборки: владельцы в сети (кроме входящего и себя), у чьих колоний
-    /// здесь нет карты.
+    /// Игроки, чей сейв нужен отдающему мир для сборки: владельцы в сети (кроме себя), у чьих колоний здесь нет карты.
     /// </summary>
     internal static HashSet<int> ExpectedBundles(int roundPlayer)
     {
@@ -230,7 +229,9 @@ public static class SplitColonies
         foreach (Settlement st in Find.WorldObjects.Settlements)
         {
             int owner = colonies.OwnerOf(st);
-            if (owner == 0 || owner == LockstepClient.PlayerId || owner == roundPlayer || st.HasMap)
+            // Входящий (без мира) сюда не попадает: его колония, пока он был не в сети, есть у всех (HasMap).
+            // Гость и включивший режим — с миром, их сейв нужен (sp1: без него колония гостя взялась из старой копии).
+            if (owner == 0 || owner == LockstepClient.PlayerId || st.HasMap)
             {
                 continue;
             }

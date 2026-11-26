@@ -1170,6 +1170,23 @@ public static class TestAutomation
             visitStep = 4;
             Note($"visittest: left, map gone here at tick {now}; maps here [{string.Join(",", Find.Maps.Select(m => m.uniqueID))}]");
         }
+        else if (visitStep == 4 && RWMLWC.Client.World.CaravanSelfTest.ArmKey("splitleave=1"))
+        {
+            // Ключ splitleave=1: после визита игрок 2 выпадает из сессии (как при вылете). У игрока 1 его колония
+            // должна появиться из последней копии (SplitColonies.OnPresence → сборка с копией и стазисом).
+            if (visitAt < now)
+            {
+                visitAt = now + 6000;
+            }
+            visitStep = 5;
+        }
+        else if (visitStep == 5 && now >= visitAt)
+        {
+            visitStep = 6;
+            Note($"splitleave: player 2 drops out at tick {now}");
+            LockstepClient.Disconnect("игрок вылетел (тест splitleave)");
+            Root.Shutdown();
+        }
     }
 
     // --- сценарий ui (T-024): окна и выделение во время прогона ---
