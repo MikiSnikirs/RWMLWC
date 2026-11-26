@@ -89,6 +89,7 @@ public static class MapEvents
         }
         seqTick = -1;
         seqByMap.Clear();
+        lastAppliedAbsent.Clear();
     }
 
     /// <summary>Докладчик карты: владелец колонии в сети, иначе младший игрок в сети.</summary>
@@ -147,6 +148,11 @@ public static class MapEvents
         }
     }
 
+    // Ключ последнего применённого события для карт, которых у этого игрока нет (sleepremove, 11.4б):
+    // MapSimState у такой карты нет, а событие применить надо — мир общий. В сейве не хранится;
+    // от повтора после загрузки защищает проверка номера сказания ниже.
+    private static readonly Dictionary<int, (int tick, int seq)> lastAppliedAbsent = new Dictionary<int, (int, int)>();
+
     /// <summary>Исполнение команды (у всех, в общем порядке).</summary>
     public static void Execute(ref PacketReader r)
     {
@@ -160,12 +166,32 @@ public static class MapEvents
             int seq = r.ReadInt32();
             byte kind = r.ReadByte();
             string xml = r.ReadString();
-            if (state == null || tick < state.lastEventTick || tick == state.lastEventTick && seq <= state.lastEventSeq)
+            int lastTick;
+            int lastSeq;
+            if (state != null)
             {
-                continue; // уже применено (второй докладчик) или карты нет
+                lastTick = state.lastEventTick;
+                lastSeq = state.lastEventSeq;
             }
-            state.lastEventTick = tick;
-            state.lastEventSeq = seq;
+            else
+            {
+                lastAppliedAbsent.TryGetValue(mapId, out (int tick, int seq) last);
+                lastTick = last.tick;
+                lastSeq = last.seq;
+            }
+            if (tick < lastTick || tick == lastTick && seq <= lastSeq)
+            {
+                continue; // уже применено (второй докладчик)
+            }
+            if (state != null)
+            {
+                state.lastEventTick = tick;
+                state.lastEventSeq = seq;
+            }
+            else
+            {
+                lastAppliedAbsent[mapId] = (tick, seq);
+            }
             Pending? mine = pending.FirstOrDefault(p => p.map == mapId && p.tick == tick && p.seq == seq);
             if (mine != null)
             {
@@ -174,7 +200,7 @@ public static class MapEvents
             if (kind == KindTale)
             {
                 Tale? tale = mine?.tale ?? LoadTale(xml);
-                if (tale != null)
+                if (tale != null && !Find.TaleManager.AllTalesListForReading.Any(t => t.id == tale.id))
                 {
                     applying = true;
                     try
@@ -185,7 +211,7 @@ public static class MapEvents
                     {
                         applying = false;
                     }
-                    TestAutomation.Note($"map events: tale #{tale.id} {tale.def.defName} applied at tick {Find.TickManager.TicksGame} ({(mine != null ? "own" : "restored")})");
+                    TestAutomation.Note($"map events: tale #{tale.id} {tale.def.defName} applied at tick {Find.TickManager.TicksGame} ({(mine != null ? "own" : "restored")}, map {mapId}{(map == null ? " absent" : "")})");
                 }
             }
         }
