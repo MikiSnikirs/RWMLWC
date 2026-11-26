@@ -1011,19 +1011,31 @@ public static class TestAutomation
             return;
         }
         bool mine = false, foreign = false;
+        int firstOwner = 0, firstSettlement = int.MaxValue;
         foreach (Map m in Find.Maps)
         {
-            int owner = m.Parent is RimWorld.Planet.Settlement st ? colonies.OwnerOf(st) : 0;
-            if (owner == LockstepClient.PlayerId)
+            if (m.Parent is RimWorld.Planet.Settlement st)
             {
-                mine = true;
-            }
-            else if (owner != 0)
-            {
-                foreign = true;
+                int owner = colonies.OwnerOf(st);
+                if (owner == LockstepClient.PlayerId)
+                {
+                    mine = true;
+                }
+                else if (owner != 0)
+                {
+                    foreign = true;
+                }
+                if (owner != 0 && st.ID < firstSettlement)
+                {
+                    firstSettlement = st.ID;
+                    firstOwner = owner;
+                }
             }
         }
-        if (mine && foreign)
+        // Просит только один клиент — владелец колонии с наименьшим номером поселения (у всех одинаково).
+        // Иначе каждая просьба — отдельный общий снимок: второй придёт, когда у отдающего уже нет чужих карт,
+        // и остальные загрузят сейв без своих колоний (sr1: снимок #6 стёр карту c1).
+        if (mine && foreign && firstOwner == LockstepClient.PlayerId)
         {
             sleepRemoveRequested = true;
             Note("sleepremove: both colony maps present, requesting common snapshot");
