@@ -29,8 +29,10 @@ public static class MapEvents
     private const byte KindTale = 1;
     private const byte KindPawnDeath = 2;
     private const byte KindPawnLeave = 3;
+    private const byte KindTaleRemove = 4;
     private const int DropAfterTicks = 5000;
     private const int MaxPerCommand = 32;
+    private const int WorldLevelMap = -1; // события мира (удаление сказаний): докладчик — младший игрок в сети
 
     private sealed class Pending
     {
@@ -46,6 +48,7 @@ public static class MapEvents
         public byte dinfoCategory;
         public Pawn? leftPawn; // уход (шаг 4): у владельца уведомления уже исполнены в тике — своё не повторять
         public bool leaveFreed; // освобождённый пленник/раб (goodwill за освобождение)
+        public int removeTaleId = -1; // удаление сказания: все применяют по номеру (список сказаний общий)
         public string? xml; // снимается при отправке (вызывающий может дописать сказание после RecordTale: customLabel)
         public bool sent;
     }
@@ -145,6 +148,32 @@ public static class MapEvents
         TestAutomation.Note($"map events: pawn leave {pawn.def.defName} #{pawn.thingIDNumber} from map {map.uniqueID} queued at tick {tick}.{seq} (freed={freed})");
     }
 
+    private static readonly HashSet<int> taleRemovalsQueued = new HashSet<int>();
+
+    /// <summary>
+    /// Удаление сказания (T-056, шаг 4): в режиме заглушки все удаления откладываются в команду мира и
+    /// применяются у всех по номеру. Иначе владелец убирает сказание (протухло, пешка ушла), а спящий
+    /// оставляет восстановленную копию с null-ссылками — список сказаний расходится (sr7/sr8/sr15).
+    /// Решение «убрать» принимается у каждого локально, но исполняется только командой — у всех одинаково.
+    /// </summary>
+    internal static void QueueTaleRemove(int taleId)
+    {
+        if (!taleRemovalsQueued.Add(taleId))
+        {
+            return; // уже ставили (сборщик может звать RemoveTale повторно до применения команды)
+        }
+        int tick = Find.TickManager.TicksGame + StasisClock.Offset;
+        if (tick != seqTick)
+        {
+            seqTick = tick;
+            seqByMap.Clear();
+        }
+        seqByMap.TryGetValue(WorldLevelMap, out int seq);
+        seqByMap[WorldLevelMap] = seq + 1;
+        pending.Add(new Pending { map = WorldLevelMap, tick = tick, seq = seq, kind = KindTaleRemove, removeTaleId = taleId });
+        TestAutomation.Note($"map events: tale remove #{taleId} queued at tick {tick}.{seq}");
+    }
+
     /// <summary>
     /// После загрузки (снимок, вход): объекты в очереди — из прежней игры. Данные остаются: неотправленное докладчик
     /// отправит, а при исполнении все восстановят объект из данных (отложенного нет в сейве, его не было в мире).
@@ -172,6 +201,7 @@ public static class MapEvents
         seqTick = -1;
         seqByMap.Clear();
         lastAppliedAbsent.Clear();
+        taleRemovalsQueued.Clear();
     }
 
     /// <summary>Докладчик карты: владелец колонии в сети, иначе младший игрок в сети.</summary>
@@ -236,6 +266,10 @@ public static class MapEvents
                         w.WriteBytes(System.Text.Encoding.UTF8.GetBytes(p.xml ?? ""));
                         w.WriteBool(p.leaveFreed);
                     }
+                    else if (p.kind == KindTaleRemove)
+                    {
+                        w.WriteInt32(p.removeTaleId);
+                    }
                     else
                     {
                         w.WriteString(p.xml ?? "");
@@ -286,10 +320,15 @@ public static class MapEvents
                 xml = System.Text.Encoding.UTF8.GetString(r.ReadBytes());
                 leaveFreed = r.ReadBool();
             }
+            else if (kind == KindTaleRemove)
+            {
+                xml = "";
+            }
             else
             {
                 xml = r.ReadString();
             }
+            int removeTaleId = kind == KindTaleRemove ? r.ReadInt32() : -1;
             int lastTick;
             int lastSeq;
             if (state != null)
@@ -346,8 +385,28 @@ public static class MapEvents
             {
                 ApplyPawnLeave(xml, leaveFreed, mapId, tick, seq, own: mine != null);
             }
+            else if (kind == KindTaleRemove)
+            {
+                // Применяют все, включая постановщика: локальное удаление было отложено префиксом RemoveTale.
+                applying = true;
+                try
+                {
+                    int removed = TalesListRef(Find.TaleManager).RemoveAll(t => t.id == removeTaleId);
+                    if (removed > 0)
+                    {
+                        TestAutomation.Note($"map events: tale remove #{removeTaleId} applied at tick {Find.TickManager.TicksGame} ({(mine != null ? "own" : "remote")})");
+                    }
+                }
+                finally
+                {
+                    applying = false;
+                }
+            }
         }
     }
+
+    private static readonly AccessTools.FieldRef<TaleManager, List<Tale>> TalesListRef =
+        AccessTools.FieldRefAccess<TaleManager, List<Tale>>("tales");
 
     /// <summary>
     /// Спящий клиент: восстановить ушедшую пешку из XML в WorldPawns и исполнить мировые уведомления ухода.
@@ -588,14 +647,28 @@ internal static class Patch_Pawn_ExitMap_MapEvent
     }
 }
 
-/// <summary>Диагностика sleepremove (T-056): кто и откуда убирает сказание — список входит в хеш мира.</summary>
+/// <summary>
+/// Удаление сказания в режиме заглушки (T-056, шаг 4): не исполнять на месте, а поставить событием мира —
+/// применят все по номеру одинаково. Иначе владелец убирает, а спящий оставляет копию с null-ссылками
+/// (сказания вне хеша, но их удаление двигало общий Rand через сборщик мировых пешек, sr15).
+/// Вне режима — как в игре; диагностика удаления сохраняется.
+/// </summary>
 [HarmonyPatch(typeof(TaleManager), "RemoveTale")]
 internal static class Patch_TaleManager_RemoveTale_Diag
 {
-    private static void Prefix(Tale tale)
+    private static bool Prefix(Tale tale)
     {
-        if (PerMapSim.SleepRemoveTest && tale != null)
+        if (tale == null)
         {
+            return true;
+        }
+        if (PerMapSim.SleepRemoveTest && !MapEvents.Applying)
+        {
+            if (LockstepClient.InSession)
+            {
+                MapEvents.QueueTaleRemove(tale.id);
+                return false; // удаление применится командой у всех
+            }
             string caller = new System.Diagnostics.StackTrace(1).ToString();
             if (caller.Length > 600)
             {
@@ -603,5 +676,6 @@ internal static class Patch_TaleManager_RemoveTale_Diag
             }
             TestAutomation.Note($"tale diag: removing #{tale.id} {tale.def?.defName} (uses={tale.Uses}, pawn={(tale.DominantPawn == null ? "null" : tale.DominantPawn.thingIDNumber.ToString())}) by {caller.Replace("\n", " | ")}");
         }
+        return true;
     }
 }
