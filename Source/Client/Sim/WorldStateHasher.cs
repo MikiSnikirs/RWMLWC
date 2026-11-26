@@ -17,6 +17,9 @@ public static class WorldStateHasher
 {
     private static readonly List<WorldObject> tmp = new List<WorldObject>();
 
+    private static readonly HarmonyLib.AccessTools.FieldRef<UniqueIDsManager, int> NextTaleId =
+        HarmonyLib.AccessTools.FieldRefAccess<UniqueIDsManager, int>("nextTaleID");
+
     /// <summary>Подхеши частей мира для поиска расхождения (файл хешей, строка world): карты, объекты мира, колонии, сказания, Rand.</summary>
     public static string Parts()
     {
@@ -36,7 +39,9 @@ public static class WorldStateHasher
         Fnv64 col = Fnv64.Create();
         RWMLWC.Client.World.ColoniesComponent? colonies = RWMLWC.Client.World.Colonies.Component;
         if (colonies != null) { foreach (int v in colonies.HashValues()) { col.Add(v); } }
-        return $"pMaps={m.Value:X16};pObjs={o.Value:X16};pCol={col.Value:X16};pRand={MapRandContext.GlobalState:X16};objs={objs}";
+        // T-056 (11.4б): номера сказаний входят в хеш мира; список — чтобы видеть, какой номер разошёлся.
+        string taleIds = string.Join(",", Find.TaleManager.AllTalesListForReading.Select(t => t.id));
+        return $"pMaps={m.Value:X16};pObjs={o.Value:X16};pCol={col.Value:X16};pRand={MapRandContext.GlobalState:X16};taleIds={taleIds};nextTale={NextTaleId(Find.UniqueIDsManager)};objs={objs}";
     }
 
     public static ulong Compute()
