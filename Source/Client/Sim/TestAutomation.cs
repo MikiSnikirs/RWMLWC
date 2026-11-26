@@ -1120,14 +1120,52 @@ public static class TestAutomation
     }
 
     private static int visitStep;
+    private static int visitOrderStep;
+    private static int visitOrderAt;
     private static int visitAt = -1;
 
     // T-057 (ключ visittest=1): игрок 2 приходит в гости в колонию игрока 1, через 12000 тиков уходит.
     // Ожидание: сервер сравнивает хеши этой карты у владельца и гостя (молчит), после ухода у гостя карты снова нет.
+    private static bool visitGranted;
+    private static int visitDraftCheckAt = -1;
+
     private static void VisitStep()
     {
         if (!RWMLWC.Client.World.CaravanSelfTest.ArmKey("visittest=1") || !PerMapSim.Split || Current.Game == null
-            || LockstepClient.CurrentState != LockstepClient.State.InSession || LockstepClient.PlayerId != 2)
+            || LockstepClient.CurrentState != LockstepClient.State.InSession)
+        {
+            return;
+        }
+        bool orders = RWMLWC.Client.World.CaravanSelfTest.ArmKey("visitorder=1");
+        if (LockstepClient.PlayerId == 1)
+        {
+            // Владелец: увидел гостя (игрок 2) в своей колонии — выдаёт ему права «стройка» на её карте (visitorder=1).
+            RWMLWC.Client.World.ColoniesComponent? cc = RWMLWC.Client.World.Colonies.Component;
+            RimWorld.Planet.Settlement? mine = cc == null ? null
+                : Find.WorldObjects.Settlements.Where(st => cc.OwnerOf(st) == 1 && st.HasMap).OrderBy(st => st.ID).FirstOrDefault();
+            if (orders && !visitGranted && mine != null && (SplitColonies.Component?.Visits(mine.ID, 2) ?? false)
+                && Find.TickManager.TicksGame >= visitDraftCheckAt)
+            {
+                if (visitDraftCheckAt < 0)
+                {
+                    // Карта колонии на сервере чья-то, только если владелец её «занял» (окно «Карты и права»);
+                    // иначе она открыта всем. Занимаем, гость пробует без прав, через 2500 тиков — права.
+                    visitDraftCheckAt = Find.TickManager.TicksGame + 2500;
+                    Note($"visitorder: owner claims map {mine.Map.uniqueID} at tick {Find.TickManager.TicksGame}");
+                    RWMLWC.Client.Maps.MapAccess.Claim(mine.Map);
+                    return;
+                }
+                visitGranted = true;
+                Note($"visitorder: owner grants Full to player 2 on map {mine.Map.uniqueID} at tick {Find.TickManager.TicksGame}");
+                RWMLWC.Client.Maps.MapAccess.Grant(mine.Map.uniqueID, 2, RWMLWC.Shared.Protocol.PermissionLevel.Full);
+            }
+            if (mine != null && orders && visitGranted && Find.TickManager.TicksGame % 1000 == 0)
+            {
+                Note($"visitorder: owner sees drafted [{string.Join(",", mine.Map.mapPawns.FreeColonistsSpawned.Where(p => p.Drafted).Select(p => p.thingIDNumber))}] at tick {Find.TickManager.TicksGame}");
+            }
+            return;
+        }
+        if (LockstepClient.PlayerId != 2)
         {
             return;
         }
@@ -1158,6 +1196,33 @@ public static class TestAutomation
             visitStep = 2;
             visitAt = now + 12000;
             Note($"visittest: guest holds the map of {target.LabelCap} (map {target.Map.uniqueID}) at tick {now}; maps here [{string.Join(",", Find.Maps.Select(m => m.uniqueID))}]");
+            if (orders)
+            {
+                visitOrderStep = 1;
+                visitOrderAt = now + 1000;
+            }
+        }
+        else if (visitStep == 2 && orders && visitOrderStep > 0 && visitOrderStep < 4 && target.HasMap && now >= visitOrderAt)
+        {
+            // Гость отдаёт приказ на чужой карте: «призвать» первого колониста владельца — без прав и с правами.
+            Current.Game.CurrentMap = target.Map;
+            int mapId = target.Map.uniqueID;
+            if (visitOrderStep == 1 && RWMLWC.Client.Maps.MapAccess.OwnerOf(mapId) == 1)
+            {
+                visitOrderStep = 2;
+                AccessTry("guest draft, no rights", GizmoDraft);
+            }
+            else if (visitOrderStep == 2 && RWMLWC.Client.Maps.MapAccess.MyLevel(mapId) >= RWMLWC.Shared.Protocol.PermissionLevel.Full)
+            {
+                visitOrderStep = 3;
+                visitOrderAt = now + 1500;
+                AccessTry("guest draft, Full", GizmoDraft);
+            }
+            else if (visitOrderStep == 3)
+            {
+                visitOrderStep = 4;
+                Note($"visitorder: guest sees drafted [{string.Join(",", target.Map.mapPawns.FreeColonistsSpawned.Where(p => p.Drafted).Select(p => p.thingIDNumber))}] at tick {now}");
+            }
         }
         else if (visitStep == 2 && now >= visitAt)
         {
