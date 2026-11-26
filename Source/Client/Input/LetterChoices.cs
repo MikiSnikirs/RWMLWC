@@ -155,3 +155,29 @@ internal static class Patch_DiaOption_Activate_Letter
         }
     }
 }
+
+[HarmonyPatch(typeof(ChoiceLetter), nameof(ChoiceLetter.OpenLetter))]
+internal static class Patch_ChoiceLetter_OpenLetter_MissingMap
+{
+    // Письмо, чьи варианты не строятся у этого игрока (режим заглушки: письмо задания для чужой колонии, её карты нет —
+    // ChoiceLetter_AcceptJoiner.MapToUse падал в LetterStackTick → OpenAutomaticLetters, sr29), не открывается:
+    // выбор делает владелец колонии.
+    [HarmonyPriority(Priority.First)]
+    private static bool Prefix(ChoiceLetter __instance)
+    {
+        if (!LockstepClient.InSession)
+        {
+            return true;
+        }
+        try
+        {
+            _ = __instance.Choices.ToList();
+            return true;
+        }
+        catch (System.Exception)
+        {
+            TestAutomation.Note($"letter {__instance.ID} '{__instance.Label}' not opened here: its choices need a map this player does not have");
+            return false;
+        }
+    }
+}
