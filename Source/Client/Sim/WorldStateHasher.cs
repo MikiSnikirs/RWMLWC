@@ -91,11 +91,20 @@ public static class WorldStateHasher
         }
 
         // Сказания (T-056): применяются событием карты у всех одинаково; при раздельном счёте без событий расходились.
-        List<Tale> tales = Find.TaleManager.AllTalesListForReading;
-        h.Add(tales.Count);
-        for (int i = 0; i < tales.Count; i++)
+        // sleepremove (11.4б): жизненный цикл сказания у владельца и у спящего разный — у спящего ссылки на пешек
+        // чужой карты null, и Notify_PawnDiscarded не убирает то, что у владельца убрано (sr7/sr8: тик 90250).
+        // Влияние сказаний на симуляцию — выбор сюжета искусства (CompArt) — в этой схеме считает только владелец
+        // карты, под Rand карты. Поэтому в хеш мира сказания не входят; синхронизация событием сохраняется,
+        // список номеров — в диагностике Parts() (taleIds). Полный возврат сказаний в хеш — с событиями ухода
+        // и смерти пешек (шаг 4 плана 11.4б).
+        if (!PerMapSim.SleepRemoveTest)
         {
-            h.Add(tales[i].id);
+            List<Tale> tales = Find.TaleManager.AllTalesListForReading;
+            h.Add(tales.Count);
+            for (int i = 0; i < tales.Count; i++)
+            {
+                h.Add(tales[i].id);
+            }
         }
 
         h.Add(MapRandContext.GlobalState);
