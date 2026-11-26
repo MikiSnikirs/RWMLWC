@@ -353,7 +353,7 @@ public static class MapEvents
                 xml = System.Text.Encoding.UTF8.GetString(r.ReadBytes());
                 leaveFreed = r.ReadBool();
             }
-            else if (kind == KindTaleRemove)
+            else if (kind == KindTaleRemove || kind == KindPawnDiscard)
             {
                 xml = "";
             }
