@@ -216,6 +216,32 @@
 - лечебный снимок сервера при расхождении в этом режиме пропускается: полного мира нет ни у кого (шаг 3 — сбор сейва из карт владельцев);
 - вне хеша расходятся мировые пешки (смерти/уходы), письма, архив, история, журнал — как и в sleepforeign (sl1); это шаги 4–5.
 
+**Шаг 4 — разбор мест записи (26.11.2026, агент A, декомпиляция 1.7.5005; игра 5014 — сверить при реализации).**
+
+Смерть пешки (`Pawn.Kill` → `DoKillSideEffects`, `Verse/Pawn.cs`) пишет в мир из тика карты:
+- `Find.Storyteller.Notify_PawnEvent(this, AdaptationEvent.Died)` (~2016) — адаптация и компоненты рассказчика;
+- `Find.StoryWatcher.statsRecord.Notify_ColonistKilled()` (~2020) — статистика;
+- `RecordsUtility.Notify_PawnKilled` (~2031) — записи пешки;
+- `Find.HistoryEventsManager.RecordEvent` (~2045, невинное животное) — история;
+- `TaleUtility.Notify_PawnDied` (~2049) — сказания (уже событием карты, `MapEvents`);
+- `Find.BattleLog.Add` (~2051) — журнал боя;
+- `HomeFaction.Notify_MemberDied(this, dinfo, wasWorldPawn, …, map)` (~2278) — отношения фракций, письма;
+- `Ideo.Notify_MemberDied` / `Notify_MemberLost` (~2305) — идеология;
+- `Find.QuestManager.Notify_PawnKilled`, `Find.FactionManager.Notify_PawnKilled`, `Find.IdeoManager.Notify_PawnKilled`, `Find.BossgroupManager.Notify_PawnKilled` (~2330–2340) — задания, фракции, идеологии, боссы;
+- `Find.WorldPawns.Notify_PawnDestroyed` (`Destroy`, ~2357) и `WorldPawns.PassToWorld` (~2394–2397) — мёртвая пешка в мировых пешках.
+
+Уход с карты (`Pawn.ExitMap`, ~2513–2605):
+- `Ideo.Notify_MemberLost`; `Faction.kidnapped.Kidnap` (похищение carried); `Faction.Notify_MemberExitedMap` (+ `SlaveFaction`); `ownership.UnclaimAll`; `guest.SetGuestStatus/SetNoInteraction`, `GuestUtility.Notify_PrisonerEscaped`; `relations.Notify_ExitedMap`; `Find.WorldPawns.PassToWorld`; `QuestUtility.SendQuestTargetSignals("LeftMap")`; `Find.FactionManager.Notify_PawnLeftMap`; `Find.IdeoManager.Notify_PawnLeftMap`.
+
+Вывод: перехватывать каждое место по отдельности — «неизвестное число мест записи» из 11.5. Механизм шага 4 — **одно событие карты на смерть/уход** (по образцу `MapEvents`, новые kind):
+- докладчик (владелец карты) отправляет XML пешки (`Scribe.DebugOutputFor`, ссылки по номерам — как сказания) + контекст: для смерти — def урона, instigator (номер), `wasWorldPawn`, карта; для ухода — `allowedToJoinOrCreateCaravan`, направление, флаги гостя/пленника;
+- у владельца событие применяется как «своё» (уведомления уже исполнены в тике — повторно не запускать);
+- у спящего пешка восстанавливается из XML в `WorldPawns` (состояние: живая/мёртвая/в караване), и **список мировых уведомлений исполняется на восстановленной пешке**;
+- исполнение у спящего — под `Rand.PushState` с зерном из события и `PopState`: владелец исполнял уведомления в контексте карты (Rand карты), спящий не должен трогать общий Rand. Какие уведомления реально потребляют Rand — проверить трассировкой при реализации;
+- письма, архив, история, журнал — «только для игрока» (вне хеша), у спящего могут отличаться; адаптация, отношения фракций, состав мировых пешек, задания — обязаны совпасть.
+
+Открытый вопрос (трассировка при реализации): в sr10 общий Rand разошёлся на 574 итерации к тику 164000 — это не один вызов, а накопленное расхождение; подозреваемый — `WorldPawns.WorldPawnsTick` по разным спискам мировых пешек (мёртвые/живые), а не сам блок `Kill`. Зонд: постфикс `Pawn.Kill` включает трассировку у владельца; у спящего — окно от события. После шага 4 — вернуть сказания в хеш мира и добавить мировые пешки (шаг 5).
+
 ### 11.5. Риски, названные честно
 
 - **Неизвестное число мест записи из карты в мир.** Пропущенное место = расхождение мира. Инструмент из пункта 11.3.3 находит такие места в тесте, но не доказывает, что их больше нет; моды добавят свои.
