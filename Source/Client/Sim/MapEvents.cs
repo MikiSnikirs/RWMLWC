@@ -560,7 +560,7 @@ public static class MapEvents
         try
         {
             Find.WorldPawns.PassToWorld(pawn);
-            Find.Storyteller.Notify_PawnEvent(pawn, AdaptationEvent.Died);
+            // Общая адаптация в режиме заглушки из событий карты не меняется (StorytellerPerMap.cs) — у владельца тоже.
             Faction? f = factionLoadId >= 0 ? Find.FactionManager.AllFactionsListForReading.FirstOrDefault(x => x.loadID == factionLoadId) : null;
             if (f != null)
             {
