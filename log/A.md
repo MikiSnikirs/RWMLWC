@@ -182,6 +182,36 @@
 
 ---
 
+## 2026-11-27 07:05 МСК — Агент A — T-085: мост Multiplayer API — работает, прогон со сборкой стоит на Compatibility (не закончено)
+
+Ветка `a/T-085-mp-api-bridge` отправлена, в `main` не влита.
+
+**Сделано:**
+- `Source/MpBridge` — сборка `Multiplayer.dll` с `Multiplayer.Common.MultiplayerAPIBridge`;
+- `Source/Client/Input/MpApi`: реализация `IAPI` поверх нашей шины, новая команда `CommandKinds.ApiCall = 13`. Синхронные методы, замыкания (вложенные тоже), поля через `Watch`, сериализаторы модов (`SyncWorker`), лямбды по номеру (как `MpMethodUtil` в Multiplayer, MIT). Сессии и деревья диалогов — заглушки;
+- заглушки внутренностей Multiplayer: `TimestampFixer`, `CommandAuthority`, `MpScope`;
+- `0MultiplayerAPI.dll` 0.6 из NuGet кладётся в папку мода;
+- `tools/mods_order.py` включает Compatibility, а CE исключается ключом;
+- `run-tst014.ps1 -ModsConfig`;
+- тестовая автоматика грузит сейв без проверки модов и закрывает окна, ставящие игру на паузу.
+
+**Проверено загрузкой (mods5, 145 модов, без CE и Bolt Rifle):**
+- мост включается;
+- Compatibility инициализирует 31 модуль;
+- YART сам нашёл API.
+- Не подключились части, которые лезут во внутренности Multiplayer: своё время карт (`AsyncTimeComp`), `RoomSettings`, «часы владельца», `Multiplayer.Client.Multiplayer`. Это Alpha Animals, Fortifications, Nice Plants Menu, RimDark, VPE (3), VFE Core, Gun Recoil.
+
+**Прогон двух клиентов со сборкой (t085a–e) не дошёл до конца:**
+1. Окно «моды не совпадают» падало при загрузке — обойдено.
+2. VEF при загрузке старого сейва спрашивает про каждую недостающую фракцию окном с паузой — автоматика закрывает. **Для живой игры:** выбор в этом окне меняет мир только у нажавшего — расхождение.
+3. **Блокер:** модуль Compatibility для Fortified Features Framework поставил постфикс на `Map.MapPostTick`, а потом упал на `Multiplayer.Client.AsyncTimeComp`. Постфикс остался и падает каждый тик (NullReference) — игра стоит.
+
+**Дальше:** не давать модулям Compatibility, которые упали при инициализации, оставлять патчи (снимать патчи владельца `rimworld.multiplayer.compat` для упавшего модуля) или дать заглушку `AsyncTimeComp` (`tickingMap`, `mapTicks`). Потом — тишина двух клиентов со сборкой, сценарий с действием через API.
+
+**Не проверено:** ни один вызов через мост не исполнялся в сессии.
+
+---
+
 ## 2026-11-27 06:22 МСК — Агент A — T-082: моды без 1.7 — 9 из 10 грузятся, Combat Extended сломан
 
 Владелец попросил проверить 10 модов, выкинутых из-за отсутствия 1.7 в `supportedVersions`. В `tools/mods_order.py` добавлен ключ `--allow-old`.

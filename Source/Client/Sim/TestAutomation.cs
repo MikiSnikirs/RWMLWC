@@ -2382,7 +2382,9 @@ public static class TestAutomation
             {
                 try
                 {
-                    GameDataSaveLoader.CheckVersionAndLoadGame(save);
+                    // TST-054: тестовый сейв сделан без модов, со сборкой игра показала бы окно «моды не совпадают»
+                // (а с частью модов его создание падает). Тест сравнивает клиенты между собой — загружаем сразу.
+                GameDataSaveLoader.LoadGame(save);
                 }
                 catch (Exception ex)
                 {
@@ -2420,11 +2422,32 @@ public static class TestAutomation
             watchTick = t;
             watchNoteWritten = false;
         }
+        if (watchStill >= 120 && watchStill % 30 == 0)
+        {
+            ClosePausingWindows();
+        }
         if (watchStill == 300 && !watchNoteWritten)
         {
             watchNoteWritten = true;
             string top = Find.WindowStack.Windows.Count > 0 ? Find.WindowStack.Windows[Find.WindowStack.Windows.Count - 1].GetType().Name : "-";
             Note($"watchdog: no tick advance for 300 frames at tick {t}: speed={Find.TickManager.CurTimeSpeed}, paused={Find.TickManager.Paused}, topWindow={top}, windows={Find.WindowStack.Windows.Count}");
+        }
+    }
+
+    /// <summary>
+    /// TST-054: моды показывают окна, которые ставят игру на паузу (VEF спрашивает про каждую фракцию, которой нет
+    /// в старом сейве). В сессии пауза одного останавливает всех; прогон без людей закрывает такие окна, пока тики стоят.
+    /// </summary>
+    private static void ClosePausingWindows()
+    {
+        for (int i = Find.WindowStack.Windows.Count - 1; i >= 0; i--)
+        {
+            Window w = Find.WindowStack.Windows[i];
+            if (w.forcePause || w is Dialog_NodeTree || w is Dialog_MessageBox)
+            {
+                Note("watchdog: closing pausing window " + w.GetType().FullName);
+                Find.WindowStack.TryRemove(w, doCloseSound: false);
+            }
         }
     }
 
@@ -2644,7 +2667,9 @@ public static class TestAutomationBoot
             LongEventHandler.ExecuteWhenFinished(() =>
             {
                 TestAutomation.Note("autoload: loading save '" + save + "'");
-                GameDataSaveLoader.CheckVersionAndLoadGame(save);
+                // TST-054: тестовый сейв сделан без модов; со сборкой игра показала бы окно «моды не совпадают»
+                // (а с частью модов его создание падает). Тест сравнивает клиенты между собой — загружаем сразу.
+                GameDataSaveLoader.LoadGame(save);
             });
         }
         catch (Exception ex)
