@@ -182,6 +182,26 @@
 
 ---
 
+## 2026-11-27 07:35 МСК — Агент A — T-085: причина расхождения t085f подтверждена кодом модов
+
+Декомпиляция (`ilspycmd`) Fortified Features Framework 1.7, DMS 1.7 и DMS — Ancient Corps.
+
+1. **Fortified — `GameComponent_WorldGenSiteFactionRepair.FinalizeInit`.** При загрузке сейва компонент дозаполняет места мира с расширением `SpawnAtWorldGen`, которых в сейве нет: `WorldGenStep_FFFSpawnWorldObjects.SpawnObjects`. Клетку он выбирает через `Rand.Range(0, TilesCount)` (`RandomTileFor`), на `Rand` загрузки, у каждого клиента своём. Отметка `backfilled` пишется в сейв. DMS — Ancient Corps помечает так свои `DMSAC_LogisticTerminal`, `DMSAC_Graveyard` и др. (`1.7/Defs/WorldSite/WorldObjectDef.xml`, `SpawnAtWorldGen`). Это и есть разные клетки терминалов и кладбищ в t085f.
+2. **Fortified — `GameComponent_Readiness.FinalizeInit`.** `ScheduleDrop` и `ScheduleAction` назначают сроки через `RandomInRange` — тоже на загрузке.
+3. **VEF — `Dialog_NewFactionSpawning`.** Окно у каждого игрока, выбор меняет мир только у нажавшего. Лишние поселения 264…281 у c1 — это фракции, добавленные там (автоматика закрывала окна у клиентов в разном порядке).
+
+**Вывод.** Сам старый сейв ни при чём: при любой загрузке, где код модов в `FinalizeInit`/`LoadedGame` берёт `Rand`, загрузка расходится. В RWMLWC `Rand` во время `Game.LoadGame` не засевается: проверено поиском, патч на `Game.LoadGame` есть только у номеров регионов. RimWorld Multiplayer засевает (`SeedGameLoad`: `Rand.Seed = 1` на время загрузки; `SeedMapLoad` — от номера карты).
+
+**Предлагаемая правка (A, `Source/Client/Sim`):**
+- на время `Game.LoadGame` в сессии — `Rand.PushState(общее зерно)`, например `1`, как в Multiplayer. Загружают все один и тот же сейв или снимок, так что общий порядок вызовов даст одинаковый результат;
+- окно VEF «новая фракция» в сессии — либо командой, либо закрывать у всех, кроме хозяина, а его выбор — командой.
+
+После первой общей перезагрузки снимком места Fortified уже в сейве (`backfilled = true`), повторно они не появятся.
+
+Не проверено прогоном.
+
+---
+
 ## 2026-11-27 07:24 МСК — Агент A — T-085: защита патчей Compatibility; со сборкой игра идёт, но расходится при загрузке старого сейва
 
 `CompatPatchGuard`: каждый метод-патч Compatibility получил финализатор. Исключение пишется один раз и гасится; упавший префикс пропускает оригинал.
