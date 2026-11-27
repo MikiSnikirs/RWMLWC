@@ -482,6 +482,12 @@ public static class TestAutomation
             // T-085: действие мода через мост Multiplayer API — YART ставит проект в очередь исследований.
             sessionSteps.Enqueue((startTick + 300, "mpapi: yart enqueue", MpApiYartEnqueue));
         }
+        if (cfg.issuer && cfg.scenario == "modmech")
+        {
+            // T-084: кнопки построек модов. Нажатия ставятся в очередь после первой общей перезагрузки (загрузка со
+            // сборкой ещё расходится на несколько объектов мира и лечится снимком около +200).
+            sessionSteps.Enqueue((startTick + 600, "modmech: queue presses", () => ModMechQueuePresses(startTick + 600)));
+        }
         if (cfg.desync && cfg.scenario == "desync")
         {
             // T-034: этот клиент нарочно портит своё состояние.
@@ -852,6 +858,9 @@ public static class TestAutomation
         {
             switch (scenario)
             {
+                case "modmech":
+                    ModMechSpawn();
+                    break;
                 case "raid":
                     ScenarioRaid();
                     break;
@@ -1628,6 +1637,140 @@ public static class TestAutomation
             }
         }
         return "[" + string.Join(",", queued) + "]";
+    }
+
+    // --- сценарий modmech (T-084): постройки модов и их кнопки ---
+
+    private static readonly List<int> modMechThings = new List<int>();
+
+    /// <summary>Мод, которому принадлежит определение или код (по сборке).</summary>
+    private static string ModOf(Def def) => def.modContentPack?.Name ?? "?";
+
+    private static string ModOfAssembly(System.Reflection.Assembly asm)
+    {
+        foreach (ModContentPack mod in LoadedModManager.RunningModsListForReading)
+        {
+            if (mod.assemblies.loadedAssemblies.Contains(asm))
+            {
+                return mod.Name;
+            }
+        }
+        return asm.GetName().Name ?? "?";
+    }
+
+    /// <summary>У всех клиентов в тике: по 3 постройки каждого мода — одинаково (порядок по именам, клетки от центра).</summary>
+    private static void ModMechSpawn()
+    {
+        Map map = Find.Maps[0];
+        modMechThings.Clear();
+        List<ThingDef> defs = DefDatabase<ThingDef>.AllDefsListForReading
+            .Where(d => d.category == ThingCategory.Building && d.designationCategory != null && d.BuildableByPlayer
+                && d.modContentPack != null && !d.modContentPack.IsOfficialMod && d.size.x <= 3 && d.size.z <= 3
+                && !d.IsBlueprint && !d.IsFrame && d.thingClass != null)
+            .OrderBy(d => d.modContentPack!.PackageId).ThenBy(d => d.defName).ToList();
+        Dictionary<string, int> perMod = new Dictionary<string, int>();
+        List<ThingDef> chosen = new List<ThingDef>();
+        foreach (ThingDef def in defs)
+        {
+            string mod = def.modContentPack!.PackageId;
+            perMod.TryGetValue(mod, out int n);
+            if (n >= 3)
+            {
+                continue;
+            }
+            perMod[mod] = n + 1;
+            chosen.Add(def);
+        }
+        CellRect area = CellRect.CenteredOn(map.Center, 40).ClipInsideMap(map);
+        List<IntVec3> cells = area.Cells.OrderBy(c => c.z).ThenBy(c => c.x).ToList();
+        int cursor = 0;
+        int spawned = 0;
+        foreach (ThingDef def in chosen)
+        {
+            for (; cursor < cells.Count; cursor++)
+            {
+                IntVec3 c = cells[cursor];
+                CellRect rect = GenAdj.OccupiedRect(c, Rot4.North, def.size).ExpandedBy(1);
+                if (!rect.InBounds(map) || rect.Cells.Any(x => !x.Standable(map) || x.Fogged(map) || x.GetEdifice(map) != null || x.GetFirstPawn(map) != null))
+                {
+                    continue;
+                }
+                try
+                {
+                    ThingDef? stuff = def.MadeFromStuff ? GenStuff.DefaultStuffFor(def) : null;
+                    Thing thing = ThingMaker.MakeThing(def, stuff);
+                    thing.SetFactionDirect(Faction.OfPlayer);
+                    GenSpawn.Spawn(thing, c, map, Rot4.North, WipeMode.Vanish);
+                    modMechThings.Add(thing.thingIDNumber);
+                    spawned++;
+                }
+                catch (Exception ex)
+                {
+                    Note($"modmech: spawn {def.defName} ({ModOf(def)}) FAILED: {ex.GetType().Name}: {ex.Message}");
+                }
+                cursor += def.size.x + 2;
+                break;
+            }
+        }
+        Note($"modmech: spawned {spawned} of {chosen.Count} buildings from {perMod.Count} mods at tick {Find.TickManager.TicksGame}");
+    }
+
+    /// <summary>Автор: кнопки модов на поставленных постройках — по одной каждые 15 тиков.</summary>
+    private static void ModMechQueuePresses(int from)
+    {
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        int at = Find.TickManager.TicksGame + 30;
+        int queued = 0;
+        foreach (int id in modMechThings)
+        {
+            Thing? thing = ValueCodec.FindThing(map, id);
+            if (thing == null)
+            {
+                Note($"modmech: thing {id} is gone");
+                continue;
+            }
+            List<Gizmo> gizmos;
+            try
+            {
+                gizmos = thing.GetGizmos().ToList();
+            }
+            catch (Exception ex)
+            {
+                Note($"modmech: GetGizmos of {thing.def.defName} FAILED: {ex.GetType().Name}: {ex.Message}");
+                continue;
+            }
+            foreach (Gizmo g in gizmos)
+            {
+                Delegate? act = g is Command_Toggle t ? t.toggleAction : g is Command_Action a ? a.action : null;
+                if (act == null || g.Disabled || act.Method.DeclaringType?.Assembly == typeof(Thing).Assembly)
+                {
+                    continue; // только код модов, только простые кнопки
+                }
+                string label = (g as Command)?.defaultLabel ?? g.GetType().Name;
+                Type type = g.GetType();
+                string mod = ModOfAssembly(act.Method.DeclaringType!.Assembly);
+                int thingId = id;
+                string defName = thing.def.defName;
+                sessionSteps.Enqueue((at, "modmech: press", () =>
+                {
+                    Thing? owner = ValueCodec.FindThing(map, thingId);
+                    if (owner == null)
+                    {
+                        return;
+                    }
+                    SelectOnly(owner);
+                    bool sent = GizmoCommands.SendClick(map, owner, x => x.GetType() == type && ((x as Command)?.defaultLabel ?? x.GetType().Name) == label);
+                    Note($"modmech: press [{mod}] {defName} '{label}' tick={Find.TickManager.TicksGame} sent={sent}");
+                }));
+                at += 15;
+                queued++;
+                if (queued >= 250)
+                {
+                    break;
+                }
+            }
+        }
+        Note($"modmech: queued {queued} presses from tick {Find.TickManager.TicksGame}");
     }
 
     private static string SettingsDigest(Map map)

@@ -17,6 +17,10 @@
     <PackageReference Include="Krafs.Rimworld.Ref" Version="1.6.4518" ExcludeAssets="all" PrivateAssets="all" NoWarn="NU1701" />
   </ItemGroup>
   <ItemGroup>
+    <Reference Include="0Harmony">
+      <HintPath>$(HarmonyDll)</HintPath>
+      <Private>false</Private>
+    </Reference>
     <Reference Include="Assembly-CSharp">
       <HintPath>$(RimWorldDir)/Assembly-CSharp.dll</HintPath>
       <Private>false</Private>
