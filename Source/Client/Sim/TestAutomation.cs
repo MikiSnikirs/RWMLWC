@@ -477,6 +477,11 @@ public static class TestAutomation
             sessionSteps.Enqueue((startTick + 1100, "tabs: storage filter", TabsStorageFilter));
             sessionSteps.Enqueue((startTick + 1200, "tabs: storage priority", TabsStoragePriority));
         }
+        if (cfg.issuer && cfg.scenario == "mpapi")
+        {
+            // T-085: действие мода через мост Multiplayer API — YART ставит проект в очередь исследований.
+            sessionSteps.Enqueue((startTick + 300, "mpapi: yart enqueue", MpApiYartEnqueue));
+        }
         if (cfg.desync && cfg.scenario == "desync")
         {
             // T-034: этот клиент нарочно портит своё состояние.
@@ -878,6 +883,7 @@ public static class TestAutomation
                 case "ui":
                 case "access":
                 case "tabs":
+                case "mpapi":
                 case "desync":
                 case "designate":
                 case "gizmo":
@@ -1578,6 +1584,52 @@ public static class TestAutomation
         Note($"tabs: rename zone {zone.ID}: '{before}' -> 'Тест {zone.ID}', sent={LockstepClient.CommandsSent - sentBefore}, value now='{zone.RenamableLabel}'");
     }
 
+    // --- сценарий mpapi (T-085): вызов мода через мост Multiplayer API ---
+
+    private static System.Type? YartCompat => HarmonyLib.AccessTools.TypeByName("YART.Compat.MultiplayerCompat");
+
+    private static void MpApiYartEnqueue()
+    {
+        System.Reflection.MethodInfo? enqueue = YartCompat == null ? null : HarmonyLib.AccessTools.Method(YartCompat, "Cmd_Enqueue");
+        if (enqueue == null)
+        {
+            Note("mpapi: YART not loaded");
+            return;
+        }
+        ResearchProjectDef? def = DefDatabase<ResearchProjectDef>.AllDefsListForReading
+            .Where(d => !d.IsFinished && d.CanStartNow).OrderBy(d => d.defName).FirstOrDefault();
+        if (def == null)
+        {
+            Note("mpapi: no available research project");
+            return;
+        }
+        int before = RWMLWC.Client.Input.MpApi.MpSync.Sent;
+        enqueue.Invoke(null, new object[] { def, false });
+        Note($"mpapi: yart enqueue {def.defName}, sent={RWMLWC.Client.Input.MpApi.MpSync.Sent - before}, queue now={YartQueueDigest()}");
+    }
+
+    /// <summary>Очередь YART: проекты с позицией в очереди (по имени), или «-», если YART нет.</summary>
+    private static string YartQueueDigest()
+    {
+        System.Type? manager = HarmonyLib.AccessTools.TypeByName("YART.Data.ResearchQueueManager");
+        object? instance = manager == null ? null : HarmonyLib.AccessTools.Property(manager, "Instance")?.GetValue(null);
+        System.Reflection.MethodInfo? position = manager == null ? null : HarmonyLib.AccessTools.Method(manager, "GetQueuePosition");
+        if (instance == null || position == null)
+        {
+            return "-";
+        }
+        List<string> queued = new List<string>();
+        foreach (ResearchProjectDef d in DefDatabase<ResearchProjectDef>.AllDefsListForReading.OrderBy(d => d.defName))
+        {
+            int pos = (int)position.Invoke(instance, new object[] { d })!;
+            if (pos >= 0)
+            {
+                queued.Add(d.defName + "@" + pos);
+            }
+        }
+        return "[" + string.Join(",", queued) + "]";
+    }
+
     private static string SettingsDigest(Map map)
     {
         Fnv64 hash = Fnv64.Create();
@@ -2041,6 +2093,7 @@ public static class TestAutomation
                 Note($"camera: this client moved its camera {cameraJumps} times during the run");
             }
             Note($"summary: map{map.uniqueID} settings={SettingsDigest(map)}");
+            Note("summary: yart queue=" + YartQueueDigest() + " mpapi sent=" + RWMLWC.Client.Input.MpApi.MpSync.Sent);
             RimWorld.Planet.Caravan? car = PlayerCaravan();
             Note($"summary: maps={Find.Maps.Count} player settlements={Find.WorldObjects.Settlements.Count(s => s.Faction == Faction.OfPlayer)} caravans={Find.WorldObjects.Caravans.Count(c => c.Faction == Faction.OfPlayer)}"
                 + (car != null ? $" caravan at {car.Tile.tileId} moving={car.pather.Moving} dest={car.pather.Destination.tileId}" : ""));

@@ -310,3 +310,38 @@ internal static class Lambdas
     private static string After(string s, char c) => s.Substring(s.IndexOf(c) + 1);
     private static string Until(string s, char c) => s.IndexOf(c) < 0 ? s : s.Substring(0, s.IndexOf(c));
 }
+
+/// <summary>Диагностика (T-085): что моды зарегистрировали через Multiplayer API — RWMLWC/mpapi-registry.txt.</summary>
+[StaticConstructorOnStartup]
+internal static class MpApiRegistryDump
+{
+    static MpApiRegistryDump()
+    {
+        LongEventHandler.ExecuteWhenFinished(() =>
+        {
+            try
+            {
+                System.Collections.Generic.List<string> lines = new System.Collections.Generic.List<string>
+                {
+                    $"# вызовов {MpSync.Calls.Count}, полей {MpSync.Fields.Count}"
+                };
+                foreach (ApiCall call in MpSync.Calls)
+                {
+                    lines.Add((call is ApiDelegate ? "delegate " : "method ") + call.index + " " + call.key);
+                }
+                foreach (ApiField field in MpSync.Fields)
+                {
+                    lines.Add("field " + field.index + " " + field.key);
+                }
+                string dir = System.IO.Path.Combine(GenFilePaths.SaveDataFolderPath, "RWMLWC");
+                System.IO.Directory.CreateDirectory(dir);
+                System.IO.File.WriteAllLines(System.IO.Path.Combine(dir, "mpapi-registry.txt"), lines);
+                Log.Message($"[RWMLWC] Multiplayer API: моды зарегистрировали вызовов {MpSync.Calls.Count}, полей {MpSync.Fields.Count}");
+            }
+            catch (System.Exception ex)
+            {
+                Log.Warning("[RWMLWC] Multiplayer API: выгрузка списка не удалась: " + ex.Message);
+            }
+        });
+    }
+}
