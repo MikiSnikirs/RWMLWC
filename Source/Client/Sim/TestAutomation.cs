@@ -873,6 +873,10 @@ public static class TestAutomation
                 case "modweapons":
                     ModWeaponsStart();
                     break;
+                case "modabilities":
+                    ModWeaponsStart();
+                    modAbilitiesMode = true;
+                    break;
                 case "raid":
                     ScenarioRaid();
                     break;
@@ -1855,6 +1859,11 @@ public static class TestAutomation
         {
             return;
         }
+        if (modAbilitiesMode)
+        {
+            ModAbilitiesRound(Find.Maps[0], round);
+            return;
+        }
         Map map = Find.Maps[0];
         List<string> given = new List<string>();
         List<Pawn> testPawns = ModWeaponPawns(map);
@@ -1952,6 +1961,163 @@ public static class TestAutomation
             }
         }
         Note($"modweapons: round {round}: pressed {pressed} gizmos");
+    }
+
+    // --- сценарий modabilities (T-084, проход 3): способности модов (игры и VEF), пси-силы ---
+
+    private static bool modAbilitiesMode;
+    private static List<Def>? modAbilities;
+
+    private static List<Def> ModAbilityDefs()
+    {
+        if (modAbilities != null)
+        {
+            return modAbilities;
+        }
+        List<Def> list = new List<Def>();
+        list.AddRange(DefDatabase<AbilityDef>.AllDefsListForReading.Where(d => d.modContentPack != null && !d.modContentPack.IsOfficialMod));
+        System.Type? vefDef = HarmonyLib.AccessTools.TypeByName("VEF.Abilities.AbilityDef");
+        if (vefDef != null)
+        {
+            System.Type db = typeof(DefDatabase<>).MakeGenericType(vefDef);
+            if (HarmonyLib.AccessTools.Property(db, "AllDefsListForReading")?.GetValue(null) is System.Collections.IEnumerable all)
+            {
+                foreach (Def d in all)
+                {
+                    if (d.modContentPack != null && !d.modContentPack.IsOfficialMod)
+                    {
+                        list.Add(d);
+                    }
+                }
+            }
+        }
+        // До 4 на мод, порядок по моду и имени — одинаково у всех.
+        Dictionary<string, int> count = new Dictionary<string, int>();
+        modAbilities = new List<Def>();
+        foreach (Def d in list.OrderBy(d => d.modContentPack!.PackageId).ThenBy(d => d.defName))
+        {
+            count.TryGetValue(d.modContentPack!.PackageId, out int n);
+            if (n < 4)
+            {
+                count[d.modContentPack.PackageId] = n + 1;
+                modAbilities.Add(d);
+            }
+        }
+        Note($"modabilities: {modAbilities.Count} abilities from {count.Count} mods ({list.Count} in total)");
+        return modAbilities;
+    }
+
+    /// <summary>В тике у всех клиентов: каждому тестовому колонисту следующая способность модов — выдать и применить.</summary>
+    private static void ModAbilitiesRound(Map map, int round)
+    {
+        List<Def> defs = ModAbilityDefs();
+        List<Pawn> testPawns = ModWeaponPawns(map);
+        Faction? enemyFaction = Find.FactionManager.AllFactionsListForReading
+            .Where(f => !f.IsPlayer && f.HostileTo(Faction.OfPlayer) && f.def.humanlikeFaction && !f.defeated && f.def.basicMemberKind != null)
+            .OrderBy(f => f.loadID).FirstOrDefault();
+        if (enemyFaction != null)
+        {
+            for (int j = 0; j < 4; j++)
+            {
+                try
+                {
+                    Pawn foe = PawnGenerator.GeneratePawn(new PawnGenerationRequest(enemyFaction.def.basicMemberKind, enemyFaction, forceGenerateNewPawn: true));
+                    GenSpawn.Spawn(foe, CellFinder.StandableCellNear(map.Center + new IntVec3(j * 3 - 5, 0, 10), map, 6), map);
+                }
+                catch (Exception ex)
+                {
+                    Note($"modabilities: enemy FAILED: {ex.GetType().Name}: {ex.Message}");
+                }
+            }
+        }
+        List<string> done = new List<string>();
+        System.Type? vefComp = HarmonyLib.AccessTools.TypeByName("VEF.Abilities.CompAbilities");
+        for (int i = 0; i < testPawns.Count && defs.Count > 0; i++)
+        {
+            Pawn pawn = testPawns[i];
+            Def def = defs[(round * 10 + i) % defs.Count];
+            try
+            {
+                if (round == 0 && pawn.GetPsylinkLevel() < 6)
+                {
+                    pawn.ChangePsylinkLevel(6 - pawn.GetPsylinkLevel(), false);
+                }
+                pawn.psychicEntropy?.OffsetPsyfocusDirectly(1f);
+                if (pawn.health.summaryHealth.SummaryHealthPercent < 0.5f)
+                {
+                    HealthUtility.HealNonPermanentInjuriesAndRestoreLegs(pawn);
+                }
+                Pawn? foe = map.mapPawns.AllPawnsSpawned.Where(p => p.HostileTo(pawn) && !p.Downed && !p.Dead)
+                    .OrderBy(p => p.Position.DistanceToSquared(pawn.Position)).ThenBy(p => p.thingIDNumber).FirstOrDefault();
+                List<LocalTargetInfo> targets = new List<LocalTargetInfo>();
+                if (foe != null)
+                {
+                    targets.Add(foe);
+                    targets.Add(foe.Position);
+                }
+                targets.Add(pawn);
+                targets.Add(pawn.Position + IntVec3.North * 2);
+                string result = "no target";
+                if (def is AbilityDef ad)
+                {
+                    pawn.abilities.GainAbility(ad);
+                    Ability ability = pawn.abilities.GetAbility(ad);
+                    ability.ResetCooldown();
+                    foreach (LocalTargetInfo t in targets)
+                    {
+                        if (ability.CanApplyOn(t) && ability.verb.ValidateTarget(t, false))
+                        {
+                            ability.QueueCastingJob(t, t);
+                            result = "cast on " + (t.HasThing ? "pawn" : "cell");
+                            break;
+                        }
+                    }
+                }
+                else if (vefComp != null && pawn.AllComps.FirstOrDefault(c => vefComp.IsInstanceOfType(c)) is ThingComp comp)
+                {
+                    HarmonyLib.AccessTools.Method(vefComp, "GiveAbility").Invoke(comp, new object[] { def });
+                    System.Collections.IList learned = (System.Collections.IList)HarmonyLib.AccessTools.Property(vefComp, "LearnedAbilities").GetValue(comp)!;
+                    object? ability = null;
+                    foreach (object a in learned)
+                    {
+                        if (HarmonyLib.AccessTools.Field(a.GetType(), "def")?.GetValue(a) == def)
+                        {
+                            ability = a;
+                        }
+                    }
+                    if (ability != null)
+                    {
+                        System.Reflection.MethodInfo canHit = HarmonyLib.AccessTools.Method(ability.GetType(), "CanHitTarget", new[] { typeof(LocalTargetInfo) });
+                        System.Reflection.MethodInfo cast = HarmonyLib.AccessTools.Method(ability.GetType(), "CreateCastJob", new[] { typeof(LocalTargetInfo) });
+                        foreach (LocalTargetInfo t in targets)
+                        {
+                            if ((bool)canHit.Invoke(ability, new object[] { t })!)
+                            {
+                                cast.Invoke(ability, new object[] { t });
+                                result = "vef cast on " + (t.HasThing ? "pawn" : "cell");
+                                break;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        result = "vef not learned";
+                    }
+                }
+                else
+                {
+                    result = "no CompAbilities";
+                }
+                done.Add($"{def.defName}:{result}");
+            }
+            catch (Exception ex)
+            {
+                Exception e = ex is System.Reflection.TargetInvocationException tie && tie.InnerException != null ? tie.InnerException : ex;
+                done.Add($"{def.defName}:FAILED {e.GetType().Name}");
+                Note($"modabilities: {def.defName} ({def.modContentPack?.Name}) FAILED: {e.GetType().Name}: {e.Message}");
+            }
+        }
+        Note($"modabilities: round {round} at tick {Find.TickManager.TicksGame}: {string.Join(", ", done)}");
     }
 
     private static string SettingsDigest(Map map)
