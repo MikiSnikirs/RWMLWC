@@ -118,6 +118,7 @@ internal static class Patch_TickManager_DoSingleTick
             FrameIndependentState.BeforeTick();
             // Сценарий тестового прогона исполняется уже в контексте симуляции.
             TestAutomation.ApplyScenarioIfPending();
+            TestAutomation.SimTick();
         }
     }
 
