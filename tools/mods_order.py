@@ -5,7 +5,8 @@
 - берёт все моды из папки workshop, плюс ядро, DLC, Harmony и RWMLWC;
 - выкидывает rwmt.multiplayer и rwmt.multiplayercompatibility (другой сетевой мод) и моды без 1.7 в supportedVersions,
   а затем всё, что от выкинутых зависит;
-- сортирует по loadAfter/loadBefore/forceLoad*/modDependencies (включая …ByVersion для 1.7), при равенстве —
+- сортирует по loadAfter/loadBefore/forceLoad*/modDependencies (включая …ByVersion для 1.7, а если для 1.7
+  записи нет — для ближайшей более ранней версии: HellDivers указал зависимость только для 1.6), при равенстве —
   по packageId; ядро и DLC первыми после Harmony, RWMLWC последним;
 - печатает выкинутое и причину.
 """
@@ -30,14 +31,39 @@ def ids(node, path):
     return out
 
 
+def by_version(r, tag, sub):
+    """Записи …ByVersion для 1.7; если для 1.7 их нет — из ближайшей более ранней версии (автор мог не обновить)."""
+    node = r.find(tag)
+    if node is None:
+        return []
+    best = None
+    for v in node:
+        try:
+            num = tuple(int(x) for x in v.tag.lstrip("v").split("."))
+        except ValueError:
+            continue
+        if num <= (1, 7) and (best is None or num > best[0]):
+            best = (num, v)
+    if best is None:
+        return []
+    if sub == "dep":
+        return [(li.findtext("packageId") or "").strip().lower() for li in best[1].findall("li")]
+    return [(li.text or "").strip().lower() for li in best[1].findall("li") if (li.text or "").strip()]
+
+
 def read(about):
     r = ET.parse(about).getroot()
     pid = (r.findtext("packageId") or "").strip().lower()
     vers = [(li.text or "").strip() for li in r.findall("supportedVersions/li")]
-    after = ids(r, "loadAfter/li") + ids(r, "forceLoadAfter/li") + ids(r, "loadAfterByVersion/v1.7/li")
-    before = ids(r, "loadBefore/li") + ids(r, "forceLoadBefore/li") + ids(r, "loadBeforeByVersion/v1.7/li")
+    after = ids(r, "loadAfter/li") + ids(r, "forceLoadAfter/li") + by_version(r, "loadAfterByVersion", "id")
+    before = ids(r, "loadBefore/li") + ids(r, "forceLoadBefore/li") + by_version(r, "loadBeforeByVersion", "id")
     deps = [(li.findtext("packageId") or "").strip().lower() for li in r.findall("modDependencies/li")]
-    deps += [(li.findtext("packageId") or "").strip().lower() for li in r.findall("modDependenciesByVersion/v1.7/li")]
+    exact = r.find("modDependenciesByVersion/v1.7")
+    if exact is not None:
+        deps += [(li.findtext("packageId") or "").strip().lower() for li in exact.findall("li")]
+    else:
+        # Зависимость только для старой версии — лишь порядок загрузки, мод из-за неё не выкидываем.
+        after += by_version(r, "modDependenciesByVersion", "dep")
     incompat = ids(r, "incompatibleWith/li") + ids(r, "incompatibleWithByVersion/v1.7/li")
     return dict(pid=pid, name=(r.findtext("name") or "").strip(), v17="1.7" in vers,
                 after=after, before=before, deps=[d for d in deps if d], incompat=incompat)
