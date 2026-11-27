@@ -488,6 +488,15 @@ public static class TestAutomation
             // сборкой ещё расходится на несколько объектов мира и лечится снимком около +200).
             sessionSteps.Enqueue((startTick + 600, "modmech: queue presses", () => ModMechQueuePresses(startTick + 600)));
         }
+        if (cfg.issuer && cfg.scenario == "modweapons")
+        {
+            // T-084, проход 2: кнопки модов на снаряжении тестовых колонистов — после каждой смены снаряжения.
+            for (int r = 0; r < 18; r++)
+            {
+                int round = r;
+                sessionSteps.Enqueue((startTick + 600 + 300 * r + 60, "modweapons: gizmos", () => ModWeaponsPressGizmos(round)));
+            }
+        }
         if (cfg.desync && cfg.scenario == "desync")
         {
             // T-034: этот клиент нарочно портит своё состояние.
@@ -860,6 +869,9 @@ public static class TestAutomation
             {
                 case "modmech":
                     ModMechSpawn();
+                    break;
+                case "modweapons":
+                    ModWeaponsStart();
                     break;
                 case "raid":
                     ScenarioRaid();
@@ -1771,6 +1783,175 @@ public static class TestAutomation
             }
         }
         Note($"modmech: queued {queued} presses from tick {Find.TickManager.TicksGame}");
+    }
+
+    // --- сценарий modweapons (T-084, проход 2): оружие, одежда и бой модов ---
+
+    private static readonly List<int> modWeaponPawns = new List<int>();
+    private static List<ThingDef> modWeapons = new List<ThingDef>();
+    private static List<ThingDef> modApparel = new List<ThingDef>();
+    private static int modWeaponsStart = -1;
+
+    private static List<ThingDef> PerMod(IEnumerable<ThingDef> defs, int perMod)
+    {
+        Dictionary<string, int> count = new Dictionary<string, int>();
+        List<ThingDef> result = new List<ThingDef>();
+        foreach (ThingDef d in defs.OrderBy(d => d.modContentPack!.PackageId).ThenBy(d => d.defName))
+        {
+            string mod = d.modContentPack!.PackageId;
+            count.TryGetValue(mod, out int n);
+            if (n < perMod)
+            {
+                count[mod] = n + 1;
+                result.Add(d);
+            }
+        }
+        return result;
+    }
+
+    /// <summary>У всех клиентов в тике: 10 тестовых колонистов в центре карты, списки оружия и одежды модов.</summary>
+    private static void ModWeaponsStart()
+    {
+        Map map = Find.Maps[0];
+        modWeaponsStart = Find.TickManager.TicksGame;
+        modWeaponPawns.Clear();
+        modWeapons = PerMod(DefDatabase<ThingDef>.AllDefsListForReading.Where(d => d.IsWeapon && d.category == ThingCategory.Item
+            && d.equipmentType == EquipmentType.Primary && d.modContentPack != null && !d.modContentPack.IsOfficialMod
+            && d.thingClass != null && !d.destroyOnDrop && d.graphicData != null), 3);
+        modApparel = PerMod(DefDatabase<ThingDef>.AllDefsListForReading.Where(d => d.IsApparel && d.modContentPack != null
+            && !d.modContentPack.IsOfficialMod && d.apparel != null && d.graphicData != null), 2);
+        Note($"modweapons: start at tick {modWeaponsStart}: {modWeapons.Count} weapons ({modWeapons.Select(d => d.modContentPack!.PackageId).Distinct().Count()} mods), {modApparel.Count} apparel, pawns spawn at +300 (after the first common reload)");
+    }
+
+    /// <summary>Тестовые колонисты — 10 самых новых колонистов карты (одинаково у всех клиентов, в том числе после перезагрузки).</summary>
+    private static List<Pawn> ModWeaponPawns(Map map) =>
+        map.mapPawns.FreeColonistsSpawned.OrderByDescending(p => p.thingIDNumber).Take(10).OrderBy(p => p.thingIDNumber).ToList();
+
+    /// <summary>Каждый тик у всех клиентов (в контексте симуляции): раз в 300 тиков — новое снаряжение, призыв, враги.</summary>
+    public static void SimTick()
+    {
+        if (modWeaponsStart < 0 || Find.Maps.Count == 0)
+        {
+            return;
+        }
+        int elapsed = Find.TickManager.TicksGame - modWeaponsStart;
+        if (elapsed == 300)
+        {
+            Map m0 = Find.Maps[0];
+            for (int i = 0; i < 10; i++)
+            {
+                Pawn pawn = PawnGenerator.GeneratePawn(new PawnGenerationRequest(PawnKindDefOf.Colonist, Faction.OfPlayer, forceGenerateNewPawn: true, mustBeCapableOfViolence: true));
+                GenSpawn.Spawn(pawn, CellFinder.StandableCellNear(m0.Center + new IntVec3(i * 2 - 10, 0, -8), m0, 6), m0);
+            }
+            Note($"modweapons: 10 test pawns spawned at tick {Find.TickManager.TicksGame}");
+            return;
+        }
+        if (elapsed < 600 || (elapsed - 600) % 300 != 0)
+        {
+            return;
+        }
+        int round = (elapsed - 600) / 300;
+        if (round >= 18)
+        {
+            return;
+        }
+        Map map = Find.Maps[0];
+        List<string> given = new List<string>();
+        List<Pawn> testPawns = ModWeaponPawns(map);
+        for (int i = 0; i < testPawns.Count; i++)
+        {
+            Pawn pawn = testPawns[i];
+            int k = round * 10 + i;
+            try
+            {
+                if (modWeapons.Count > 0)
+                {
+                    ThingDef def = modWeapons[k % modWeapons.Count];
+                    pawn.equipment.DestroyAllEquipment();
+                    ThingWithComps weapon = (ThingWithComps)ThingMaker.MakeThing(def, def.MadeFromStuff ? GenStuff.DefaultStuffFor(def) : null);
+                    pawn.equipment.AddEquipment(weapon);
+                    given.Add(def.defName);
+                }
+                if (modApparel.Count > 0)
+                {
+                    ThingDef ad = modApparel[k % modApparel.Count];
+                    if (ad.apparel.PawnCanWear(pawn))
+                    {
+                        Apparel ap = (Apparel)ThingMaker.MakeThing(ad, ad.MadeFromStuff ? GenStuff.DefaultStuffFor(ad) : null);
+                        pawn.apparel.Wear(ap, dropReplacedApparel: false);
+                    }
+                }
+                if (pawn.drafter != null && !pawn.Drafted)
+                {
+                    pawn.drafter.Drafted = true;
+                }
+                if (pawn.health.summaryHealth.SummaryHealthPercent < 0.5f)
+                {
+                    HealthUtility.HealNonPermanentInjuriesAndRestoreLegs(pawn);
+                }
+            }
+            catch (Exception ex)
+            {
+                Note($"modweapons: round {round} pawn {i} FAILED: {ex.GetType().Name}: {ex.Message}");
+            }
+        }
+        // Враги рядом: 4 бойца первой враждебной людской фракции.
+        Faction? enemy = Find.FactionManager.AllFactionsListForReading
+            .Where(f => !f.IsPlayer && f.HostileTo(Faction.OfPlayer) && f.def.humanlikeFaction && !f.defeated && f.def.basicMemberKind != null)
+            .OrderBy(f => f.loadID).FirstOrDefault();
+        if (enemy != null)
+        {
+            for (int j = 0; j < 4; j++)
+            {
+                try
+                {
+                    Pawn foe = PawnGenerator.GeneratePawn(new PawnGenerationRequest(enemy.def.basicMemberKind, enemy, forceGenerateNewPawn: true));
+                    GenSpawn.Spawn(foe, CellFinder.StandableCellNear(map.Center + new IntVec3(j * 3 - 5, 0, 14), map, 6), map);
+                }
+                catch (Exception ex)
+                {
+                    Note($"modweapons: enemy FAILED: {ex.GetType().Name}: {ex.Message}");
+                }
+            }
+        }
+        Note($"modweapons: round {round} at tick {Find.TickManager.TicksGame}: {string.Join(",", given)}");
+    }
+
+    /// <summary>Автор: кнопки модов на тестовых колонистах (снаряжение, одежда, способности).</summary>
+    private static void ModWeaponsPressGizmos(int round)
+    {
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        int pressed = 0;
+        foreach (Pawn pawn in ModWeaponPawns(map))
+        {
+            List<Gizmo> gizmos;
+            try
+            {
+                SelectOnly(pawn);
+                gizmos = pawn.GetGizmos().ToList();
+            }
+            catch (Exception ex)
+            {
+                Note($"modweapons: GetGizmos FAILED: {ex.GetType().Name}: {ex.Message}");
+                continue;
+            }
+            foreach (Gizmo g in gizmos)
+            {
+                Delegate? act = g is Command_Toggle t ? t.toggleAction : g is Command_Action a ? a.action : null;
+                if (act == null || g.Disabled || act.Method.DeclaringType?.Assembly == typeof(Thing).Assembly
+                    || act.Method.DeclaringType?.Assembly == typeof(TestAutomation).Assembly)
+                {
+                    continue;
+                }
+                string label = (g as Command)?.defaultLabel ?? g.GetType().Name;
+                Type type = g.GetType();
+                string mod = ModOfAssembly(act.Method.DeclaringType!.Assembly);
+                bool sent = GizmoCommands.SendClick(map, pawn, x => x.GetType() == type && ((x as Command)?.defaultLabel ?? x.GetType().Name) == label);
+                Note($"modmech: press [{mod}] {pawn.equipment?.Primary?.def.defName ?? "pawn"} '{label}' tick={Find.TickManager.TicksGame} sent={sent}");
+                pressed++;
+            }
+        }
+        Note($"modweapons: round {round}: pressed {pressed} gizmos");
     }
 
     private static string SettingsDigest(Map map)
