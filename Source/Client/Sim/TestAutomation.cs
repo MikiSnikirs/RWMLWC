@@ -881,6 +881,10 @@ public static class TestAutomation
                 case "modweapons":
                     ModWeaponsStart();
                     break;
+                case "modraces":
+                    ModWeaponsStart();
+                    modRacesMode = true;
+                    break;
                 case "modevents":
                     modEventsStart = Find.TickManager.TicksGame;
                     break;
@@ -1869,9 +1873,34 @@ public static class TestAutomation
         if (elapsed == 300)
         {
             Map m0 = Find.Maps[0];
+            // modraces: по колонисту каждой людской расы из модов (Humanoid Alien Races и др.), до 10.
+            List<PawnKindDef> kinds = new List<PawnKindDef>();
+            if (modRacesMode)
+            {
+                foreach (ThingDef race in DefDatabase<ThingDef>.AllDefsListForReading
+                    .Where(d => d.race != null && d.race.Humanlike && d.modContentPack != null && !d.modContentPack.IsOfficialMod).OrderBy(d => d.defName))
+                {
+                    PawnKindDef? kind = DefDatabase<PawnKindDef>.AllDefsListForReading.Where(k => k.race == race).OrderBy(k => k.defName).FirstOrDefault();
+                    if (kind != null && kinds.Count < 10)
+                    {
+                        kinds.Add(kind);
+                    }
+                }
+                Note($"modraces: {kinds.Count} races: {string.Join(",", kinds.Select(k => k.race.defName))}");
+            }
             for (int i = 0; i < 10; i++)
             {
-                Pawn pawn = PawnGenerator.GeneratePawn(new PawnGenerationRequest(PawnKindDefOf.Colonist, Faction.OfPlayer, forceGenerateNewPawn: true, mustBeCapableOfViolence: true));
+                PawnKindDef pk = modRacesMode && kinds.Count > 0 ? kinds[i % kinds.Count] : PawnKindDefOf.Colonist;
+                Pawn pawn;
+                try
+                {
+                    pawn = PawnGenerator.GeneratePawn(new PawnGenerationRequest(pk, Faction.OfPlayer, forceGenerateNewPawn: true, mustBeCapableOfViolence: true));
+                }
+                catch (Exception ex)
+                {
+                    Note($"modraces: {pk.defName} FAILED: {ex.GetType().Name}: {ex.Message}");
+                    pawn = PawnGenerator.GeneratePawn(new PawnGenerationRequest(PawnKindDefOf.Colonist, Faction.OfPlayer, forceGenerateNewPawn: true, mustBeCapableOfViolence: true));
+                }
                 GenSpawn.Spawn(pawn, CellFinder.StandableCellNear(m0.Center + new IntVec3(i * 2 - 10, 0, -8), m0, 6), m0);
             }
             Note($"modweapons: 10 test pawns spawned at tick {Find.TickManager.TicksGame}");
@@ -1995,6 +2024,7 @@ public static class TestAutomation
     // --- сценарий modabilities (T-084, проход 3): способности модов (игры и VEF), пси-силы ---
 
     private static bool modAbilitiesMode;
+    private static bool modRacesMode;
     private static bool modPsyMode;
     private static List<Def>? modAbilities;
 
