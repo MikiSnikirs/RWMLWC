@@ -1,6 +1,8 @@
 """Собрать порядок загрузки модов для тестового профиля (T-082).
 
-Запуск: python -I tools/mods_order.py <папка workshop 294100> <шаблон ModsConfig.xml> <выходной ModsConfig.xml> [--exclude id,id]
+Запуск: python -I tools/mods_order.py <папка workshop 294100> <шаблон ModsConfig.xml> <выходной ModsConfig.xml> [--exclude id,id] [--allow-old]
+
+--allow-old — включать и моды без 1.7 в supportedVersions (многие моды 1.6 работают на 1.7).
 
 - берёт все моды из папки workshop, плюс ядро, DLC, Harmony и RWMLWC;
 - выкидывает rwmt.multiplayer и rwmt.multiplayercompatibility (другой сетевой мод) и моды без 1.7 в supportedVersions,
@@ -92,7 +94,7 @@ def main():
             out_reason[pid] = ALWAYS_OUT[pid]
         elif pid in extra_out:
             out_reason[pid] = "исключён вручную"
-        elif not m["v17"]:
+        elif not m["v17"] and "--allow-old" not in sys.argv:
             out_reason[pid] = "нет 1.7 в supportedVersions"
     known = set(mods) | set(CORE) | {OURS}
     changed = True
