@@ -881,6 +881,9 @@ public static class TestAutomation
                 case "modweapons":
                     ModWeaponsStart();
                     break;
+                case "modevents":
+                    modEventsStart = Find.TickManager.TicksGame;
+                    break;
                 case "modabilities":
                     ModWeaponsStart();
                     modAbilitiesMode = true;
@@ -1847,6 +1850,17 @@ public static class TestAutomation
     /// <summary>Каждый тик у всех клиентов (в контексте симуляции): раз в 300 тиков — новое снаряжение, призыв, враги.</summary>
     public static void SimTick()
     {
+        if (modEventsStart >= 0)
+        {
+            try
+            {
+                ModEventsTick();
+            }
+            catch (Exception ex)
+            {
+                Note($"modevents: tick FAILED: {ex.GetType().Name}: {ex.Message}");
+            }
+        }
         if (modWeaponsStart < 0 || Find.Maps.Count == 0)
         {
             return;
@@ -2228,6 +2242,90 @@ public static class TestAutomation
             Note($"modwindows: closed at tick {Find.TickManager.TicksGame}");
         }));
         Note($"modwindows: queued {queued} windows ({tabs.Count} tabs) from tick {Find.TickManager.TicksGame}");
+    }
+
+    // --- сценарий modevents (T-084): события и задания модов в тике у всех клиентов ---
+
+    private static int modEventsStart = -1;
+    private static List<IncidentDef>? modIncidents;
+    private static List<QuestScriptDef>? modQuests;
+
+    /// <summary>Рабочий класс события создаётся при первом обращении; у части модов конструктор падает.</summary>
+    private static bool HasWorker(IncidentDef d)
+    {
+        try
+        {
+            return d.Worker != null;
+        }
+        catch (Exception ex)
+        {
+            Exception e = ex is System.Reflection.TargetInvocationException tie && tie.InnerException != null ? tie.InnerException : ex;
+            Note($"modevents: incident {d.defName} ({d.modContentPack?.Name}) worker FAILED: {e.GetType().Name}: {e.Message}");
+            return false;
+        }
+    }
+
+    private static void ModEventsTick()
+    {
+        int elapsed = Find.TickManager.TicksGame - modEventsStart;
+        if (elapsed < 600 || (elapsed - 600) % 100 != 0 || Find.Maps.Count == 0)
+        {
+            return;
+        }
+        int round = (elapsed - 600) / 100;
+        modIncidents ??= DefDatabase<IncidentDef>.AllDefsListForReading
+            .Where(d => d.modContentPack != null && !d.modContentPack.IsOfficialMod && HasWorker(d))
+            .OrderBy(d => d.modContentPack!.PackageId).ThenBy(d => d.defName).ToList();
+        modQuests ??= DefDatabase<QuestScriptDef>.AllDefsListForReading
+            .Where(d => d.modContentPack != null && !d.modContentPack.IsOfficialMod && d.root != null && !d.isRootSpecial)
+            .OrderBy(d => d.modContentPack!.PackageId).ThenBy(d => d.defName).ToList();
+        if (round == 0)
+        {
+            Note($"modevents: {modIncidents.Count} incidents, {modQuests.Count} quests from mods");
+        }
+        Map map = Find.Maps[0];
+        List<string> done = new List<string>();
+        for (int k = 0; k < 3; k++)
+        {
+            int idx = round * 3 + k;
+            if (idx >= modIncidents.Count)
+            {
+                break;
+            }
+            IncidentDef def = modIncidents[idx];
+            try
+            {
+                IIncidentTarget target = def.TargetAllowed(map) ? map : (IIncidentTarget)Find.World;
+                IncidentParms parms = StorytellerUtility.DefaultParmsNow(def.category, target);
+                parms.forced = true;
+                bool can = def.Worker.CanFireNow(parms);
+                bool ok = can && def.Worker.TryExecute(parms);
+                done.Add($"{def.defName}:{(ok ? "fired" : can ? "refused" : "cannot")}");
+            }
+            catch (Exception ex)
+            {
+                done.Add($"{def.defName}:FAILED");
+                Note($"modevents: incident {def.defName} ({def.modContentPack?.Name}) FAILED: {ex.GetType().Name}: {ex.Message}");
+            }
+        }
+        if (round < modQuests.Count)
+        {
+            QuestScriptDef q = modQuests[round];
+            try
+            {
+                Quest quest = QuestUtility.GenerateQuestAndMakeAvailable(q, StorytellerUtility.DefaultThreatPointsNow(map));
+                done.Add($"quest {q.defName}:{(quest != null ? "made" : "null")}");
+            }
+            catch (Exception ex)
+            {
+                done.Add($"quest {q.defName}:FAILED");
+                Note($"modevents: quest {q.defName} ({q.modContentPack?.Name}) FAILED: {ex.GetType().Name}: {ex.Message}");
+            }
+        }
+        if (done.Count > 0)
+        {
+            Note($"modevents: round {round} at tick {Find.TickManager.TicksGame}: {string.Join(", ", done)}");
+        }
     }
 
     private static string SettingsDigest(Map map)
