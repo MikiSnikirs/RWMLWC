@@ -877,6 +877,11 @@ public static class TestAutomation
                     ModWeaponsStart();
                     modAbilitiesMode = true;
                     break;
+                case "modpsycasts":
+                    ModWeaponsStart();
+                    modAbilitiesMode = true;
+                    modPsyMode = true;
+                    break;
                 case "raid":
                     ScenarioRaid();
                     break;
@@ -1850,12 +1855,14 @@ public static class TestAutomation
             Note($"modweapons: 10 test pawns spawned at tick {Find.TickManager.TicksGame}");
             return;
         }
-        if (elapsed < 600 || (elapsed - 600) % 300 != 0)
+        int interval = modPsyMode ? 150 : 300;
+        int rounds = modPsyMode ? 30 : 18;
+        if (elapsed < 600 || (elapsed - 600) % interval != 0)
         {
             return;
         }
-        int round = (elapsed - 600) / 300;
-        if (round >= 18)
+        int round = (elapsed - 600) / interval;
+        if (round >= rounds)
         {
             return;
         }
@@ -1966,6 +1973,7 @@ public static class TestAutomation
     // --- сценарий modabilities (T-084, проход 3): способности модов (игры и VEF), пси-силы ---
 
     private static bool modAbilitiesMode;
+    private static bool modPsyMode;
     private static List<Def>? modAbilities;
 
     private static List<Def> ModAbilityDefs()
@@ -1975,7 +1983,10 @@ public static class TestAutomation
             return modAbilities;
         }
         List<Def> list = new List<Def>();
-        list.AddRange(DefDatabase<AbilityDef>.AllDefsListForReading.Where(d => d.modContentPack != null && !d.modContentPack.IsOfficialMod));
+        if (!modPsyMode)
+        {
+    list.AddRange(DefDatabase<AbilityDef>.AllDefsListForReading.Where(d => d.modContentPack != null && !d.modContentPack.IsOfficialMod));
+        }
         System.Type? vefDef = HarmonyLib.AccessTools.TypeByName("VEF.Abilities.AbilityDef");
         if (vefDef != null)
         {
@@ -1997,7 +2008,7 @@ public static class TestAutomation
         foreach (Def d in list.OrderBy(d => d.modContentPack!.PackageId).ThenBy(d => d.defName))
         {
             count.TryGetValue(d.modContentPack!.PackageId, out int n);
-            if (n < 4)
+            if (modPsyMode || n < 4)
             {
                 count[d.modContentPack.PackageId] = n + 1;
                 modAbilities.Add(d);
@@ -2015,7 +2026,7 @@ public static class TestAutomation
         Faction? enemyFaction = Find.FactionManager.AllFactionsListForReading
             .Where(f => !f.IsPlayer && f.HostileTo(Faction.OfPlayer) && f.def.humanlikeFaction && !f.defeated && f.def.basicMemberKind != null)
             .OrderBy(f => f.loadID).FirstOrDefault();
-        if (enemyFaction != null)
+        if (enemyFaction != null && (!modPsyMode || round % 3 == 0))
         {
             for (int j = 0; j < 4; j++)
             {
@@ -2038,6 +2049,11 @@ public static class TestAutomation
             Def def = defs[(round * 10 + i) % defs.Count];
             try
             {
+                if (round == 0 && modPsyMode && pawn.equipment.Primary == null && DefDatabase<ThingDef>.GetNamedSilentFail("Gun_AssaultRifle") is ThingDef rifle)
+                {
+                    pawn.equipment.AddEquipment((ThingWithComps)ThingMaker.MakeThing(rifle));
+                    pawn.drafter.Drafted = true;
+                }
                 if (round == 0 && pawn.GetPsylinkLevel() < 6)
                 {
                     pawn.ChangePsylinkLevel(6 - pawn.GetPsylinkLevel(), false);
