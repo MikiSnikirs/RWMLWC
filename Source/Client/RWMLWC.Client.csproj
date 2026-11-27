@@ -26,6 +26,14 @@
     <ProjectReference Include="../ServerCore/RWMLWC.ServerCore.csproj" />
   </ItemGroup>
 
+  <!-- Multiplayer API (rwmt, MIT) — мост для модов, которые описывают синхронизацию через него (T-085).
+       Сам 0MultiplayerAPI.dll кладётся в папку мода: у игрока может не быть мода, который его привозит.
+       Пакет тянет за собой справочные сборки RimWorld 1.6 — они не нужны, у нас свои от 1.7. -->
+  <ItemGroup>
+    <PackageReference Include="RimWorld.MultiplayerAPI" Version="0.6.0" NoWarn="NU1701" />
+    <PackageReference Include="Krafs.Rimworld.Ref" Version="1.6.4518" ExcludeAssets="all" PrivateAssets="all" NoWarn="NU1701" />
+  </ItemGroup>
+
   <!-- Файлы игры: только для компиляции, в папку мода не копируются. -->
   <ItemGroup>
     <Reference Include="Assembly-CSharp">
@@ -53,4 +61,8 @@
       <Private>false</Private>
     </Reference>
   </ItemGroup>
+  <!-- 0MultiplayerAPI.dll из пакета — в папку мода (библиотечный проект пакетные сборки сам не копирует). -->
+  <Target Name="CopyMultiplayerApi" AfterTargets="Build">
+    <Copy SourceFiles="$(NuGetPackageRoot)rimworld.multiplayerapi/0.6.0/lib/net472/0MultiplayerAPI.dll" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" />
+  </Target>
 </Project>

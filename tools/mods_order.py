@@ -16,7 +16,10 @@ import os
 import sys
 import xml.etree.ElementTree as ET
 
-ALWAYS_OUT = {"rwmt.multiplayer": "другой сетевой мод", "rwmt.multiplayercompatibility": "другой сетевой мод"}
+# rwmt.multiplayer — другой сетевой мод; его место занимает мост RWMLWC (Multiplayer API, T-085), поэтому
+# Multiplayer Compatibility включается, а зависимость от rwmt.multiplayer считается выполненной.
+ALWAYS_OUT = {"rwmt.multiplayer": "другой сетевой мод (его заменяет мост RWMLWC)"}
+PROVIDED = {"rwmt.multiplayer"}
 CORE = ["brrainz.harmony", "ludeon.rimworld", "ludeon.rimworld.royalty", "ludeon.rimworld.ideology",
         "ludeon.rimworld.biotech", "ludeon.rimworld.anomaly", "ludeon.rimworld.odyssey"]
 OURS = "mikisnikirs.rwmlwc"
@@ -104,6 +107,8 @@ def main():
             if pid in out_reason:
                 continue
             for dep in m["deps"]:
+                if dep in PROVIDED:
+                    continue
                 if dep in out_reason or (dep not in known and not dep.startswith("ludeon.")):
                     out_reason[pid] = f"зависит от {dep}" + (" (выкинут)" if dep in out_reason else " (не установлен)")
                     changed = True

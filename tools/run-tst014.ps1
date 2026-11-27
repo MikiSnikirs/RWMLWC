@@ -31,7 +31,8 @@ param(
     [int]$RejoinDelaySec = 600, # -Scenario rejoin: how long c1 plays alone after c2 quits
     [int]$RejoinTicks = 3000,   # -Scenario rejoin: ticks c2 plays after coming back
     [string[]]$ExtraArm = @(),  # extra key=value lines for every client's arm file, e.g. caravantest=1   # game language folder for c2 only, e.g. English (players with different languages)
-    [switch]$NoBuild
+    [switch]$NoBuild,
+    [string]$ModsConfig = ''    # TST-054: ModsConfig.xml of a mod pack (tools/mods_order.py) instead of vanilla + RWMLWC
 )
 
 $ErrorActionPreference = 'Stop'
@@ -110,6 +111,8 @@ for ($c = 1; $c -le $Clients; $c++) {
     Copy-Item (Join-Path $data 'Config') (Join-Path $dir 'Config') -Recurse
     # Test runs are vanilla + DLC + Harmony + RWMLWC regardless of the mod list of the normal game (copy only).
     $mc = Join-Path $dir 'Config\ModsConfig.xml'
+    if ($ModsConfig) { Copy-Item -LiteralPath $ModsConfig -Destination $mc -Force }
+    else {
     $xml = [xml](Get-Content -LiteralPath $mc -Raw -Encoding UTF8)
     $active = $xml.ModsConfigData.activeMods
     foreach ($li in @($active.li)) {
@@ -120,6 +123,7 @@ for ($c = 1; $c -le $Clients; $c++) {
     }
     $add = $xml.CreateElement('li'); $add.InnerText = 'mikisnikirs.rwmlwc'; [void]$active.AppendChild($add)
     $xml.Save($mc)
+    }
     # Two windows share the screen: the one without focus must keep running (Options: "Run in background").
     $pf = Join-Path $dir 'Config\Prefs.xml'
     if (Test-Path -LiteralPath $pf) {

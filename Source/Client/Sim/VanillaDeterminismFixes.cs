@@ -579,3 +579,33 @@ internal static class Patch_ThingGrid_Register_SaveableOnly
 {
     private static bool Prefix(Thing t) => !PerMapSim.Enabled || t.def.isSaveable;
 }
+
+/// <summary>
+/// Загрузка игры (Game.LoadGame вместе с FinalizeInit/LoadedGame компонентов игры и модов) идёт на общем
+/// состоянии Rand, засеянном одним и тем же числом (как SeedGameLoad в RimWorld Multiplayer). В сессии все игроки
+/// загружают один и тот же сейв или снимок, но Rand к этому моменту у каждого свой — и всё, что моды делают при
+/// загрузке со случайностью, расходится. Найдено со сборкой модов (T-085, t085f): Fortified
+/// (GameComponent_WorldGenSiteFactionRepair) дозаполняет места мира со случайной клеткой, а GameComponent_Readiness
+/// назначает случайные сроки — у двух клиентов по-разному. Состояние Rand после загрузки возвращается прежним.
+/// </summary>
+[HarmonyPatch(typeof(Game), nameof(Game.LoadGame))]
+internal static class Patch_Game_LoadGame_SeedRand
+{
+    public const int LoadSeed = 1;
+
+    [HarmonyPriority(Priority.First)]
+    private static void Prefix(out bool __state)
+    {
+        Rand.PushState(LoadSeed);
+        __state = true;
+    }
+
+    [HarmonyPriority(Priority.Last)]
+    private static void Finalizer(bool __state)
+    {
+        if (__state)
+        {
+            Rand.PopState();
+        }
+    }
+}
