@@ -1,0 +1,204 @@
+# RWMLWC: методов с нашими патчами 525, из них патчат и другие 54, с чужим префиксом 31
+RimWorld.Command_Ability.ProcessInput | наши: GizmoCommands.Prefix, GizmoCommands.Finalizer
+    ПРЕФИКС DMSSR DMSSR.Buildings.Patch_CommandAbility_ProcessInput_ReversalEngineControl.Prefix (приоритет 400)
+    ПРЕФИКС Leo.CleanCommandBar Leo.CleanCommandBar.Patch_CommandAbility.Prefix_ProcessInput (приоритет 400)
+    постфикс DMSSR DMSSR.Buildings.Patch_CommandAbility_ProcessInput_ReversalEngineControl.Finalizer (приоритет 400)
+RimWorld.CompLaunchable.TryLaunch | наши: Patch_CompLaunchable_TryLaunch.Prefix
+    ПРЕФИКС AOBA.DMS DMS.Patch_ShuttleLaunchBounds.Prefix (приоритет 400)
+    ПРЕФИКС DMSE DMSE.Patch_InterceptRisk_TryLaunch.Prefix (приоритет 400)
+    ПРЕФИКС DMSSR DMSSR.Mech.Patch_HydraShuttleNativeLaunch.Prefix (приоритет 400)
+    транспайлер AOBA.DMS DMS.Patch_ShuttleLaunchBounds.Transpiler (приоритет 400)
+RimWorld.Designator_Mine.DesignateSingleCell | наши: DesignatorCommands.PrefixCell
+    ПРЕФИКС rabiosus.minesight MineSight.DesignateSingleCellPatch.Prefix (приоритет 400)
+RimWorld.Dialog_BillConfig.DoWindowContents | наши: FieldWatch.Prefix, FieldWatch.Finalizer
+    транспайлер fr.slimesenpai.rimworld.endlessgrowth SlimeSenpai.EndlessGrowth.Dialog_BillConfig_DoWindowContents_Patch.Transpiler (приоритет 400)
+RimWorld.Dialog_LoadTransporters.TryAccept | наши: Patch_Dialog_LoadTransporters_TryAccept.Prefix
+    ПРЕФИКС DMSAM.EmcAlchemyTransporter DMSEMC.EmcAlchemyTryAcceptPatch.Prefix (приоритет 400)
+RimWorld.FloatMenuOptionProvider_DraftedMove.PawnGotoAction | наши: Patch_DraftedMove_PawnGotoAction.Prefix
+    ПРЕФИКС Fortified Fortified.Patch_PawnGotoAction.Prefix (приоритет 400)
+    ПРЕФИКС AWL_Patch AzWeaponLib.AmmoSystem.Patch_FloatMenuOptionProvider_DraftedMove.Prefix_PawnGotoAction (приоритет 400)
+    ПРЕФИКС DMSSR DMSSR.Buildings.Patch_DraftedMove_PawnGotoAction_ReversalEngineControl.Prefix (приоритет 400)
+    постфикс DMSSR DMSSR.Buildings.Patch_DraftedMove_PawnGotoAction_ReversalEngineControl.Finalizer (приоритет 400)
+RimWorld.HealthCardUtility.DrawOverviewTab | наши: FieldWatch.Prefix, FieldWatch.Finalizer
+    транспайлер rimworld.erdelf.alien_race.main AlienRace.HarmonyPatches.BodyReferenceTranspiler (приоритет 400)
+RimWorld.IncidentWorker.TryExecute | наши: Patch_IncidentWorker_TryExecute_AbsentOwner.Prefix
+    ПРЕФИКС OskarPotocki.VEF VEF.Storyteller.VanillaExpandedFramework_IncidentWorker_TryExecute_Patch.Prefix (приоритет 400)
+    ПРЕФИКС voyager.crisis.point.shop VoyagerCrisisShop.Patch_IncidentWorker_TryExecute.Prefix (приоритет 400)
+    ПРЕФИКС Fortified Fortified.Patch_IncidentWork.Prefix (приоритет 400)
+    ПРЕФИКС Fortified Fortified.Patch_IncidentWorkerForDevice.Prefix (приоритет 400)
+    ПРЕФИКС AOBA.DMS DMS.Patch_IncidentWorker_FleetAidStrength.Prefix (приоритет 400)
+    постфикс voyager.crisis.point.shop VoyagerCrisisShop.Patch_IncidentWorker_TryExecute.Postfix (приоритет 400)
+    постфикс Genes40k.Mod Genes40k.LivingSaintResurrection.Postfix (приоритет 400)
+RimWorld.MapInterface.MapInterfaceOnGUI_BeforeMainTabs | наши: Patch_MapInterface_RemoteCursorLabels.Postfix
+    постфикс rabiosus.minesight MineSight.MineHighlightMarkerPatch.Postfix (приоритет 400)
+RimWorld.MapInterface.MapInterfaceUpdate | наши: Patch_MapInterface_RemoteCursors.Postfix, Patch_MapInterface_SquadRings.Postfix
+    постфикс rabiosus.minesight MineSight.MineSightOverlayDrawPatch.Postfix (приоритет 400)
+RimWorld.MoteMaker.MakeMoodThoughtBubble | наши: VisualRandIsolation.Prefix, VisualRandIsolation.Finalizer
+    ПРЕФИКС VPEPuppeteerMod VPEPuppeteer.MoteMaker_MakeMoodThoughtBubble_Patch.Prefix (приоритет 2147483647)
+RimWorld.PawnBioAndNameGenerator.GeneratePawnName | наши: TextRandIsolation.Prefix, TextRandIsolation.Finalizer
+    ПРЕФИКС rimworld.erdelf.alien_race.main AlienRace.HarmonyPatches.GeneratePawnNamePrefix (приоритет 400)
+RimWorld.Pawn_MeleeVerbs.TryGetMeleeVerb | наши: Patch_Pawn_MeleeVerbs_TryGetMeleeVerb.Prefix
+    постфикс SimsTraitsMod SimsTraits.Pawn_MeleeVerbs_TryGetMeleeVerb_Patch.Postfix (приоритет 400)
+RimWorld.PawnsArrivalModeWorker_EmergeFromWater.Arrive | наши: Patch_EmergeFromWater_TargetMap.Transpiler
+    постфикс OskarPotocki.VEF VEF.Storyteller.RaidPatches.RaidGroupChecker (приоритет 400)
+RimWorld.Planet.Caravan_PathFollower.StartPath | наши: Patch_Caravan_PathFollower_StartPath.Prefix
+    постфикс OskarPotocki.VEF VEF.Planet.Caravan_PathFollower_StartPath_Patch.Postfix (приоритет 400)
+RimWorld.Planet.SettleInEmptyTileUtility.SettleCommand | наши: Patch_SettleCommand_Reason.Postfix
+    ПРЕФИКС GeologicalLandforms.Main GeologicalLandforms.Patches.Patch_RimWorld_TileFinder+PlayerSelectingTileContext.Prefix (приоритет 900)
+    постфикс GeologicalLandforms.Main GeologicalLandforms.Patches.Patch_RimWorld_TileFinder+PlayerSelectingTileContext.Finalizer (приоритет 400)
+RimWorld.Planet.Settlement.GetGizmos | наши: Patch_Settlement_GetGizmos_Visit.Postfix
+    постфикс pb3n.Taranchuk.SimpleLeadership SimpleLeadership.Settlement_GetGizmos_Patch.Postfix (приоритет 400)
+RimWorld.Planet.WorldPawnGC.GetCriticalPawnReason | наши: Patch_WorldPawnGC_Reason_SleepRemove.Postfix
+    постфикс OberoniaAureaFrame_Hramony OberoniaAurea_Frame.GetCriticalPawnReason_Patch.Postfix (приоритет 400)
+RimWorld.Planet.WorldPawns.PassToWorld | наши: Patch_WorldPawns_PassToWorld_Event.Prefix, Patch_WorldPawns_PassToWorld_Event.Postfix
+    ПРЕФИКС VFEEmpire.Mod VFEEmpire.HarmonyPatches.Patch_WorldPawns_PassToWorld.Prefix (приоритет 400)
+    ПРЕФИКС com.NewRatkin.rimworld.mod.wanderingtrader NewRatkin.Pawn_ExitMap_Patch.PassToWorld_Prefix (приоритет 400)
+RimWorld.PlaySettings.DoPlaySettingsGlobalControls | наши: FieldWatch.Prefix, Patch_PlaySettings_SessionButton.Postfix, Patch_PlaySettings_DoPlaySettingsGlobalControls.Postfix, Patch_PlaySettings_SosButton.Postfix, FieldWatch.Finalizer
+    постфикс Dubwise.DubsMintMinimap DubsMintMinimap.H_DoPlaySettingsGlobalControls.Postfix (приоритет 400)
+    постфикс rimworld.Nals.FacialAnimation FacialAnimation.HarmonyPatches.PostfixDoPlaySettingsGlobalControls (приоритет 400)
+    постфикс Helixien.ReGrowthCore ReGrowthCore.PlaySettings_DoPlaySettingsGlobalControls_Patch.Postfix (приоритет 400)
+RimWorld.QuestManager.Add | наши: Patch_QuestManager_Add_Log.Postfix
+    постфикс OskarPotocki.VEF VEF.Storyteller.VanillaExpandedFramework_QuestManager_Add_Patch.Postfix (приоритет 400)
+RimWorld.ResearchManager.SetCurrentProject | наши: MethodCommands.Prefix
+    постфикс seohyeon.yart YART.ResearchManager_SetCurrentProject_Patch.Postfix (приоритет 400)
+RimWorld.ResearchManager.StopProject | наши: MethodCommands.Prefix
+    постфикс seohyeon.yart YART.ResearchManager_StopProject_Patch.Postfix (приоритет 400)
+RimWorld.Storyteller.TryFire | наши: Patch_Storyteller_TryFire_QuestRequest.Prefix, Patch_Storyteller_TryFire_MissingMap.Prefix, Patch_Storyteller_TryFire_MapContext.Prefix, Patch_Storyteller_TryFire_AbsentOwner.Prefix, Patch_Storyteller_TryFire_MapContext.Finalizer
+    ПРЕФИКС OskarPotocki.VEF VEF.Storyteller.VanillaExpandedFramework_Storyteller_TryFire_Patch.Prefix (приоритет 400)
+    ПРЕФИКС BreadMo.Cinders.Storyteller Embergarden.Storytelling.EmberThreatBudgetPatch.Prefix (приоритет 400)
+RimWorld.StorytellerUtility.DefaultThreatPointsNow | наши: Patch_DefaultThreatPointsNow_Target.Prefix, Patch_DefaultThreatPointsNow_AbsentWealth.Prefix, Patch_DefaultThreatPointsNow_Target.Finalizer, Patch_DefaultThreatPointsNow_AbsentWealth.Finalizer
+    ПРЕФИКС DMSSR DMSSR.Gene.Patch_GeneSet_ThreatPoints.Prefix (приоритет 400)
+    постфикс DMSSR DMSSR.Gene.Patch_GeneSet_ThreatPoints.Postfix (приоритет 400)
+RimWorld.TendUtility.DoTend | наши: Patch_TendUtility_DoTend_WorldPawnRand.Prefix, Patch_TendUtility_DoTend_WorldPawnRand.Finalizer
+    постфикс Genes40k.Mod Genes40k.SerfSavedByTend.Postfix (приоритет 400)
+RimWorld.TradeDeal.TryExecute | наши: Patch_TradeDeal_TryExecute.Prefix
+    ПРЕФИКС OskarPotocki.VEF VEF.Factions.TradeDeal_TryExecute_Patch.Prefix (приоритет 400)
+    ПРЕФИКС OskarPotocki.VanillaPsycastsExpanded VanillaPsycastsExpanded.TradeDeal_TryExecute_Patch.Prefix (приоритет 400)
+    транспайлер SimsTraitsMod SimsTraits.TradeDeal_TryExecute_Patch.Transpiler (приоритет 400)
+    постфикс OskarPotocki.VEF VEF.Factions.TradeDeal_TryExecute_Patch.Postfix (приоритет 400)
+    постфикс OskarPotocki.VanillaPsycastsExpanded VanillaPsycastsExpanded.TradeDeal_TryExecute_Patch.Postfix (приоритет 400)
+    постфикс com.vanillamemesexpanded VanillaMemesExpanded.VanillaMemesExpanded_TradeDeal_TryExecute_Patch.NotifySuccessfulTrade (приоритет 400)
+RimWorld.UIRoot_Play.UIRootOnGUI | наши: Patch_UIRoot_Play_LocalClock.Prefix, Patch_UIRoot_Play_LocalClock.Finalizer
+    ПРЕФИКС Dubwise.PerformanceAnalyzer Analyzer.H_KeyPresses.OnGUI (приоритет 400)
+RimWorld.WorkGiver_ConstructDeliverResourcesToBlueprints.JobOnThing | наши: Patch_DeliverToBlueprints_Pending.Prefix
+    ПРЕФИКС OskarPotocki.VEF VEF.Pawns.Workgiver_Patches.Prefix (приоритет 400)
+Verse.AI.Pawn_JobTracker.StartJob | наши: Patch_Pawn_JobTracker_StartJob_FrameCount.Prefix
+    ПРЕФИКС OskarPotocki.VanillaTraitsExpanded VanillaTraitsExpanded.StartJob_Patch.Prefix (приоритет 400)
+    ПРЕФИКС OskarPotocki.VanillaPsycastsExpanded VanillaPsycastsExpanded.Pawn_JobTracker_StartJob_Patch.Prefix (приоритет 400)
+Verse.AI.Pawn_JobTracker.TryTakeOrderedJob | наши: Patch_TryTakeOrderedJob_Who.Postfix
+    ПРЕФИКС OskarPotocki.VanillaTraitsExpanded VanillaTraitsExpanded.TryTakeOrderedJob_Patch.Prefix (приоритет 400)
+    постфикс SimsTraitsMod SimsTraits.Pawn_JobTracker_TryTakeOrderedJob_Patch.Postfix (приоритет 400)
+    постфикс DMSSR DMSSR.Buildings.Patch_PawnJobTracker_TryTakeOrderedJob_ReversalEngineControl.Postfix (приоритет 400)
+    постфикс OskarPotocki.VanillaTraitsExpanded VanillaTraitsExpanded.TryTakeOrderedJob_Patch.Postfix (приоритет 400)
+Verse.CameraJumper.TryJumpAndSelect | наши: Patch_CameraJumper_TryJumpAndSelect_Remote.Prefix, VisualRandIsolation.Prefix, VisualRandIsolation.Finalizer
+    ПРЕФИКС Fortified Fortified.Patch_CameraJumper_TryJumpAndSelect.Prefix (приоритет 400)
+Verse.Command_Action.ProcessInput | наши: GizmoCommands.Prefix, GizmoCommands.Finalizer
+    ПРЕФИКС Leo.CleanCommandBar.VPE Leo.CleanCommandBar.VPE.Patch_VPE.Prefix_ProcessInput (приоритет 400)
+Verse.Command_SetPlantToGrow.ProcessInput | наши: GizmoCommands.Prefix, GizmoCommands.Finalizer
+    ПРЕФИКС Andromeda.NicePlantsMenu NicePlantsMenu.Patch_Command_SetPlantToGrow.Prefix (приоритет 400)
+    ПРЕФИКС Dubwise.DubsMintMenus DubsMintMenus.Patch_Command_SetPlantToGrow.Prefix (приоритет 400)
+Verse.Command_VerbTarget.ProcessInput | наши: GizmoCommands.Prefix, GizmoCommands.Finalizer
+    ПРЕФИКС DMSSR DMSSR.Buildings.Patch_CommandVerbTarget_ProcessInput_ReversalEngineControl.Prefix (приоритет 400)
+    ПРЕФИКС Leo.CleanCommandBar Leo.CleanCommandBar.Patch_CommandVerbOwner.Prefix_ProcessInput (приоритет 400)
+    постфикс DMSSR DMSSR.Buildings.Patch_CommandVerbTarget_ProcessInput_ReversalEngineControl.Finalizer (приоритет 400)
+Verse.Designator.DesignateMultiCell | наши: DesignatorCommands.PrefixCells
+    ПРЕФИКС rabiosus.minesight MineSight.DesignateMultiCellPatch.Prefix (приоритет 400)
+    постфикс rabiosus.minesight MineSight.DesignateMultiCellPatch.Postfix (приоритет 400)
+    постфикс rabiosus.minesight MineSight.DesignateMultiCellPatch.Finalizer (приоритет 400)
+Verse.DesignatorManager.Select | наши: Patch_DesignatorManager_Select.Prefix
+    ПРЕФИКС Dubwise.DubsMintMenus DubsMintMenus.HarmonyPatches+H_DesignatorManager_Select.Prefix (приоритет 400)
+Verse.Game.InitNewGame | наши: Patch_Game_InitNewGame_RegionIds.Prefix
+    транспайлер OskarPotocki.VEF VEF.Maps.VanillaExpandedFramework_Game_InitNewGame_Patch.TweakMapSizes (приоритет 400)
+Verse.Game.LoadGame | наши: Patch_Game_LoadGame_RegionIds.Prefix, Patch_Game_LoadGame_RegionIds.Postfix
+    ПРЕФИКС Mlie.PerspectiveBuildings Perspective.Game_LoadGame.Prefix (приоритет 400)
+    постфикс MRK.architectmenuoptimizer ArchitectMenuOptimizer.Patches.Patch_Invalidation_GameLoad.Postfix (приоритет 400)
+Verse.GetOrGenerateMapUtility.GetOrGenerateMap | наши: Patch_GetOrGenerateMap_Split.Prefix
+    ПРЕФИКС OskarPotocki.VEF VEF.Maps.VanillaExpandedFramework_GetOrGenerateMapUtility_GetOrGenerateMap_Patch.TweakMapSizes (приоритет 400)
+Verse.GizmoGridDrawer.DrawGizmoGrid | наши: Patch_GizmoGridDrawer_DrawGizmoGrid.Prefix, Patch_GizmoGridDrawer_DrawGizmoGrid.Finalizer
+    транспайлер MRK.architectmenuoptimizer ArchitectMenuOptimizer.Patches.Patch_GizmoGrid.Transpiler (приоритет 0)
+    транспайлер Leo.CleanCommandBar Leo.CleanCommandBar.Patch_GizmoGridDrawer_Transpiler.Transpiler (приоритет 400)
+    транспайлер Leo.CleanCommandBar.VPE Leo.CleanCommandBar.VPE.Patch_GizmoGridDrawer_Transpiler_VPE.Transpiler (приоритет 400)
+Verse.LetterStack.ReceiveLetter | наши: Patch_LetterStack_ReceiveLetter_Alarm.Postfix
+    постфикс SimsTraitsMod SimsTraits.LetterStack_ReceiveLetter_Patch.Postfix (приоритет 400)
+    постфикс DMS_Legion DMS_Legion.Incidents.UnknownMechSupport.LetterStack_ReceiveLetter_HalfDownedLetter_Patch.Postfix (приоритет 400)
+Verse.Map.MapPostTick | наши: Patch_Map_MapPostTick.Prefix, Patch_Map_MapPostTick_WorldWrites.Prefix, Patch_Map_MapPostTick.Finalizer, Patch_Map_MapPostTick_WorldWrites.Finalizer
+    постфикс SimsTraitsMod SimsTraits.Map_MapPostTick_Patch.Postfix (приоритет 400)
+Verse.Map.MapPreTick | наши: Patch_Map_MapPreTick.Prefix, Patch_Map_MapPreTick_WorldWrites.Prefix, Patch_Map_MapPreTick.Finalizer, Patch_Map_MapPreTick_WorldWrites.Finalizer
+    постфикс Helixien.ReGrowthCore ReGrowthCore.Patch_Map_MapPreTick.Postfix (приоритет 400)
+Verse.Pawn.DeSpawn | наши: Patch_Pawn_DeSpawn_Clock.Prefix
+    ПРЕФИКС legodude17.mvcf MVCF.PatchSets.PatchSet_IndependentVerbs.Postfix_Pawn_DeSpawn (приоритет 400)
+    постфикс OskarPotocki.VEF VEF.Hediffs.ShieldsSystem.OnPawnDespawn (приоритет 400)
+    постфикс OskarPotocki.VEF VEF.Hediffs.PhasingPatches.Despawn_Postfix (приоритет 400)
+    постфикс OskarPotocki.VanillaPsycastsExpanded VanillaPsycastsExpanded.Pawn_Spawn_Patches.PawnPostDeSpawned (приоритет 400)
+Verse.Pawn.ExitMap | наши: Patch_Pawn_ExitMap_MapEvent.Prefix, Patch_Pawn_ExitMap_MapEvent.Postfix, Patch_Pawn_ExitMap_MapEvent.Finalizer
+    ПРЕФИКС Fortified Fortified.Patch_FFF_Pawn_ExitMap.Prefix (приоритет 400)
+    ПРЕФИКС gtek.meleestuff GTekFunctions.HarmonyPatchesGTekMelee.ExitMap_PreFix (приоритет 400)
+    ПРЕФИКС DMS_Legion DMS_Legion.Incidents.EngineerArrival.Patch_Pawn_ExitMap.Prefix (приоритет 400)
+    постфикс OskarPotocki.VanillaTraitsExpanded VanillaTraitsExpanded.ExitMap_Patch.Postfix (приоритет 400)
+Verse.Pawn.GetGizmos | наши: Patch_Pawn_GetGizmos_PlayerTrade.Postfix, Patch_Pawn_GetGizmos_Lend.Postfix, Patch_Pawn_GetGizmos_Squads.Postfix
+    постфикс WeaponSwitch.Mod GTekFunctions.Patch_GetGizmos.Postfix (приоритет 400)
+    постфикс OskarPotocki.VEF VEF.VanillaExpandedFramework_Pawn_GetGizmos_Patch.Postfix (приоритет 400)
+    постфикс VFEEmpire.Mod VFEEmpire.HarmonyPatches.Patch_HonorsMisc.GetGizmos_Postfix (приоритет 400)
+    постфикс Fortified Fortified.Patch_MechModificationGizmo.Postfix (приоритет 400)
+    постфикс AOBA.Embergarden Embergarden.PawnGizmoPatch.Postfix (приоритет 400)
+    постфикс DMSSR DMSSR.Buildings.Patch_Pawn_GetGizmos_ReversalEngineControl.Postfix (приоритет 400)
+    постфикс DMSSR DMSSR.Hediffs.Patch_Pawn_BiogelGizmo.Postfix (приоритет 400)
+    постфикс DMSSR DMSSR.Patches.Patch_MechParticleBeam_ChargeGizmo.Postfix (приоритет 400)
+    постфикс DMSSR DMSSR.Patches.Patch_Pawn_GetGizmos_AddDownedUndying.Postfix (приоритет 400)
+    постфикс dmsac.missile.patch DMSACMissile.Patch_Pawn_GetGizmos.Postfix (приоритет 400)
+    постфикс com.dms.guardianshield GuardianShield.Patch_Pawn_GetGizmos.Postfix (приоритет 400)
+    постфикс legodude17.mvcf MVCF.PatchSets.PatchSet_Animals.Pawn_GetGizmos_Postfix (приоритет 400)
+Verse.Pawn.Kill | наши: Patch_Pawn_Kill_TestSafety.Prefix, Patch_Pawn_Kill_MapEvent.Prefix, Patch_Pawn_Kill_MapEvent.Postfix
+    ПРЕФИКС com.ASEL.RimworldMod ASEL.HarmonyPatches+Pawn_Kill_Patch.Prefix (приоритет 400)
+    ПРЕФИКС OskarPotocki.VEF VEF.Storyteller.VanillaExpandedFramework_Pawn_Kill_Patch.Prefix (приоритет 400)
+    ПРЕФИКС OskarPotocki.VEF VEF.Apparels.VanillaExpandedFramework_Pawn_Kill_Patch.Prefix (приоритет 400)
+    ПРЕФИКС VPEPuppeteerMod VPEPuppeteer.Pawn_Kill_Patch.Prefix (приоритет 400)
+    ПРЕФИКС AOBA.DMS DMS.Patch_Pawn_Kill_BossKilledSignal.Prefix (приоритет 400)
+    ПРЕФИКС BreadMo.Cinders.Storyteller Embergarden.Storytelling.EmberColonistDeathPatch.Prefix (приоритет 400)
+    ПРЕФИКС DMSSR DMSSR.Patches.Patch_Schizophrenia_CascadeKill.Prefix (приоритет 400)
+    ПРЕФИКС DMSSR DMSSR.Content.Patch_ContentDeathDrops.Prefix (приоритет 400)
+    ПРЕФИКС DMSSR DMSSR.Content.Patch_ScourgeNextDeath.Prefix (приоритет 400)
+    ПРЕФИКС OskarPotocki.VanillaPsycastsExpanded VanillaPsycastsExpanded.Pawn_Kill_Patch.Prefix (приоритет 400)
+    ПРЕФИКС OskarPotocki.VanillaPsycastsExpanded VanillaPsycastsExpanded.Skipmaster.SkipdoorPatches.Pawn_Kill_Prefix (приоритет 400)
+    постфикс com.ASEL.RimworldMod ASEL.HarmonyPatches+Pawn_Kill_Patch.Postfix (приоритет 400)
+    постфикс OskarPotocki.VEF VEF.Pawns.VanillaExpandedFramework_Pawn_Kill.Postfix (приоритет 400)
+    постфикс OskarPotocki.VEF VEF.Apparels.VanillaExpandedFramework_Pawn_Kill_Patch.Postfix (приоритет 400)
+    постфикс VFEEmpire.Mod VFEEmpire.HarmonyPatches.ColonistTitleCache+OnPawn.Postfix (приоритет 400)
+    постфикс vanillaexpanded.factions.deserters VFED.HarmonyPatches.MiscPatches.ExplodePackOnDeath (приоритет 400)
+    постфикс pb3n.Taranchuk.SimpleLeadership SimpleLeadership.Pawn_Kill_Patch.Postfix (приоритет 400)
+    постфикс Genes40k.Mod Genes40k.LivingSaintAscension.Postfix (приоритет 400)
+    постфикс AOBA.DMS DMS.Patch_Pawn_Kill_BossKilledSignal.Postfix (приоритет 400)
+    постфикс BreadMo.Cinders.Storyteller Embergarden.Storytelling.EmberColonistDeathPatch.Postfix (приоритет 400)
+    постфикс DMSSR DMSSR.Patches.Patch_Schizophrenia_CascadeKill.Postfix (приоритет 400)
+    постфикс DMSSR DMSSR.Content.Patch_ContentDeathDrops.Postfix (приоритет 400)
+    постфикс DMSSR DMSSR.Bosses.Hydra.Patch_HydraDisguiseKilled.Postfix (приоритет 400)
+    постфикс OskarPotocki.VanillaPsycastsExpanded VanillaPsycastsExpanded.Pawn_Kill_Patch.Postfix (приоритет 400)
+Verse.Pawn.SpawnSetup | наши: Patch_Pawn_SpawnSetup_EnterEvent.Prefix, Patch_Pawn_SpawnSetup_EnterEvent.Postfix, Patch_Pawn_SpawnSetup_Clock.Postfix
+    постфикс OskarPotocki.VEF VEF.Apparels.CompShieldField+SpawnSetup_Patch.Postfix (приоритет 400)
+    постфикс Genes40k.Mod Genes40k.SerfBuffOnSpawn.Postfix (приоритет 400)
+    постфикс Genes40k.Mod Genes40k.SpaceMarineChapterSpawn.Postfix (приоритет 400)
+    постфикс OskarPotocki.VEF VEF.Hediffs.ShieldsSystem.OnPawnSpawn (приоритет 400)
+    постфикс OskarPotocki.VEF VEF.Hediffs.PhasingPatches.CheckPhasing (приоритет 400)
+    постфикс DMSSR DMSSR.Mech.Patch_MechCarrier_PassengerSpawned.Postfix (приоритет 400)
+    постфикс DMSSR DMSSR.Abilities.Patch_BullfrogJumpMigration.Postfix (приоритет 400)
+    постфикс DMSSR DMSSR.Patches.Patch_InitialDeathCheat_SpawnSetup.Postfix (приоритет 400)
+    постфикс OskarPotocki.VanillaTraitsExpanded VanillaTraitsExpanded.SpawnSetup_Patch.Postfix (приоритет 400)
+    постфикс OskarPotocki.VanillaPsycastsExpanded VanillaPsycastsExpanded.Pawn_Spawn_Patches.PawnPostSpawned (приоритет 400)
+    постфикс legodude17.mvcf MVCF.PatchSets.PatchSet_IndependentVerbs.Postfix_Pawn_SpawnSetup (приоритет 400)
+Verse.PawnCapacitiesHandler.GetLevel | наши: Patch_PawnCapacitiesHandler_GetLevel_SimOnly.Transpiler
+    постфикс DMSSR DMSSR.Patches.Patch_Schizophrenia_ConsciousnessFloor.Postfix (приоритет 400)
+Verse.Pawn_DrawTracker.get_DrawPos | наши: Patch_Pawn_DrawTracker_DrawPos.Postfix
+    постфикс OskarPotocki.VEF VEF.AestheticScaling.VanillaExpandedFramework_Pawn_DrawTracker_DrawPos_Patch.Postfix (приоритет 400)
+Verse.Sound.SoundStarter.PlayOneShot | наши: VisualRandIsolation.Prefix, VisualRandIsolation.Finalizer
+    ПРЕФИКС AOBA.DMS DMS.Patch_SoundStarter_PlayOneShot_FogSilence.Prefix (приоритет 400)
+    ПРЕФИКС senilia.deadmanswitch.moreweaponsounds GAU8TailSound.Patch_SoundStarter_PlayOneShot.Prefix (приоритет 400)
+Verse.TickManager.DoSingleTick | наши: Patch_TickManager_DoSingleTick.Prefix, Patch_TickManager_DoSingleTick_StrayGuard.Prefix, Patch_TickManager_DoSingleTick_Timer.Prefix, Patch_TickManager_DoSingleTick_RoomProbe.Postfix, Patch_TickManager_DoSingleTick_Timer.Postfix, Patch_TickManager_DoSingleTick.Finalizer
+    ПРЕФИКС OskarPotocki.VEF VEF.Maps.VanillaExpandedFramework_DoSingleTick_Patch.Prefix (приоритет 400)
+    постфикс OskarPotocki.VEF VEF.Maps.VanillaExpandedFramework_DoSingleTick_Patch.Postfix (приоритет 400)
+    постфикс DMSAM.SupportManager DMSAM.SupportManager.DoSingleTickPostfix (приоритет 400)
+    постфикс Helixien.ReGrowthCore ReGrowthCore.Patch_TickManager_DoSingleTick.Postfix (приоритет 400)
+Verse.Verb.OrderForceTarget | наши: VirtualUi.OrderForceTargetPrefix
+    ПРЕФИКС SimsTraitsMod SimsTraits.Verb_OrderForceTarget_Patch.Prefix (приоритет 400)
+    ПРЕФИКС DMSSR DMSSR.Buildings.Patch_Verb_OrderForceTarget_ReversalEngineControl.Prefix (приоритет 400)
+    ПРЕФИКС legodude17.mvcf MVCF.PatchSets.PatchSet_MultiVerb.Prefix_OrderForceTarget (приоритет 400)
+    постфикс DMSSR DMSSR.Buildings.Patch_Verb_OrderForceTarget_ReversalEngineControl.Finalizer (приоритет 400)
