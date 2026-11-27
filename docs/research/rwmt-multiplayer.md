@@ -92,3 +92,61 @@
 2. Перенять их дешёвый стек на каждый `Rand` (MIT, с указанием авторства) — инструмент для этапа 2.
 3. Проверить у нас список исправлений ванили из раздела «Где у них лучше», п. 2.
 4. Свою модель ввода не менять: для модов она сильнее.
+
+## Сверка исправлений ванили (T-088, 27.11.2026)
+
+Проверено по коду игры **1.7.5021** (игра обновилась 27.11 утром; декомпиляция `ilspycmd` 11.2 в `%USERPROFILE%\rw-decompiled-5021`). Multiplayer (ветка `dev`) уже рассчитан на 1.7, но каждое место смотрелось в нашей версии игры заново. Сверялись все их патчи, которые касаются совпадения симуляции: `Determinism.cs`, `Seeds.cs`, `Patches.cs`, `HashCodes.cs`, `Odyssey.cs`, `Anomaly.cs`, `PathFinderPatch.cs`, `VTRSyncPatch.cs`, `TileTemperatures.cs` и др.
+
+### Применено у нас (`Source/Client/Sim/VanillaDeterminismFixes.cs`)
+
+| Место в игре | Что не так в 1.7.5021 | Правка в сессии |
+|---|---|---|
+| `Zone.Cells`, `Plan.Cells` | клетки перемешиваются через `Rand` при первом обращении; первым часто обращается подсказка огорода (`Zone_Growing.GetInspectString`) — на состоянии `Rand` показа, у каждого своём. По порядку клеток носят на склад и сеют | вне симуляции клетки без перемешивания |
+| `WealthWatcher.ForceRecount` | вкладка «История» и геттеры богатства пересчитывают его в кадре; богатство идёт в очки угроз | вне симуляции пересчёт пропускается (кроме создания карты) |
+| `DangerWatcher.DangerRating` | кэш «значение + тик», каждый кадр его спрашивает музыка | вне симуляции — последнее значение |
+| `Caravan.ImmobilizedByMass` | кэш на 60 тиков от первого спросившего | вне симуляции — без записи в кэш |
+| `Pawn_AbilityTracker.AllAbilitiesForReading` | список собирается тем, кто спросил первым (кнопки пешки) | вне симуляции — во временный список, кэш не трогается |
+| `PriorityWork.Clear` | геттер `IsPrioritized` из кнопок пешки сбрасывает приоритетную работу | вне симуляции сброс пропускается |
+| `SituationalThoughtHandler` (4 метода) | окно потребностей и вкладка отношений пересчитывают мысли и сдвигают сроки кэша | вне симуляции — только посчитанное, без пересчёта |
+| `PawnCapacitiesHandler.GetLevel` | способности (сознание, движение…) кэшируются тем, кто спросил первым, а боль меняется плавно, без сброса кэша | значение интерфейса помечается особо, симуляция его пересчитывает |
+| `CompDissolutionEffect_Goodwill/Pollution.WorldUpdate` | загрязнение мира и потеря отношений от растворения отходов применяются **раз в кадр** (`World.WorldUpdate`) | применяются перед каждым тиком, в кадре — нет |
+| `UndercaveMapComponent.MapComponentTick` (Anomaly) | вся логика обрушения, включая падение камней и `Rand`, идёт только у смотрящего на карту (`Find.CurrentMap`) — `SimCamera` этого не закрывал | камни и `Rand` у всех, тряска, звук и фоновые эффекты — у смотрящего |
+| `PawnsArrivalModeWorker_EmergeFromWater.Arrive` | ошибка игры: появление пешек ставится на `Find.CurrentMap`, а не на карту события | карта события |
+| `FastTileFinder.Query` | параллельный поиск клеток мира, 50 мест «кто первый успел» | один пакет — по порядку |
+| `PathFinder.PathFinderTick` | задание `PathGridDoorsBlockedJob` идёт в другом потоке **одновременно с тиком** и читает живые позиции и задания пешек. Наш разбор 6а считал поиск пути безопасным — это было неверно | задания завершаются сразу после постановки, до тика пешек |
+| `ThingGrid.Register` | мошки (не сохраняемые вещи) попадают в сетку вещей только у смотрящего | не сохраняемые вещи в сетку не ставятся |
+| `PawnBioAndNameGenerator.TryGetRandomUnusedSolidName` | общий список имён перемешивается на месте и хранит порядок всю жизнь процесса | перед выбором списки приводятся к одному порядку |
+| `QuestNode_TradeRequest_GetRequestedThing.RandomRequestCount` | **не из их списка**: зерно от `thingDef.GetHashCode()`, а хеш `Def` — хеш строки имени, в .NET он свой в каждом процессе | `shortHash` |
+
+### Уже было у нас
+
+- `StatWorker.GetValue` → `StatCacheIsolation`;
+- `Pawn_MeleeVerbs.TryGetMeleeVerb` → `MeleeVerbUiIsolation`;
+- `MapBrightnessTracker.Tick` (`deltaTime`) и `Pawn_JobTracker.StartJob` (номер кадра) → `FrameIndependentState`;
+- `WindManager.BaseWindSpeedAt` → `DeterministicGenSeed`;
+- `FishShadowComponent.MapComponentTick` → `VisualRandIsolation`;
+- мошки, `MoteAttachLink`, `MoteMaker.MakeStaticMote` → `VisualRandIsolation`;
+- `FloodFillerFog.FloodUnfog` (`allOnScreen`), `AnomalyUtility.TryGetNearbyUnseenCell` → `SimCamera` (кадр камеры в тике — вне карты);
+- `Pawn.ProcessPostTickVisuals`, `PawnTweener` → `TickStableDrawPos`, `TickDrivenRotation`;
+- `GenTicks.GetCameraUpdateRate` (их `VTRSyncPatch`) → 6з;
+- долгие события из тика → `SessionLongEvents`;
+- тексты и имена (`GrammarResolver`, `NameGenerator`, `GeneratePawnName`) → `TextRandIsolation`;
+- номера объектов, созданных интерфейсом → `FieldWatch` (`idgive`).
+
+### Не нужно в нашей модели или в 1.7.5021
+
+- **`Pawn_RecordsTracker.ExposeData` пишет `battleActive`.** Геттер `BattleActive` делает ту же запись при каждом чтении, результат одинаков.
+- **`PreceptComp_UnwillingToDo_Chance`, `RitualBehaviorWorker_GravshipLaunch.CanReachGravship`.** Вне тика у нас и так `Rand` показа. Кэш «может дойти» от `Rand` не зависит.
+- **`GenSpawn.Spawn` (`Rot4.Random`), `CaravanEnterMapUtility.Enter`, загрузка (`Game.LoadGame`, `Map.ExposeData`).** Команды и тик идут на общем `Rand`, загружают все один снимок.
+- **`PawnRenderer.SetAllGraphicsDirty`.** В 1.7 лямбда только ставит пометки, `Rand` нет.
+- **`Building_Electroharvester` / `Building_BioferriteHarvester`** (инициализация при отрисовке). Подписки перестраивают только провода — вид, `Rand` не берут.
+- **`Pawn_GeneTracker.Notify_GenesChanged` (`BiotechInstalled`).** Без включённого Biotech генов нет. Разный состав включённых DLC и так не допускается.
+- **`WorldObjectSelectionUtility.VisibleToCameraNow`, `Archive.Add`, сортировка одежды.** Первые два — только сообщение и архив писем. Сортировка одежды детерминирована.
+- **Хеши `GlowGrid.litGlowers`, `TargetInfo`, `Tradeable`.** В .NET порядок обхода `HashSet`/`Dictionary` не зависит от значений хешей, в зёрна эти хеши не идут.
+- **Их собственная модель:** своё время у каждой карты (`TileTemperatures`, `IncidentDef.TargetAllowed`, `IncidentWorker_Aurora`), фракции игроков (`FogGrid`, предупреждения), синхронизация и окна (`DiaOption`, `Designator`, `WorkSettings`, `MainTabWindow`, `ScreenFader`, `TickManager.Pause`, `DirectXmlSaver` и др.).
+
+### Найдено попутно, в этой задаче не сделано
+
+- **Окно автозабоя (`Dialog_AutoSlaughter`) в сессии не синхронизируется:** меняет настройки прямо в поле и зовёт `Notify_ConfigChanged` только у автора. Это пробел ввода, а не детерминизма; расхождение ловит сверка хешей.
+- **Окно имени гравикорабля** при первой постройке открывается у всех; имя не синхронизируется.
+- В .NET хеш строки свой в каждом процессе, поэтому любой код, который берёт `Def.GetHashCode()` или хеш строки в зерно `Rand`, расходится. В игре 1.7.5021 нашлось одно такое место (выше). **В модах их надо искать отдельно** (этап T-083).

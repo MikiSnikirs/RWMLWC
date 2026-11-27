@@ -83,6 +83,8 @@ internal static class FrameIndependentState
         // Поле статическое. Кэш способности «Скачок обломков» — поле экземпляра, его сбрасывает
         // Patch_CompAbilityEffect_Chunkskip_FindClosestChunks.
         accessibleThingsFrame?.SetValue(null, -1);
+        // Загрязнение мира и отношения от растворения отходов: в игре применяются раз в кадр (T-088).
+        Patch_CompDissolutionEffect_WorldUpdate_TickOnly.Flush();
     }
 }
 
