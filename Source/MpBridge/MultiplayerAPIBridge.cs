@@ -6,5 +6,11 @@ namespace Multiplayer.Common;
 /// </summary>
 public static class MultiplayerAPIBridge
 {
-    public static readonly global::Multiplayer.API.IAPI Instance = RWMLWC.Client.Input.MpApi.MpApiImpl.Create();
+    public static readonly global::Multiplayer.API.IAPI Instance = Create();
+
+    private static global::Multiplayer.API.IAPI Create()
+    {
+        global::Multiplayer.Client.AsyncTimeShimPatches.Install();
+        return RWMLWC.Client.Input.MpApi.MpApiImpl.Create();
+    }
 }
