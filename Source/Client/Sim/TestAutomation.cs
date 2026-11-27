@@ -453,6 +453,13 @@ public static class TestAutomation
         {
             // T-023, ч. 2: в тестовом сейве нет верстака и склада — ставим их обычной разметкой (у места для крафта
             // время постройки 0, игра ставит его сразу). Шаги со счётом и складом ждут, пока они появятся у этого клиента.
+            // Место для крафта ставится сразу, без чертежа, — игроку не из колонии это запрещено (T-052). Второй
+            // игрок становится соавтором (colonychoice=join) командой уже после начала прогона: установка ждёт этого,
+            // но не дольше 600 тиков (без соавторства шаги со счётом и складом не выполнятся).
+            int tabsStart = startTick;
+            stepGates["tabs: setup table and stockpile"] = () =>
+                RWMLWC.Client.Maps.BlueprintApproval.IsApprover(Find.CurrentMap ?? Find.Maps[0], LockstepClient.PlayerId)
+                || Find.TickManager.TicksGame >= tabsStart + 600;
             sessionSteps.Enqueue((startTick + 150, "tabs: setup table and stockpile", TabsSetup));
             stepGates["tabs: add bill"] = () => FirstWorkTable() != null;
             stepGates["tabs: storage filter"] = () => FirstStockpile() != null;
