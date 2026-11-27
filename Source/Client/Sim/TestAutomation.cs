@@ -497,6 +497,11 @@ public static class TestAutomation
                 sessionSteps.Enqueue((startTick + 600 + 300 * r + 60, "modweapons: gizmos", () => ModWeaponsPressGizmos(round)));
             }
         }
+        if (cfg.issuer && cfg.scenario == "modwindows")
+        {
+            // T-084: окна модов открываются только у автора; второй клиент их не открывает. Расхождение = окно меняет игру.
+            sessionSteps.Enqueue((startTick + 600, "modwindows: queue", ModWindowsQueue));
+        }
         if (cfg.desync && cfg.scenario == "desync")
         {
             // T-034: этот клиент нарочно портит своё состояние.
@@ -868,6 +873,9 @@ public static class TestAutomation
             switch (scenario)
             {
                 case "modmech":
+                    ModMechSpawn();
+                    break;
+                case "modwindows":
                     ModMechSpawn();
                     break;
                 case "modweapons":
@@ -2134,6 +2142,92 @@ public static class TestAutomation
             }
         }
         Note($"modabilities: round {round} at tick {Find.TickManager.TicksGame}: {string.Join(", ", done)}");
+    }
+
+    // --- сценарий modwindows (T-084): вкладки и окна модов открываются у одного игрока ---
+
+    private static void ModWindowsQueue()
+    {
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        int at = Find.TickManager.TicksGame + 30;
+        int queued = 0;
+        List<(object owner, Type tab, string label)> tabs = new List<(object, Type, string)>();
+        // Постройки модов на карте (запросом: номера, запомненные до общей перезагрузки, у автора могут быть чужими).
+        foreach (Building thing in map.listerBuildings.allBuildingsColonist
+            .Where(b => b.def.modContentPack != null && !b.def.modContentPack.IsOfficialMod).OrderBy(b => b.thingIDNumber))
+        {
+            if (thing.def.inspectorTabsResolved == null)
+            {
+                continue;
+            }
+            foreach (InspectTabBase tab in thing.def.inspectorTabsResolved)
+            {
+                tabs.Add((thing, tab.GetType(), thing.def.defName));
+            }
+        }
+        Pawn? colonist = map.mapPawns.FreeColonistsSpawned.OrderBy(p => p.thingIDNumber).FirstOrDefault();
+        if (colonist?.def.inspectorTabsResolved != null)
+        {
+            foreach (InspectTabBase tab in colonist.def.inspectorTabsResolved)
+            {
+                if (tab.GetType().Assembly != typeof(Thing).Assembly)
+                {
+                    tabs.Add((colonist, tab.GetType(), "colonist"));
+                }
+            }
+        }
+        foreach ((object owner, Type tab, string label) in tabs.Take(220))
+        {
+            object o = owner;
+            Type t = tab;
+            string l = label;
+            sessionSteps.Enqueue((at, "modwindows: tab", () =>
+            {
+                try
+                {
+                    SelectOnly(o);
+                    Find.MainTabsRoot.SetCurrentTab(MainButtonDefOf.Inspect, false);
+                    if (MainButtonDefOf.Inspect.TabWindow is IInspectPane pane)
+                    {
+                        pane.OpenTabType = t;
+                    }
+                    Note($"modwindows: tab {t.Name} of {l} ({ModOfAssembly(t.Assembly)}) tick={Find.TickManager.TicksGame}");
+                }
+                catch (Exception ex)
+                {
+                    Note($"modwindows: tab {t.Name} of {l} FAILED: {ex.GetType().Name}: {ex.Message}");
+                }
+            }));
+            at += 15;
+            queued++;
+        }
+        foreach (MainButtonDef button in DefDatabase<MainButtonDef>.AllDefsListForReading
+            .Where(b => b.modContentPack != null && !b.modContentPack.IsOfficialMod && b.tabWindowClass != null).OrderBy(b => b.defName))
+        {
+            MainButtonDef b = button;
+            sessionSteps.Enqueue((at, "modwindows: main", () =>
+            {
+                try
+                {
+                    Find.Selector.ClearSelection();
+                    Find.MainTabsRoot.SetCurrentTab(b, false);
+                    Note($"modwindows: main tab {b.defName} ({b.modContentPack?.Name}) tick={Find.TickManager.TicksGame}");
+                }
+                catch (Exception ex)
+                {
+                    Note($"modwindows: main tab {b.defName} FAILED: {ex.GetType().Name}: {ex.Message}");
+                }
+            }));
+            at += 30;
+            queued++;
+        }
+        sessionSteps.Enqueue((at, "modwindows: close", () =>
+        {
+            Find.MainTabsRoot.EscapeCurrentTab(false);
+            Find.Selector.ClearSelection();
+            Note($"modwindows: closed at tick {Find.TickManager.TicksGame}");
+        }));
+        Note($"modwindows: queued {queued} windows ({tabs.Count} tabs) from tick {Find.TickManager.TicksGame}");
     }
 
     private static string SettingsDigest(Map map)
