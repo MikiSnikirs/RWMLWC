@@ -461,6 +461,9 @@ public static class TestAutomation
             sessionSteps.Enqueue((startTick + 500, "tabs: outfit policy", TabsOutfit));
             sessionSteps.Enqueue((startTick + 600, "tabs: allowed area", TabsArea));
             sessionSteps.Enqueue((startTick + 700, "tabs: research", TabsResearch));
+            // T-089: до шагов, которые ждут верстак и склад.
+            sessionSteps.Enqueue((startTick + 720, "tabs: auto slaughter", TabsAutoSlaughter));
+            sessionSteps.Enqueue((startTick + 740, "tabs: rename zone", TabsRenameZone));
             sessionSteps.Enqueue((startTick + 800, "tabs: add bill", TabsAddBill));
             sessionSteps.Enqueue((startTick + 900, "tabs: suspend bill", TabsSuspendBill));
             sessionSteps.Enqueue((startTick + 1000, "tabs: medical care", TabsMedCare));
@@ -1530,6 +1533,44 @@ public static class TestAutomation
         Note($"tabs: storage priority of zone {zone.ID}: {before} -> {after}, sent={LockstepClient.CommandsSent - sentBefore}");
     }
 
+    // T-089: строка окна автозабоя — запись в поле под наблюдением FieldWatch, как это делает DoAnimalRow.
+    private static void TabsAutoSlaughter()
+    {
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        AutoSlaughterConfig? config = map.autoSlaughterManager?.configs?.OrderBy(c => c.animal.defName).FirstOrDefault();
+        if (config == null)
+        {
+            Note("tabs: auto slaughter: no configs");
+            return;
+        }
+        int before = config.maxTotal;
+        int after = before == 3 ? 5 : 3;
+        int sentBefore = LockstepClient.CommandsSent;
+        FieldWatch.RunWatched(config, () =>
+        {
+            config.maxTotal = after;
+            config.allowSlaughterPregnant = !config.allowSlaughterPregnant;
+            map.autoSlaughterManager.Notify_ConfigChanged();
+        });
+        Note($"tabs: auto slaughter {config.animal.defName}: maxTotal {before} -> {after}, sent={LockstepClient.CommandsSent - sentBefore}, value now={config.maxTotal}");
+    }
+
+    // T-089: переименование зоны — запись RenamableLabel, как окно Dialog_RenameZone.
+    private static void TabsRenameZone()
+    {
+        Map map = Find.CurrentMap ?? Find.Maps[0];
+        Zone? zone = map.zoneManager.AllZones.OrderBy(z => z.ID).FirstOrDefault();
+        if (zone == null)
+        {
+            Note("tabs: rename zone: no zone");
+            return;
+        }
+        string before = zone.RenamableLabel;
+        int sentBefore = LockstepClient.CommandsSent;
+        zone.RenamableLabel = "Тест " + zone.ID;
+        Note($"tabs: rename zone {zone.ID}: '{before}' -> 'Тест {zone.ID}', sent={LockstepClient.CommandsSent - sentBefore}, value now='{zone.RenamableLabel}'");
+    }
+
     private static string SettingsDigest(Map map)
     {
         Fnv64 hash = Fnv64.Create();
@@ -1570,6 +1611,22 @@ public static class TestAutomation
             hash.Add(pawn.outfits?.CurrentApparelPolicy?.id ?? -1);
             hash.Add(pawn.playerSettings?.AreaRestrictionInPawnCurrentMap?.ID ?? -1);
             hash.Add(pawn.playerSettings != null ? (int)pawn.playerSettings.medCare : -1);
+        }
+        // T-089: автозабой и имена зон.
+        if (map.autoSlaughterManager?.configs != null)
+        {
+            foreach (AutoSlaughterConfig config in map.autoSlaughterManager.configs.OrderBy(c => c.animal.defName))
+            {
+                hash.Add(config.maxTotal);
+                hash.Add(config.allowSlaughterPregnant);
+            }
+        }
+        foreach (Zone zone in map.zoneManager.AllZones.OrderBy(z => z.ID))
+        {
+            foreach (char ch in zone.RenamableLabel ?? "")
+            {
+                hash.Add((int)ch);
+            }
         }
         return hash.Value.ToString("X16");
     }
