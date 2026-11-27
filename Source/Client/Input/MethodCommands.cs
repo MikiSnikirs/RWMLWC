@@ -103,6 +103,76 @@ public static class MethodCommands
         // Вкладка «Животные»: чему учить, хозяин.
         Method(typeof(Pawn_TrainingTracker), nameof(Pawn_TrainingTracker.SetWantedRecursive));
         Setter(typeof(Pawn_PlayerSettings), nameof(Pawn_PlayerSettings.Master));
+        // Переименование (T-089): имя гравикорабля, зоны, области, счёта, политики и всего, что переименовывается
+        // окнами игры и модов (IRenameable.RenamableLabel). Объект, который не умеем передать, переименовывается на месте.
+        RenameSetters();
+    }
+
+    // Все типы игры и модов с собственной записью IRenameable.RenamableLabel — в порядке полного имени типа:
+    // порядок одинаков у игроков с одним набором модов (набор и так должен совпадать).
+    private static void RenameSetters()
+    {
+        List<(string key, MethodInfo setter, MethodInfo getter)> found = new List<(string, MethodInfo, MethodInfo)>();
+        HashSet<MethodInfo> seen = new HashSet<MethodInfo>();
+        foreach (Type type in GenTypes.AllTypes)
+        {
+            if (type.IsInterface || type.IsGenericTypeDefinition || !typeof(IRenameable).IsAssignableFrom(type))
+            {
+                continue;
+            }
+            InterfaceMapping mapping;
+            try
+            {
+                mapping = type.GetInterfaceMap(typeof(IRenameable));
+            }
+            catch (Exception)
+            {
+                continue;
+            }
+            MethodInfo? setter = null;
+            MethodInfo? getter = null;
+            for (int i = 0; i < mapping.InterfaceMethods.Length; i++)
+            {
+                if (mapping.InterfaceMethods[i].Name == "set_RenamableLabel")
+                {
+                    setter = mapping.TargetMethods[i];
+                }
+                else if (mapping.InterfaceMethods[i].Name == "get_RenamableLabel")
+                {
+                    getter = mapping.TargetMethods[i];
+                }
+            }
+            // Карта интерфейса у наследника отдаёт метод базового класса «глазами» наследника; Harmony патчит
+            // только метод, взятый у класса, где он объявлен.
+            setter = Declared(setter);
+            getter = Declared(getter);
+            if (setter == null || getter == null || setter.IsAbstract || setter.GetMethodBody() == null || !seen.Add(setter))
+            {
+                continue;
+            }
+            found.Add(((setter.DeclaringType?.FullName ?? type.FullName ?? "?") + ".set_RenamableLabel", setter, getter));
+        }
+        found.Sort((a, b) => string.CompareOrdinal(a.key, b.key));
+
+        static MethodInfo? Declared(MethodInfo? method)
+        {
+            if (method?.DeclaringType == null)
+            {
+                return method;
+            }
+            foreach (MethodInfo m in method.DeclaringType.GetMethods(BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
+            {
+                if (m.MetadataToken == method.MetadataToken && m.Module == method.Module)
+                {
+                    return m;
+                }
+            }
+            return method;
+        }
+        foreach ((string key, MethodInfo setter, MethodInfo getter) in found)
+        {
+            Add(setter, key, PermissionLevel.Build, getter, localIfUnknown: true);
+        }
     }
 
     // ---------- перехват ----------
@@ -159,6 +229,8 @@ public static class MethodCommands
             ValueCodec.TryPawnPart(instance, out pawn, out _);
         }
         Map? map = pawn?.MapHeld ?? (instance as BillStack)?.billGiver?.Map ?? (instance as Bill)?.Map
+            ?? (instance as Thing)?.MapHeld ?? (instance as Zone)?.Map ?? (instance as Area)?.Map
+            ?? (instance is AutoSlaughterConfig slaughter ? Find.Maps.Find(m => m.autoSlaughterManager?.configs?.Contains(slaughter) == true) : null)
             ?? ((instance as StorageSettings)?.owner as Zone)?.Map ?? ((instance as StorageSettings)?.owner as Thing)?.MapHeld ?? Find.CurrentMap;
         if (map == null && Find.Maps.Count > 0)
         {

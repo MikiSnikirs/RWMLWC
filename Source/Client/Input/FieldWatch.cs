@@ -84,6 +84,10 @@ public static class FieldWatch
         // на экране; это личное дело каждого игрока, хотя и лежит в сейве.
         Add(typeof(PlaySettings), nameof(PlaySettings.DoPlaySettingsGlobalControls), (_, _) => Find.PlaySettings, "autoHomeArea", "autoRebuild");
         Add(typeof(MainTabWindow_Work), "DoManualPrioritiesCheckbox", (_, _) => Find.PlaySettings, "useWorkPriorities");
+        // Окно автозабоя (T-089): строка животного — пределы и флажки «беременных», «связанных».
+        // Текстовые буферы полей ввода (uiMax…Buffer) — личное дело окна, их не передаём.
+        Add(typeof(Dialog_AutoSlaughter), "DoAnimalRow", (_, args) => args[1] as AutoSlaughterConfig,
+            "maxTotal", "maxMales", "maxMalesYoung", "maxFemales", "maxFemalesYoung", "allowSlaughterPregnant", "allowSlaughterBonded");
     }
 
     // ---------- наблюдение ----------
@@ -302,12 +306,17 @@ public static class FieldWatch
             throw new InvalidOperationException("поля: значение не того типа для " + name);
         }
         field.SetValue(target, value);
-        AfterSet(target, name);
+        AfterSet(map, target, name);
     }
 
     // То, что интерфейс делает сразу после записи поля.
-    private static void AfterSet(object target, string fieldName)
+    private static void AfterSet(Map map, object target, string fieldName)
     {
+        if (target is AutoSlaughterConfig)
+        {
+            // Как Dialog_AutoSlaughter после изменения строки: список «кого забивать» пересчитать.
+            map.autoSlaughterManager?.Notify_ConfigChanged();
+        }
         if (target is PlaySettings && fieldName == "useWorkPriorities")
         {
             // Как MainTabWindow_Work.DoManualPrioritiesCheckbox.

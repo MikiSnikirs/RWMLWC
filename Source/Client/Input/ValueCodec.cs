@@ -44,6 +44,7 @@ public static class ValueCodec
     private const byte KDefList = 27;
     private const byte KSlotGroup = 28;
     private const byte KPlaySettings = 29;
+    private const byte KAutoSlaughter = 30;
 
     // Чей это фильтр: зоны-склада, вещи с настройками хранения, счёта, политики.
     private const byte OwnerZone = 1;
@@ -274,6 +275,12 @@ public static class ValueCodec
                 return Find.ResearchManager;
             case KPlaySettings:
                 return Find.PlaySettings;
+            case KAutoSlaughter:
+            {
+                // Строка окна автозабоя: настройка карты команды для этого животного (T-089).
+                ThingDef? animal = DefDatabase<ThingDef>.GetNamedSilentFail(r.ReadString());
+                return animal == null ? null : map.autoSlaughterManager?.configs?.Find(c => c.animal == animal);
+            }
             case KSlotGroup:
             {
                 bool isZone = r.ReadBool();
@@ -352,6 +359,10 @@ public static class ValueCodec
                 return true;
             case PlaySettings:
                 w.WriteByte(KPlaySettings);
+                return true;
+            case AutoSlaughterConfig slaughter when slaughter.animal != null:
+                w.WriteByte(KAutoSlaughter);
+                w.WriteString(slaughter.animal.defName);
                 return true;
             case ThingFilter filter:
                 return TryWriteFilter(w, filter);
