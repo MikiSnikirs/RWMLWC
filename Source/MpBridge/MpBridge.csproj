@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- T-085: сборка «Multiplayer» с типом Multiplayer.Common.MultiplayerAPIBridge. По ней Multiplayer API
+       (0MultiplayerAPI.dll в модах) находит реализацию; сама реализация — в RWMLWC.dll (Input/MpApi). -->
+  <PropertyGroup>
+    <AssemblyName>Multiplayer</AssemblyName>
+    <RootNamespace>Multiplayer.Common</RootNamespace>
+    <OutputPath>../../Mod/1.7/Assemblies/</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <GenerateRuntimeConfigurationFiles>false</GenerateRuntimeConfigurationFiles>
+    <DebugType>portable</DebugType>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Client/RWMLWC.Client.csproj" Private="false" />
+    <PackageReference Include="RimWorld.MultiplayerAPI" Version="0.6.0" NoWarn="NU1701" />
+    <PackageReference Include="Krafs.Rimworld.Ref" Version="1.6.4518" ExcludeAssets="all" PrivateAssets="all" NoWarn="NU1701" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(RimWorldDir)/Assembly-CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+</Project>

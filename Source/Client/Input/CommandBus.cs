@@ -45,6 +45,9 @@ public static class CommandKinds
 
     /// <summary>Действие на карте мира (T-073): основать поселение, маршрут каравана.</summary>
     public const int WorldAction = 12;
+
+    /// <summary>Вызов, который мод описал через Multiplayer API (T-085): метод, замыкание или поле (MpApi.MpSync).</summary>
+    public const int ApiCall = 13;
 }
 
 /// <summary>
@@ -234,6 +237,9 @@ public static class CommandBus
                     break;
                 case CommandKinds.WorldAction:
                     WorldCommands.ExecuteWorldAction(ref reader);
+                    break;
+                case CommandKinds.ApiCall:
+                    MpApi.MpSync.Execute(map, ref reader);
                     break;
                 default:
                     Failed++;
