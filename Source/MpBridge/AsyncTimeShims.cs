@@ -80,6 +80,29 @@ namespace Multiplayer.Client
     {
         public static MultiplayerGame game = new MultiplayerGame();
         public static bool dontSync;
+
+        /// <summary>Просмотр записи игры (повтор) — в RWMLWC его нет.</summary>
+        public static bool IsReplay => false;
+
+        /// <summary>Арбитр Multiplayer (безголовый клиент-судья) — в RWMLWC его нет.</summary>
+        public static bool arbiterInstance;
+    }
+
+    /// <summary>Догон тиков Multiplayer при входе («симуляция»): в RWMLWC вошедший загружает снимок, догона нет.</summary>
+    public static class TickPatch
+    {
+        public static bool Simulating => false;
+    }
+
+    /// <summary>
+    /// Сверка описаний (defs) при входе в Multiplayer. Модули Compatibility добавляют сюда свои отпечатки
+    /// (StartupDefFingerprint). В RWMLWC совпадение сборки проверяет сервер по списку модов; отпечатки не сверяются.
+    /// </summary>
+    public static class MultiplayerData
+    {
+        public static System.Collections.Generic.Dictionary<string, Common.DefInfo> localDefInfos = new System.Collections.Generic.Dictionary<string, Common.DefInfo>();
+
+        public static void CollectDefInfos() { }
     }
 
     public static class LoadPatch
