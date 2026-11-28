@@ -97,6 +97,27 @@ public sealed class WorldSenderTests : IDisposable
     }
 
     [Fact]
+    public void JoinerWithOwnWorldIsNotTheSenderWhenOthersHaveOne()
+    {
+        Session s = NewSession();
+        C host = Join(s, "host", 80, withWorld: true);
+        C joiner = Join(s, "joiner", 5, withWorld: true); // свой сейв на тике сервера, лучший пинг
+        RequestWorld(s, joiner);
+        host.Drain();
+        Assert.Equal(host.Id, WorldSnapshotOrder.Sender(host.Ordered(ProtocolIds.RequestWorldSnapshotKind).Single().Payload));
+    }
+
+    [Fact]
+    public void LoneRequesterWithWorldSendsItself()
+    {
+        Session s = NewSession(stored: new byte[] { 1 });
+        C a = Join(s, "a", 30, withWorld: true);
+        RequestWorld(s, a);
+        a.Drain();
+        Assert.Equal(a.Id, WorldSnapshotOrder.Sender(a.Ordered(ProtocolIds.RequestWorldSnapshotKind).Single().Payload));
+    }
+
+    [Fact]
     public void JoinerBecomesASenderAfterSnapshotApplied()
     {
         Session s = NewSession();

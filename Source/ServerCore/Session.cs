@@ -958,7 +958,10 @@ public sealed class Session
     /// </summary>
     private void OrderWorldSnapshot(Player? requester, int clientSeq, string why, ISet<int>? among = null)
     {
-        int sender = ChooseWorldSender(requester != null && !requester.HasWorld ? requester : null, among);
+        // Просящий не отдаёт, пока есть кто-то ещё с миром: вошедший со своим сейвом просит мир тех, кто уже в игре
+        // (клиент, CheckJoinWorld). Других с миром нет — отдаёт он сам, если мир у него есть.
+        int sender = ChooseWorldSender(requester, among);
+        if (sender == ServerPlayerId && requester != null && requester.HasWorld) sender = ChooseWorldSender(null, among);
         if (sender == ServerPlayerId && requester == null)
         {
             _log($"общий снимок ({why}) не заказан: мир некому отдать");
