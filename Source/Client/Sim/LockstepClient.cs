@@ -191,7 +191,18 @@ public static class LockstepClient
         connection = null;
         connecting = null;
         state = State.Off;
+        try
+        {
+            SessionStopping?.Invoke();
+        }
+        catch (Exception ex)
+        {
+            Log.Error("[RWMLWC] уборка после сессии упала: " + ex);
+        }
     }
+
+    /// <summary>Сессия закончилась у этого клиента (Multiplayer.dll: SessionLifecycle — вернуть личные настройки модов).</summary>
+    public static event Action? SessionStopping;
 
     /// <summary>
     /// Раз в кадр, вместо штатного TickManagerUpdate. Возвращает true, если тиками управляет клиент.

@@ -32,7 +32,7 @@ namespace Multiplayer.Client
         public void PostContext() { }
     }
 
-    public static class Extensions
+    public static partial class Extensions
     {
         private static readonly Dictionary<Map, AsyncTimeComp> comps = new Dictionary<Map, AsyncTimeComp>();
 

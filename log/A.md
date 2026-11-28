@@ -45,6 +45,8 @@
 
 | Дата | Тест | Коммит | Результат | Что наблюдали |
 |---|---|---|---|---|
+| 2026-11-28 | TST-054 со сборкой, оружие (t095b, `modweapons`) | ветка `a/compat-session-services` | прошёл | новые заглушки сервисов сессии: Gun Recoil и Alpha Animals подключились (ошибок загрузки нет), 28 нажатий, сервер чист |
+| 2026-11-28 | то же (t095a) | ветка `a/compat-session-services` | не проверял заглушки | шёл со старой `Multiplayer.dll`: `setup.ps1` не собирал мост — добавлен в `RWMLWC.slnx`; стрельба чистая |
 | 2026-11-28 | TST-065 (юнит, `WorldSenderTests`) + TST-014 (t094a) | ветка `a/snapshot-sender-not-requester` | прошёл | юнит 149/149 (новые: вошедший со своим миром не отдаёт при хосте с миром; одинокий с миром отдаёт сам); t094a — снимок при входе от игрока 1, сервер чист |
 | 2026-11-28 | TST-054 со сборкой (t093b), вход со своим миром | ветка `a/join-host-world` | прошёл | c2 вошёл со своим сейвом → сразу общий снимок #4 от игрока 1 (тик 14998); сервер чист с первого замера (раньше — расхождение мира на 15000 в каждом прогоне) |
 | 2026-11-28 | TST-014 (t093a) | ветка `a/join-host-world` | прошёл | то же без модов: c1 оставил мир, c2 взял общий снимок, сервер чист |
@@ -211,6 +213,14 @@
 ## Записи
 
 ---
+
+## 2026-11-28 12:31 МСК — Агент A — Compatibility: сервисы сессии Multiplayer (`SessionServices`)
+
+- Модули Compatibility (Gun Recoil, DMS Expedition — настройки боя, Alpha Genes, Hunters Use Melee, RimMarket, Smart Odyssey и др.) берут у Multiplayer 1.7 сервисы `Multiplayer.Client.Compatibility`: `RoomSettings`, `SessionLifecycle`, `Presentation`, `DecisionOwnership`. Их не было — модули не включались.
+- Сделано в `Source/MpBridge/SessionServicesShims.cs` по смыслу классов Multiplayer (декомпиляция 1.7): настройки комнаты — в сейве, в сессии мод работает на них, личные возвращаются в конце сессии (новое событие `LockstepClient.SessionStopping`), `ModSettings.Write` таких настроек в сессии не пишет; «только у себя» — свой Rand (рамки, снимаются по порядку стека); владелец решения — копия. «Игрок ушёл насовсем» у нас не наступает — решения остаются за ушедшим.
+- Alpha Animals: пустая `Multiplayer.Client.Extensions.PatchMeasure` (замер патчей Multiplayer).
+- `Source/MpBridge` добавлен в `RWMLWC.slnx`: `setup.ps1` его не собирал, и `Multiplayer.dll` в папке мода была с 10:09.
+- Не подключаются по-прежнему: Fortifications — Industrial (в моде нет метода), VPE — временные эффекты (намеренно), две части VEF, HAR — окно парикмахерской (`StylingDialog_*` Multiplayer; у нас окно устроено иначе).
 
 ## 2026-11-28 12:17 МСК — Агент A — сервер: просящий снимок не отдаёт, если мир есть у других (зона B по решению владельца)
 
