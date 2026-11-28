@@ -79,6 +79,9 @@ public static class LockstepClient
     private static readonly Dictionary<int, byte[]?[]> incomingSnapshots = new Dictionary<int, byte[]?[]>();
     private static bool gameLoadedPending;
     private static bool forcePauseActive;
+
+    /// <summary>Вошли со своим миром на тике сервера: по первому составу сессии решить, оставить его или взять общий.</summary>
+    private static bool joinWorldCheckPending;
     private static int speedBeforeForcePause;
 
     /// <summary>Для тестов с отдельным сервером: этот клиент отдаёт снимок (в обычной игре — тот, кто держит сессию).</summary>
@@ -358,6 +361,7 @@ public static class LockstepClient
                 }
                 SimSession.Begin(welcome.SessionSeed);
                 state = State.InSession;
+                joinWorldCheckPending = true;
                 holdClock.Restart();
                 TestAutomation.Note($"lockstep: Welcome, playerId={welcome.PlayerId}, serverTick={welcome.ServerTick}, seed={welcome.SessionSeed}");
                 // Новый игрок держит паузу, пока не пришлёт SpeedRequest: шлём, как только готовы тикать.
@@ -425,6 +429,15 @@ public static class LockstepClient
             case CommandRejectedMessage rejected:
                 TestAutomation.Note($"lockstep: command #{rejected.ClientSeq} REJECTED on map {rejected.MapId}: need {rejected.Required}, have {rejected.Had}");
                 Messages.Message("RWMLWC: нет прав на это действие на этой карте", MessageTypeDefOf.RejectInput, false);
+                break;
+
+            case PlayersMessage players:
+                RWMLWC.Client.SessionView.SessionUi.Receive(message);
+                if (joinWorldCheckPending)
+                {
+                    joinWorldCheckPending = false;
+                    CheckJoinWorld(players);
+                }
                 break;
 
             default:
@@ -559,6 +572,35 @@ public static class LockstepClient
         {
             Messages.Message("RWMLWC: игра разошлась между игроками — перезагружаем общий снимок", MessageTypeDefOf.CautionInput, false);
         }
+    }
+
+    /// <summary>
+    /// Вошедший игрок берёт мир тех, кто уже в игре (как в RimWorld Multiplayer: вошедший всегда загружает мир хоста).
+    /// Свой сейв на том же тике — не тот же мир: моды при загрузке добавляют фракции и поселения со случайностью,
+    /// которую засеянный Rand загрузки не покрывает (сборка 145 модов, t091–t092: 267 и 271 объект мира из одного
+    /// файла). Раньше такой игрок оставался со своим миром, и первая же сверка хешей кончалась общей перезагрузкой.
+    ///
+    /// Свой мир оставляет первый в сессии и хозяин сессии из игры (его мир — источник). Остальные сразу просят общий
+    /// снимок: все загружают один и тот же снимок, и сверка хешей начинается с одинаковых миров.
+    /// </summary>
+    private static void CheckJoinWorld(PlayersMessage players)
+    {
+        bool othersOnline = false;
+        foreach (PlayerInfo p in players.Players)
+        {
+            if (p.PlayerId != PlayerId && p.Online)
+            {
+                othersOnline = true;
+                break;
+            }
+        }
+        if (!othersOnline || IsSnapshotSender)
+        {
+            TestAutomation.Note($"lockstep: joined with own world, keeping it (others online={othersOnline}, sender={IsSnapshotSender})");
+            return;
+        }
+        TestAutomation.Note("lockstep: joined with own world while others play: requesting the common snapshot");
+        RequestCommonSnapshot();
     }
 
     /// <summary>
