@@ -24,9 +24,9 @@ public static class BugReport
     private static int nextId = (int)(DateTime.UtcNow.Ticks & 0x3FFFFFFF);
 
     /// <summary>Собрать, сохранить у себя и отправить на сервер. Возвращает путь локальной копии.</summary>
-    public static string Submit(string userText)
+    public static string Submit(string userText, bool withThingDumps = false)
     {
-        byte[] zip = Collect(userText, out string stamp);
+        byte[] zip = Collect(userText, withThingDumps, out string stamp);
         string dir = Path.Combine(GenFilePaths.SaveDataFolderPath, "RWMLWC", "bugreports");
         Directory.CreateDirectory(dir);
         string local = Path.Combine(dir, $"bugreport-{stamp}.zip");
@@ -65,7 +65,7 @@ public static class BugReport
         return true;
     }
 
-    private static byte[] Collect(string userText, out string stamp)
+    private static byte[] Collect(string userText, bool withThingDumps, out string stamp)
     {
         DateTime now = DateTime.UtcNow;
         stamp = now.ToString("yyyyMMdd-HHmmss");
@@ -83,9 +83,77 @@ public static class BugReport
                     AddFileTail(zip, Path.GetFileName(hash), hash);
                 }
             }
+            AddText(zip, "state.txt", StateDigest());
+            if (withThingDumps && Current.Game != null)
+            {
+                foreach (Map map in Find.Maps)
+                {
+                    try
+                    {
+                        StringBuilder dump = new StringBuilder();
+                        MapStateHasher.DumpThings(map, dump);
+                        AddText(zip, $"things-map{map.uniqueID}.txt", dump.ToString());
+                    }
+                    catch (Exception ex)
+                    {
+                        AddText(zip, $"things-map{map.uniqueID}.error.txt", ex.ToString());
+                    }
+                }
+            }
             AddText(zip, "mods.txt", string.Join("\n", LoadedModManager.RunningModsListForReading.Select(m => $"{m.PackageId} | {m.Name}")));
         }
         return ms.ToArray();
+    }
+
+    /// <summary>Хеш мира и карт по частям — по двум отчётам одного расхождения видно, какая часть разошлась.</summary>
+    private static string StateDigest()
+    {
+        if (Current.Game == null)
+        {
+            return "нет игры";
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.AppendLine($"tick={Find.TickManager.TicksGame}");
+        try
+        {
+            sb.AppendLine("world;" + WorldStateHasher.Parts());
+        }
+        catch (Exception ex)
+        {
+            sb.AppendLine("world: " + ex.Message);
+        }
+        foreach (Map map in Find.Maps)
+        {
+            try
+            {
+                sb.AppendLine($"map{map.uniqueID};" + MapStateHasher.Compute(map));
+            }
+            catch (Exception ex)
+            {
+                sb.AppendLine($"map{map.uniqueID}: " + ex.Message);
+            }
+        }
+        return sb.ToString();
+    }
+
+    private static DateTime lastAuto = DateTime.MinValue;
+
+    /// <summary>Расхождение замечено сервером: отчёт с разбором хеша и списками вещей — у себя и на сервер, не чаще раза в 5 минут.</summary>
+    public static void OnDesync(int tick)
+    {
+        if ((DateTime.UtcNow - lastAuto).TotalMinutes < 5)
+        {
+            return;
+        }
+        lastAuto = DateTime.UtcNow;
+        try
+        {
+            Submit($"(автоматически) сервер заметил расхождение, тик {tick}", withThingDumps: true);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning("[RWMLWC] автоотчёт о расхождении не собран: " + ex.Message);
+        }
     }
 
     private static string Describe(string userText, DateTime now)
