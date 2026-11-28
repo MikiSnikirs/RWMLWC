@@ -48,6 +48,9 @@ public static class CommandKinds
 
     /// <summary>Вызов, который мод описал через Multiplayer API (T-085): метод, замыкание или поле (MpApi.MpSync).</summary>
     public const int ApiCall = 13;
+
+    /// <summary>Настройки модов хозяина вошедшему игроку (Sim/ModConfigSync); исполняется до общего пути, без обстановки.</summary>
+    public const int ModConfig = 14;
 }
 
 /// <summary>
@@ -84,6 +87,16 @@ public static class CommandBus
 
     /// <summary>Действие игрока надо перехватить: идёт сессия, это не исполнение команды и не тик симуляции.</summary>
     public static bool CaptureActive => LockstepClient.InSession && !Executing && !MapRandContext.InTick;
+
+    /// <summary>Команда из общего порядка обработана вне <see cref="Execute"/> (настройки модов): учесть в счётчиках.</summary>
+    public static void CountHandledOutside(bool own)
+    {
+        Executed++;
+        if (own)
+        {
+            ExecutedOwn++;
+        }
+    }
 
     public static void Reset()
     {

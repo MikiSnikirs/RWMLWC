@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -133,6 +133,7 @@ public static class TestAutomation
 
     public static Config Read()
     {
+        string modCfgTamper = "";
         Config cfg = new Config();
         string path = HashRecorder.ArmFilePath;
         if (!File.Exists(path))
@@ -323,6 +324,10 @@ public static class TestAutomation
                     cfg.steamAuto = value == "auto" || ulong.TryParse(value, out steamHostId);
                     if (value == "auto") steamHostId = 0;
                     break;
+                case "modcfgtest":
+                    // Синхронизация настроек модов: получатель (1 — любой, иначе с этим именем) перед сравнением портит свои файлы.
+                    modCfgTamper = value;
+                    break;
                 case "tpf":
                     if (int.TryParse(value, out int tpf) && tpf >= 0)
                     {
@@ -335,6 +340,7 @@ public static class TestAutomation
         // T-076: UI-зонд асимметричен — только c1 имитирует рисующий клиент. Настоящий баг:
         // комнаты из кадра читает только тот клиент, который рисует карту; у второго кэш иной.
         RoofCountIsolation.UiProbe = cfg.uiProbe && cfg.playerName == "c1";
+        ModConfigSync.TestTamper = modCfgTamper == "1" || (modCfgTamper.Length > 0 && cfg.playerName == modCfgTamper);
         if (cfg.queue != null)
         {
             cfg.queueIndex = ReadProgress();
