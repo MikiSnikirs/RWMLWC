@@ -144,6 +144,7 @@ namespace Multiplayer.Client
                 prefix: new HarmonyMethod(typeof(AsyncTimeShimPatches), nameof(MapTickBegin)) { priority = Priority.First });
             h.Patch(AccessTools.Method(typeof(Map), nameof(Map.MapPostTick)),
                 finalizer: new HarmonyMethod(typeof(AsyncTimeShimPatches), nameof(MapTickEnd)));
+            OnlyConstructorsPlaceNoCostFrames.Install(h);
         }
 
         private static void BeforeTick()
