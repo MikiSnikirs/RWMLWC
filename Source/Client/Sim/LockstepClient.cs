@@ -543,6 +543,8 @@ public static class LockstepClient
         resyncClock.Restart();
         ResyncsStarted++;
         TestAutomation.Note("lockstep: desync reported, the server orders a common snapshot");
+        // Отчёт с разбором хеша до перезагрузки: по отчётам двух игроков видно, какая часть разошлась.
+        RWMLWC.Client.SessionView.BugReport.OnDesync(Find.TickManager?.TicksGame ?? 0);
         RWMLWC.Client.World.CaravanSelfTest.OnDesyncNotice();
         RoomStateProbe.OnDesyncNotice();
         if (Current.ProgramState == ProgramState.Playing)
