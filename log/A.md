@@ -215,6 +215,18 @@
 
 ---
 
+## 2026-11-28 13:51 МСК — Агент A — ПЕРЕДАЧА ДЕЛ → B (лимиты A кончаются, решение владельца)
+
+**ПРОСЬБА → B** (2026-11-28 13:51): владелец передаёт всю работу агенту B. Состояние:
+
+1. **Ветка `a/compat-vef-animals` (PR открыт, НЕ слит, не проверен до конца).** В ней:
+   - `Source/MpBridge/SessionServicesShims.cs`: `Multiplayer.Client.Sync.handlers` и `SyncDelegate` (часть VEF «поведение животных» подключается — t096a), `OnlyConstructorsPlaceNoCostFrames` (правка Multiplayer: рамку постройки без материалов ставит только строитель; часть VEF «постройки, требующие не строительного навыка» подключается — t096b). Ставится из `AsyncTimeShimPatches.Install`.
+   - `Source/Client/Sim/TestAutomation.cs`: `TestScenarioState` (GameComponent, отметка «сценарий применён» в сейве/снимке) — сценарий `modmech` после правки входа (PR #224) срабатывал второй раз у вошедшего после снимка и давал расхождение глобального Rand на 1 вызов (t096a–c; без сценария чисто — t096d).
+   - t096e/f зависли в меню: класс встал между `[StaticConstructorOnStartup]` и `TestAutomationBoot` — исправлено. **Нужно:** прогнать `tools/run-tst014.ps1 -Clients 2 -Ticks 3000 -Scenario modmech -ModsConfig <сборка> -ExtraArm colonychoice=join`; ожидание — сервер чист, у одного клиента «scenario modmech: already applied … skipped». Прошёл — слить PR.
+2. **Слито сегодня (A):** PR #223 синхронизация настроек модов (команда 14, TST-091); #224 вошедший со своим миром сразу берёт общий снимок; #225 сервер не назначает просящего отдающим (зона B по решению владельца); #226 сервисы сессии Multiplayer (`RoomSettings` и др.), мост в `RWMLWC.slnx`; #227 заглушки `MultiplayerData`, `IsReplay`, `TickPatch.Simulating`.
+3. **Открыто:** модули Compatibility, которые не подключаются — Fortifications Industrial и Perspective Buildings (в модах нет методов), HAR окно парикмахерской, VPE время (намеренно); откуда при загрузке сборки лишние объекты мира (на синхронность не влияет — мир берётся снимком); окно перезапуска после записи настроек модов не видели в живой игре; живая игра двух людей на v8 не проверялась; T-084/T-085/T-086 — `review`.
+4. **Как искать ошибки модулей Compatibility:** не только «MPCompat ::», но и стеки `Multiplayer.Compat.*.Install*/LatePatch` после «Could not execute post-long-event action» в Player.log.
+
 ## 2026-11-28 12:40 МСК — Агент A — Compatibility: ещё заглушки (сверка описаний, повтор, догон)
 
 - Прежний поиск ошибок по «MPCompat ::» пропускал падения в отложенных действиях («Could not execute post-long-event action»). Найдено: DMS Expedition и Cinders — `MultiplayerData.CollectDefInfos` (отпечатки описаний `StartupDefFingerprint`; из-за этого у DMSE не ставились настройки боя), DeadMansSwitch II — `Multiplayer.IsReplay`, `TickPatch.Simulating`, `arbiterInstance`.

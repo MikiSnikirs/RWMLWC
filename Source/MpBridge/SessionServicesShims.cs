@@ -488,3 +488,79 @@ namespace Multiplayer.Client
         public static void PatchMeasure(System.Reflection.MethodBase original) { }
     }
 }
+
+namespace Multiplayer.Client
+{
+    /// <summary>
+    /// Описание синхронизируемого замыкания Multiplayer. Compatibility (VEF, поведение животных) кладёт такое
+    /// описание прямо во внутренний список <see cref="Sync.handlers"/> — для получателя состояния переключателя кнопки
+    /// пешки. В RWMLWC нажатие кнопки и так идёт командой GizmoClick, поэтому описание только принимается.
+    /// </summary>
+    public class SyncDelegate
+    {
+        public readonly System.Type delegateType;
+        public readonly System.Reflection.MethodInfo method;
+        public readonly string[]? fields;
+
+        public SyncDelegate(System.Type delegateType, System.Reflection.MethodInfo method, string[]? fields)
+        {
+            this.delegateType = delegateType;
+            this.method = method;
+            this.fields = fields;
+        }
+    }
+
+    public static class Sync
+    {
+        public static System.Collections.Generic.List<object> handlers = new System.Collections.Generic.List<object>();
+    }
+}
+
+namespace Multiplayer.Client
+{
+    /// <summary>
+    /// Правка Multiplayer к ванильному коду: рамку для постройки без материалов (PlaceNoCostFrame) ставит только
+    /// работа «строительство», а не любая выдача заданий «доставить материалы к чертежу». Compatibility (VEF,
+    /// «постройки, требующие не строительного навыка») дописывает к <see cref="IsConstruction"/> вид работы, который
+    /// мод задал постройке. Ставится из <see cref="AsyncTimeShimPatches.Install"/>, как остальные патчи моста.
+    /// </summary>
+    public static class OnlyConstructorsPlaceNoCostFrames
+    {
+        private static readonly System.Reflection.MethodInfo IsConstructionMethod =
+            HarmonyLib.AccessTools.Method(typeof(OnlyConstructorsPlaceNoCostFrames), nameof(IsConstruction));
+
+        internal static void Install(HarmonyLib.Harmony h)
+        {
+            System.Reflection.MethodInfo? target = HarmonyLib.AccessTools.Method(typeof(RimWorld.WorkGiver_ConstructDeliverResourcesToBlueprints), "NoCostFrameMakeJobFor");
+            if (target != null)
+            {
+                h.Patch(target, transpiler: new HarmonyLib.HarmonyMethod(typeof(OnlyConstructorsPlaceNoCostFrames), nameof(Transpiler)));
+            }
+        }
+
+        private static System.Collections.Generic.IEnumerable<HarmonyLib.CodeInstruction> Transpiler(System.Collections.Generic.IEnumerable<HarmonyLib.CodeInstruction> insts)
+        {
+            int found = 0;
+            foreach (HarmonyLib.CodeInstruction inst in insts)
+            {
+                yield return inst;
+                if (inst.opcode == System.Reflection.Emit.OpCodes.Isinst && inst.operand as System.Type == typeof(RimWorld.Blueprint))
+                {
+                    found++;
+                    yield return new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldnull);
+                    yield return new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Cgt_Un);
+                    yield return new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldarg_0);
+                    yield return new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Call, IsConstructionMethod);
+                    yield return new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.And);
+                }
+            }
+            if (found != 1)
+            {
+                Verse.Log.Warning($"[RWMLWC] OnlyConstructorsPlaceNoCostFrames: найдено {found} проверок «чертёж» вместо одной");
+            }
+        }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        public static bool IsConstruction(RimWorld.WorkGiver w) => w.def.workType == RimWorld.WorkTypeDefOf.Construction;
+    }
+}

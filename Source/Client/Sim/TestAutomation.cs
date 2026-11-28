@@ -879,6 +879,15 @@ public static class TestAutomation
             return;
         }
         pendingScenario = null;
+        // Сценарий меняет мир у каждого клиента сам (не командой). Мир с уже применённым сценарием мог прийти
+        // снимком от другого игрока (вход берёт мир тех, кто в игре) — тогда второй раз не применяем.
+        TestScenarioState? state = Current.Game?.GetComponent<TestScenarioState>();
+        if (state != null && state.applied.Contains(scenario))
+        {
+            Note($"scenario {scenario}: already applied in this world (came with the snapshot), skipped");
+            return;
+        }
+        state?.applied.Add(scenario);
         try
         {
             switch (scenario)
@@ -3474,6 +3483,22 @@ public static class TestAutomation
         }
         List<Map> maps = Find.Maps;
         Note($"scenario twomaps: tile={tile}, new map id={map.uniqueID}, frozen={freeze}, maps now={maps.Count}");
+    }
+}
+
+/// <summary>Какие тестовые сценарии уже применены к этому миру (в сейве и снимке).</summary>
+public sealed class TestScenarioState : GameComponent
+{
+    public List<string> applied = new List<string>();
+
+    public TestScenarioState(Game game)
+    {
+    }
+
+    public override void ExposeData()
+    {
+        Scribe_Collections.Look(ref applied, "rwmlwcTestScenarios", LookMode.Value);
+        applied ??= new List<string>();
     }
 }
 
