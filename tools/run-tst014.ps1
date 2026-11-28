@@ -114,6 +114,11 @@ for ($c = 1; $c -le $Clients; $c++) {
     if ($ModsConfig) { Copy-Item -LiteralPath $ModsConfig -Destination $mc -Force }
     else {
     $xml = [xml](Get-Content -LiteralPath $mc -Raw -Encoding UTF8)
+    # A ModsConfig written by another game version is reset by the game on start (mod list lost):
+    # stamp the copy with the installed version.
+    $gv = (Get-Content (Join-Path $game 'Version.txt') -ErrorAction SilentlyContinue | Select-Object -First 1)
+    $vn = $xml.ModsConfigData.SelectSingleNode('version')
+    if ($gv -and $vn) { $vn.InnerText = $gv.Trim() }
     $active = $xml.ModsConfigData.activeMods
     foreach ($li in @($active.li)) {
         if ($li -notmatch '^(brrainz\.harmony|ludeon\.rimworld(\..+)?)$') {
