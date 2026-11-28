@@ -43,7 +43,7 @@ public sealed class SteamBridge : IDisposable
         IConnection server;
         try
         {
-            server = await QuicTransport.ConnectAsync(_serverHost, _serverPort, _serverThumbprint).ConfigureAwait(false);
+            server = await NetTransport.ConnectAsync(_serverHost, _serverPort, _serverThumbprint).ConfigureAwait(false);
         }
         catch (Exception e)
         {

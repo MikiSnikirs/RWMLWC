@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
@@ -8,7 +9,7 @@ using RWMLWC.Net;
 namespace RWMLWC.Server;
 
 /// <summary>
-/// Запускает <see cref="Session"/> поверх сети: принимает подключения QUIC и раз в <see cref="Interval"/>
+/// Запускает <see cref="Session"/> поверх сети: принимает подключения (QUIC, TCP) и раз в <see cref="Interval"/>
 /// вызывает <c>Pump</c> и <c>Advance</c>. Вся работа с сессией идёт в одном потоке цикла.
 /// </summary>
 public sealed class SessionHost
@@ -30,9 +31,12 @@ public sealed class SessionHost
     /// <summary>Выполнить действие над сессией в потоке цикла (команды консоли и т. п.).</summary>
     public void Post(Action<Session> action) => _actions.Enqueue(action);
 
-    public async Task RunAsync(QuicServer? server, CancellationToken ct, Action<string>? log = null)
+    public Task RunAsync(IConnectionListener? server, CancellationToken ct, Action<string>? log = null) =>
+        RunAsync(server == null ? Array.Empty<IConnectionListener>() : new[] { server }, ct, log);
+
+    public async Task RunAsync(IReadOnlyList<IConnectionListener> servers, CancellationToken ct, Action<string>? log = null)
     {
-        if (server != null) _ = AcceptLoop(server, ct, log);
+        foreach (IConnectionListener server in servers) _ = AcceptLoop(server, ct, log);
         var clock = Stopwatch.StartNew();
         TimeSpan last = TimeSpan.Zero;
         using var timer = new PeriodicTimer(Interval);
@@ -53,7 +57,7 @@ public sealed class SessionHost
         }
     }
 
-    private async Task AcceptLoop(QuicServer server, CancellationToken ct, Action<string>? log)
+    private async Task AcceptLoop(IConnectionListener server, CancellationToken ct, Action<string>? log)
     {
         try
         {
