@@ -165,7 +165,7 @@ public static class CaravanSelfTest
             }
         }
 
-        bool issuer = LockstepClient.PlayerId == 2 && !ArmKey("adapttest=1") && !ArmKey("exchangetest=1"); // adapttest, exchangetest — свои шаги
+        bool issuer = LockstepClient.PlayerId == 2 && !ArmKey("adapttest=1") && !ArmKey("exchangetest=1") && !ArmKey("stylingtest=1"); // adapttest, exchangetest, stylingtest — свои шаги
 
         if (issuer && !_formed && tick >= _startTick + 300)
         {
@@ -334,6 +334,12 @@ public static class CaravanSelfTest
         if (ArmKey("renttest=1"))
         {
             RentFrame(tick);
+        }
+
+        // stylingtest: станция стиля — окно у автора приказа с копией пешки, «Принять» командой (StylingStationSync).
+        if (ArmKey("stylingtest=1"))
+        {
+            StylingStationSync.TestFrame(tick, _startTick);
         }
 
         // sostest (T-051): игрок 1 нажимает «SOS» один раз — письмо должно прийти всем.

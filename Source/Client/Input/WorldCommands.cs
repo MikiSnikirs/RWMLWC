@@ -1049,6 +1049,16 @@ public static class WorldCommands
             ExecuteWorldGizmo(ref r);
             return;
         }
+        if (op == RWMLWC.Client.World.StylingStationSync.OpStyling)
+        {
+            RWMLWC.Client.World.StylingStationSync.Execute(ref r);
+            return;
+        }
+        if (op == RWMLWC.Client.World.StylingStationSync.OpTestStyling)
+        {
+            RWMLWC.Client.World.StylingStationSync.ExecuteTest(ref r);
+            return;
+        }
         if (op == RWMLWC.Client.World.TradeCommands.OpTrade)
         {
             RWMLWC.Client.World.TradeCommands.Execute(ref r);
