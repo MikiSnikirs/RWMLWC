@@ -90,6 +90,12 @@ public static class ProtocolIds
     /// </summary>
     public const int PlayerPresenceKind = 102;
 
+    /// <summary>
+    /// <c>MapId</c> кусков <c>SnapshotChunk</c> с отчётом об ошибке (v8): клиент шлёт zip-архив отчёта кусками,
+    /// сервер их не пересылает, а собирает и сохраняет в <c>bugreports/</c> рядом с копиями мира.
+    /// </summary>
+    public const int BugReportMapId = -3000;
+
     /// <summary>Номер «игрока» для команд и сообщений самого сервера.</summary>
     public const int ServerPlayerId = 0;
 }

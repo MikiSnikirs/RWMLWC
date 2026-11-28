@@ -64,6 +64,9 @@ public static class LockstepClient
     private static State state = State.Off;
     private static Task<IConnection>? connecting;
     private static IConnection? connection;
+
+    /// <summary>Соединение с сервером (отчёт об ошибке шлёт куски напрямую).</summary>
+    internal static IConnection? Connection => connection;
     private static string playerName = "";
     private static int tickUpTo;
     private static byte serverSpeed;
@@ -781,6 +784,10 @@ public static class LockstepClient
     // Куски копятся при любом состоянии: отстающий клиент может получить их раньше, чем дойдёт до просьбы в общем порядке.
     private static void OnSnapshotChunk(SnapshotChunkMessage chunk)
     {
+        if (chunk.MapId == ProtocolIds.BugReportMapId)
+        {
+            return; // отчёт об ошибке — только для сервера
+        }
         if (chunk.MapId <= SplitColonies.BundleMapBase)
         {
             SplitColonies.OnBundleChunk(chunk); // сейв владельца для сборки (раздельный счёт колоний)

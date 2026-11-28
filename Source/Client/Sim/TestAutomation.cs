@@ -502,6 +502,11 @@ public static class TestAutomation
             // T-084: окна модов открываются только у автора; второй клиент их не открывает. Расхождение = окно меняет игру.
             sessionSteps.Enqueue((startTick + 600, "modwindows: queue", ModWindowsQueue));
         }
+        if (cfg.issuer && cfg.scenario == "bugreport")
+        {
+            // Отчёт об ошибке (v8): собрать, сохранить у себя и отправить серверу — как кнопка в меню паузы.
+            sessionSteps.Enqueue((startTick + 300, "bugreport: submit", () => RWMLWC.Client.SessionView.BugReport.Submit("Тестовый отчёт автопрогона: проверка отправки")));
+        }
         if (cfg.desync && cfg.scenario == "desync")
         {
             // T-034: этот клиент нарочно портит своё состояние.
@@ -932,6 +937,7 @@ public static class TestAutomation
                 case "access":
                 case "tabs":
                 case "mpapi":
+                case "bugreport":
                 case "desync":
                 case "designate":
                 case "gizmo":

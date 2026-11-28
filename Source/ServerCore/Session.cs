@@ -608,6 +608,11 @@ public sealed class Session
                 break;
 
             case SnapshotChunkMessage chunk:
+                if (chunk.MapId == ProtocolIds.BugReportMapId)
+                {
+                    CollectBugReport(player, chunk); // отчёт об ошибке (v8): только серверу
+                    break;
+                }
                 // Пересылка снимка остальным; снимок автосохранения (101) — только серверу.
                 if (!_saveSnapshotIds.Contains(chunk.SnapshotId))
                     foreach (Player other in _players)
@@ -713,6 +718,38 @@ public sealed class Session
                        "Похоже, сервер запущен со старой копии — продолжать с неё значит потерять прогресс.";
             _log("ВНИМАНИЕ: " + t);
             Broadcast(new NoticeMessage { Code = NoticeCode.NewerSaveOnClient, Text = t });
+        }
+    }
+
+    // Отчёт об ошибке (v8): куски одного отчёта собираются и сохраняются в bugreports/ хранилища.
+    private readonly Dictionary<(int player, int id), byte[]?[]> _bugReports = new();
+
+    private void CollectBugReport(Player player, SnapshotChunkMessage chunk)
+    {
+        if (chunk.ChunkCount <= 0 || chunk.ChunkCount > 512 || chunk.ChunkIndex < 0 || chunk.ChunkIndex >= chunk.ChunkCount) return;
+        var key = (player.Id, chunk.SnapshotId);
+        if (!_bugReports.TryGetValue(key, out byte[]?[]? parts) || parts.Length != chunk.ChunkCount)
+        {
+            parts = new byte[]?[chunk.ChunkCount];
+            _bugReports[key] = parts;
+        }
+        parts[chunk.ChunkIndex] = chunk.Data;
+        if (parts.Any(p => p == null)) return;
+        _bugReports.Remove(key);
+        byte[] data = parts.SelectMany(p => p!).ToArray();
+        if (_options.Store == null)
+        {
+            _log($"игрок {player.Id}: отчёт об ошибке ({data.Length} байт) не сохранён — у сервера нет хранилища");
+            return;
+        }
+        try
+        {
+            string path = _options.Store.StoreBugReport(player.Id, player.Name, data);
+            _log($"игрок {player.Id} «{player.Name}»: отчёт об ошибке сохранён — {path}");
+        }
+        catch (Exception ex)
+        {
+            _log($"игрок {player.Id}: отчёт об ошибке не сохранён: {ex.Message}");
         }
     }
 
