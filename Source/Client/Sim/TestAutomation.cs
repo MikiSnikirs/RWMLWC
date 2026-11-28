@@ -888,6 +888,9 @@ public static class TestAutomation
                 case "modevents":
                     modEventsStart = Find.TickManager.TicksGame;
                     break;
+                case "modsites":
+                    modSitesStart = Find.TickManager.TicksGame;
+                    break;
                 case "modabilities":
                     ModWeaponsStart();
                     modAbilitiesMode = true;
@@ -1854,6 +1857,17 @@ public static class TestAutomation
     /// <summary>Каждый тик у всех клиентов (в контексте симуляции): раз в 300 тиков — новое снаряжение, призыв, враги.</summary>
     public static void SimTick()
     {
+        if (modSitesStart >= 0)
+        {
+            try
+            {
+                ModSitesTick();
+            }
+            catch (Exception ex)
+            {
+                Note($"modsites: tick FAILED: {ex.GetType().Name}: {ex.Message}");
+            }
+        }
         if (modEventsStart >= 0)
         {
             try
@@ -2355,6 +2369,45 @@ public static class TestAutomation
         if (done.Count > 0)
         {
             Note($"modevents: round {round} at tick {Find.TickManager.TicksGame}: {string.Join(", ", done)}");
+        }
+    }
+
+    // --- сценарий modsites (T-084): карты мест и поселений модов генерируются у всех клиентов в тике ---
+
+    private static int modSitesStart = -1;
+
+    private static void ModSitesTick()
+    {
+        int elapsed = Find.TickManager.TicksGame - modSitesStart;
+        if (elapsed < 300 || (elapsed - 300) % 600 != 0)
+        {
+            return;
+        }
+        int step = (elapsed - 300) / 600;
+        // Места и поселения модов без карты: сначала места (Site), потом поселения фракций модов; порядок по номеру.
+        List<MapParent> candidates = Find.WorldObjects.AllWorldObjects.OfType<MapParent>()
+            .Where(o => !o.HasMap && o.def.modContentPack != null && !o.def.modContentPack.IsOfficialMod
+                || !o.HasMap && o is RimWorld.Planet.Settlement st && st.Faction != null && !st.Faction.IsPlayer
+                    && st.Faction.def.modContentPack != null && !st.Faction.def.modContentPack.IsOfficialMod)
+            .OrderBy(o => o is RimWorld.Planet.Settlement ? 1 : 0).ThenBy(o => o.ID).ToList();
+        if (step >= 6 || candidates.Count == 0)
+        {
+            if (step == 6)
+            {
+                Note($"modsites: done, maps now {Find.Maps.Count}");
+            }
+            return;
+        }
+        MapParent parent = candidates[Math.Min(step, candidates.Count - 1)];
+        string what = $"{parent.def.defName} #{parent.ID} ({(parent.Faction?.def.modContentPack?.Name ?? parent.def.modContentPack?.Name ?? "?")}) tile {parent.Tile}";
+        try
+        {
+            Map map = GetOrGenerateMapUtility.GetOrGenerateMap(parent.Tile, null);
+            Note($"modsites: step {step} generated map {map.uniqueID} for {what}: things {map.listerThings.AllThings.Count}, pawns {map.mapPawns.AllPawnsCount} at tick {Find.TickManager.TicksGame}");
+        }
+        catch (Exception ex)
+        {
+            Note($"modsites: step {step} {what} FAILED: {ex.GetType().Name}: {ex.Message}");
         }
     }
 
