@@ -27,6 +27,9 @@ public sealed class SessionOptions
     /// <summary>Предел размера одного собираемого снимка мира.</summary>
     public long MaxSnapshotBytes = 512L * 1024 * 1024;
 
+    /// <summary>Предел размера одного отчёта об ошибке (v8); больше — отброшен.</summary>
+    public long MaxBugReportBytes = 64L * 1024 * 1024;
+
     /// <summary>
     /// Выделенный сервер (T-058): мира в процессе нет ни у кого постоянно. Когда в сессии никого нет,
     /// часы встают на тик мира, с которым придёт первый игрок: копия на сервере или его сейв, если он новее.
@@ -722,20 +725,38 @@ public sealed class Session
     }
 
     // Отчёт об ошибке (v8): куски одного отчёта собираются и сохраняются в bugreports/ хранилища.
-    private readonly Dictionary<(int player, int id), byte[]?[]> _bugReports = new();
+    // У игрока собирается не больше одного отчёта: куски нового отчёта сбрасывают недособранный прежний.
+    // Сборки ушедших игроков выбрасываются, размер ограничен MaxBugReportBytes — память сервера не растёт.
+    private sealed class BugReportAssembly
+    {
+        public int Id;
+        public byte[]?[] Parts = Array.Empty<byte[]?>();
+        public long Bytes;
+    }
+
+    private readonly Dictionary<int, BugReportAssembly> _bugReports = new();
 
     private void CollectBugReport(Player player, SnapshotChunkMessage chunk)
     {
+        foreach (int gone in _players.Where(p => !p.Online).Select(p => p.Id).Where(_bugReports.ContainsKey).ToList())
+            _bugReports.Remove(gone);
         if (chunk.ChunkCount <= 0 || chunk.ChunkCount > 512 || chunk.ChunkIndex < 0 || chunk.ChunkIndex >= chunk.ChunkCount) return;
-        var key = (player.Id, chunk.SnapshotId);
-        if (!_bugReports.TryGetValue(key, out byte[]?[]? parts) || parts.Length != chunk.ChunkCount)
+        if (!_bugReports.TryGetValue(player.Id, out BugReportAssembly? a) || a.Id != chunk.SnapshotId || a.Parts.Length != chunk.ChunkCount)
         {
-            parts = new byte[]?[chunk.ChunkCount];
-            _bugReports[key] = parts;
+            a = new BugReportAssembly { Id = chunk.SnapshotId, Parts = new byte[]?[chunk.ChunkCount] };
+            _bugReports[player.Id] = a;
         }
+        byte[]?[] parts = a.Parts;
+        a.Bytes += chunk.Data.Length - (parts[chunk.ChunkIndex]?.Length ?? 0);
         parts[chunk.ChunkIndex] = chunk.Data;
+        if (a.Bytes > _options.MaxBugReportBytes)
+        {
+            _bugReports.Remove(player.Id);
+            _log($"игрок {player.Id}: отчёт об ошибке больше {_options.MaxBugReportBytes} байт, отброшен");
+            return;
+        }
         if (parts.Any(p => p == null)) return;
-        _bugReports.Remove(key);
+        _bugReports.Remove(player.Id);
         byte[] data = parts.SelectMany(p => p!).ToArray();
         if (_options.Store == null)
         {
