@@ -45,6 +45,7 @@
 
 | Дата | Тест | Коммит | Результат | Что наблюдали |
 |---|---|---|---|---|
+| 2026-11-28 | TST-054 со сборкой, оружие (t095c) | ветка `a/compat-more-shims` | прошёл | DMSE, Cinders, DeadMansSwitch II ставятся целиком (вызовов моста 370 вместо 344, есть `SyncCombatSettings`); 28 нажатий, сервер чист |
 | 2026-11-28 | TST-054 со сборкой, оружие (t095b, `modweapons`) | ветка `a/compat-session-services` | прошёл | новые заглушки сервисов сессии: Gun Recoil и Alpha Animals подключились (ошибок загрузки нет), 28 нажатий, сервер чист |
 | 2026-11-28 | то же (t095a) | ветка `a/compat-session-services` | не проверял заглушки | шёл со старой `Multiplayer.dll`: `setup.ps1` не собирал мост — добавлен в `RWMLWC.slnx`; стрельба чистая |
 | 2026-11-28 | TST-065 (юнит, `WorldSenderTests`) + TST-014 (t094a) | ветка `a/snapshot-sender-not-requester` | прошёл | юнит 149/149 (новые: вошедший со своим миром не отдаёт при хосте с миром; одинокий с миром отдаёт сам); t094a — снимок при входе от игрока 1, сервер чист |
@@ -213,6 +214,12 @@
 ## Записи
 
 ---
+
+## 2026-11-28 12:40 МСК — Агент A — Compatibility: ещё заглушки (сверка описаний, повтор, догон)
+
+- Прежний поиск ошибок по «MPCompat ::» пропускал падения в отложенных действиях («Could not execute post-long-event action»). Найдено: DMS Expedition и Cinders — `MultiplayerData.CollectDefInfos` (отпечатки описаний `StartupDefFingerprint`; из-за этого у DMSE не ставились настройки боя), DeadMansSwitch II — `Multiplayer.IsReplay`, `TickPatch.Simulating`, `arbiterInstance`.
+- Заглушки в `Source/MpBridge`: сверка описаний пустая (сборку сверяет сервер по списку модов), повтора, догона и арбитра нет — `false`.
+- Не подключаются: Fortifications — Industrial и Perspective Buildings (в модах нет методов), HAR — окно парикмахерской, VPE — время (намеренно), две части VEF. Проверка ошибок модулей теперь: стеки `Multiplayer.Compat.*.Install*/LatePatch` в Player.log.
 
 ## 2026-11-28 12:31 МСК — Агент A — Compatibility: сервисы сессии Multiplayer (`SessionServices`)
 

@@ -14,3 +14,10 @@ public static class MultiplayerAPIBridge
         return RWMLWC.Client.Input.MpApi.MpApiImpl.Create();
     }
 }
+
+/// <summary>Отпечаток описаний для сверки при входе (MultiplayerData.localDefInfos).</summary>
+public class DefInfo
+{
+    public int count;
+    public int hash;
+}
