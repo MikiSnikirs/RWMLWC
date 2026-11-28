@@ -499,8 +499,16 @@ public static class LockstepClient
                 {
                     RWMLWC.Client.Maps.PlayerPresence.Component?.Apply(presence.Value.playerId, presence.Value.online);
                     SplitColonies.OnPresence(presence.Value.playerId, presence.Value.online);
+                    ModConfigSync.OnPresence(presence.Value.playerId, presence.Value.online,
+                        RWMLWC.Client.Maps.PlayerPresence.Component?.OnlinePlayers() ?? System.Linq.Enumerable.Empty<int>());
                 }
                 continue;
+            }
+            if (command.Kind == ModConfigSync.Kind)
+            {
+                ModConfigSync.Execute(command.PlayerId, command.Payload);
+                CommandBus.CountHandledOutside(command.PlayerId == PlayerId);
+                continue; // состояния игры не меняет
             }
             if (command.Tick < tickManager.TicksGame)
             {
