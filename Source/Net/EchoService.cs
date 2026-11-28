@@ -10,7 +10,7 @@ namespace RWMLWC.Net;
 /// </summary>
 public static class EchoService
 {
-    public static async Task RunAsync(QuicServer server, CancellationToken ct, Action<string>? log = null)
+    public static async Task RunAsync(IConnectionListener server, CancellationToken ct, Action<string>? log = null)
     {
         try
         {

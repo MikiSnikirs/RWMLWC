@@ -63,7 +63,7 @@ public static class Reconnect
             _selfTestAt = -1f;
             Log.Message("[RWMLWC] самопроверка: переподключаюсь к " + a.host + ":" + a.port);
             TestAutomation.Note("reconnect: connecting again to " + a.host + ":" + a.port);
-            LockstepClient.Connect(a.host, a.port, a.thumb, a.name);
+            DirectConnect.Start(a.host, a.port, a.thumb, a.name);
         }
         bool inSession = LockstepClient.InSession;
         if (inSession)

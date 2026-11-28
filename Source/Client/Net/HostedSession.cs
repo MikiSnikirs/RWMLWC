@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
@@ -22,7 +24,7 @@ namespace RWMLWC.Client.Net;
 public static class HostedSession
 {
     private static SessionHost? _host;
-    private static QuicServer? _quic;
+    private static IReadOnlyList<IConnectionListener>? _listeners;
     private static CancellationTokenSource? _cts;
     private static readonly object LogGate = new();
 
@@ -101,8 +103,8 @@ public static class HostedSession
         Password = settings.GetString("password") ?? "";
         IPEndPoint bind = directPort > 0 ? new IPEndPoint(IPAddress.Any, directPort) : new IPEndPoint(IPAddress.Loopback, port);
         // Синхронное ожидание допустимо: ListenAsync завершается сразу, сети не ждёт.
-        _quic = QuicServer.StartAsync(bind, cert).GetAwaiter().GetResult();
-        Port = _quic.LocalEndPoint.Port;
+        _listeners = NetTransport.ListenAsync(bind, cert, Write).GetAwaiter().GetResult();
+        Port = _listeners[0].LocalEndPoint.Port;
         Thumbprint = ServerCertificate.Thumbprint(cert);
         DirectCode = directPort > 0 ? ConnectionCode.Format(LocalAddress(), Port, Thumbprint) : "";
 
@@ -118,9 +120,9 @@ public static class HostedSession
         };
         _host = new SessionHost(new Session(options, Write));
         _cts = new CancellationTokenSource();
-        _ = _host.RunAsync(_quic, _cts.Token, Write);
-        Write($"сессия запущена: тик {startTick}, seed {options.SessionSeed}, QUIC {bind.Address}:{Port}");
-        if (DirectCode.Length > 0) Write("прямое подключение (локальная сеть; через интернет — проброс UDP-порта " + Port + "): " + DirectCode);
+        _ = _host.RunAsync(_listeners, _cts.Token, Write);
+        Write($"сессия запущена: тик {startTick}, seed {options.SessionSeed}, {string.Join(" и ", _listeners.Select(l => l.Kind))} {bind.Address}:{Port}");
+        if (DirectCode.Length > 0) Write("прямое подключение (локальная сеть; через интернет — проброс порта " + Port + ", UDP и TCP): " + DirectCode);
 
         if (steam && SteamNet.Available)
         {
@@ -143,7 +145,7 @@ public static class HostedSession
         }
         Start(Find.TickManager.TicksGame);
         RWMLWC.Client.Sim.LockstepClient.ConnectPassword = Password;
-        RWMLWC.Client.Sim.LockstepClient.Connect("127.0.0.1", Port, Thumbprint, SteamNet.Available ? Steamworks.SteamFriends.GetPersonaName() : "host");
+        DirectConnect.Start("127.0.0.1", Port, Thumbprint, SteamNet.Available ? Steamworks.SteamFriends.GetPersonaName() : "host");
         string id = SteamNet.Available ? SteamNet.MySteamId.ToString() : "(Steam недоступен)";
         if (SteamNet.Available)
         {
@@ -175,9 +177,10 @@ public static class HostedSession
         SteamNet.Accepted -= OnSteamAccepted;
         SteamNet.StopListening();
         _cts?.Cancel();
-        try { _quic?.DisposeAsync().AsTask().Wait(2000); } catch { }
+        foreach (IConnectionListener l in _listeners ?? Array.Empty<IConnectionListener>())
+            try { l.DisposeAsync().AsTask().Wait(2000); } catch { }
         _host = null;
-        _quic = null;
+        _listeners = null;
         Write("сессия остановлена");
     }
 
