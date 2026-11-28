@@ -372,8 +372,16 @@ public class SessionTests
             string thumb = ServerCertificate.Thumbprint(cert);
             a = await QuicTransport.ConnectAsync("127.0.0.1", server.LocalEndPoint.Port, thumb).WaitAsync(limit);
             b = await QuicTransport.ConnectAsync("127.0.0.1", server.LocalEndPoint.Port, thumb).WaitAsync(limit);
+            // Сервер рассылает приказ только вошедшим. Приказы шлются, когда оба получили Welcome,
+            // иначе вошедший позже не получит первых приказов другого (на медленной машине CI это и бывало).
+            async Task WaitWelcome(IConnection c)
+            {
+                while (await c.ReceiveAsync().AsTask().WaitAsync(limit) is not WelcomeMessage) { }
+            }
             a.Send(new HelloMessage { PlayerName = "A" });
+            await WaitWelcome(a);
             b.Send(new HelloMessage { PlayerName = "B" });
+            await WaitWelcome(b);
             a.Send(new SpeedRequestMessage { Speed = 2 });
             b.Send(new SpeedRequestMessage { Speed = 2 });
             for (int i = 1; i <= 50; i++)
@@ -382,14 +390,20 @@ public class SessionTests
                 b.Send(new CommandMessage { ClientSeq = i, Kind = 2 });
             }
 
-            // Служебные приказы сервера (присутствие игроков, вид 102) идут в том же порядке, но клиент, вошедший
-            // на шаг позже, первых из них не получает. Поэтому сравниваются только приказы игроков.
+            // Служебные приказы сервера (присутствие игроков, вид 102) идут в том же порядке, но приказ о входе A
+            // B не получает (его ещё не было). Поэтому сравниваются только приказы игроков.
             async Task<List<CommandOrderedMessage>> Collect(IConnection c)
             {
                 var list = new List<CommandOrderedMessage>();
+                // Общий срок: служебные сообщения (Tick, Players, Ping) идут постоянно, по одному сроку на приём
+                // тест крутился бы вечно, если приказы не дошли.
+                var clock = System.Diagnostics.Stopwatch.StartNew();
                 while (list.Count < 100)
+                {
+                    Assert.True(clock.Elapsed < limit, $"за {limit.TotalSeconds} с пришло {list.Count} приказов игроков из 100");
                     if (await c.ReceiveAsync().AsTask().WaitAsync(limit) is CommandOrderedMessage m && m.PlayerId != Session.ServerPlayerId)
                         list.Add(m);
+                }
                 return list;
             }
 
