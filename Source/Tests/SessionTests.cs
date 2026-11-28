@@ -360,41 +360,55 @@ public class SessionTests
         if (!QuicTransport.IsSupported) return;
         string dir = Path.Combine(Path.GetTempPath(), "rwmlwc-session-" + Guid.NewGuid().ToString("N"));
         var cert = ServerCertificate.LoadOrCreate(Path.Combine(dir, "server.pfx"));
-        await using var server = await QuicServer.StartAsync(new IPEndPoint(IPAddress.Loopback, 0), cert);
+        QuicServer server = await QuicServer.StartAsync(new IPEndPoint(IPAddress.Loopback, 0), cert);
         var host = new SessionHost(new Session(new SessionOptions { StartTick = StartTick, SessionSeed = 1 }));
         using var cts = new CancellationTokenSource();
         Task run = host.RunAsync(server, cts.Token);
-
-        string thumb = ServerCertificate.Thumbprint(cert);
-        IConnection a = await QuicTransport.ConnectAsync("127.0.0.1", server.LocalEndPoint.Port, thumb);
-        IConnection b = await QuicTransport.ConnectAsync("127.0.0.1", server.LocalEndPoint.Port, thumb);
-        a.Send(new HelloMessage { PlayerName = "A" });
-        b.Send(new HelloMessage { PlayerName = "B" });
-        a.Send(new SpeedRequestMessage { Speed = 2 });
-        b.Send(new SpeedRequestMessage { Speed = 2 });
-        for (int i = 1; i <= 50; i++)
+        IConnection? a = null, b = null;
+        // Все ожидания ограничены: на медленной машине CI тест должен падать с сообщением, а не висеть.
+        var limit = TimeSpan.FromSeconds(20);
+        try
         {
-            a.Send(new CommandMessage { ClientSeq = i, Kind = 1 });
-            b.Send(new CommandMessage { ClientSeq = i, Kind = 2 });
-        }
+            string thumb = ServerCertificate.Thumbprint(cert);
+            a = await QuicTransport.ConnectAsync("127.0.0.1", server.LocalEndPoint.Port, thumb).WaitAsync(limit);
+            b = await QuicTransport.ConnectAsync("127.0.0.1", server.LocalEndPoint.Port, thumb).WaitAsync(limit);
+            a.Send(new HelloMessage { PlayerName = "A" });
+            b.Send(new HelloMessage { PlayerName = "B" });
+            a.Send(new SpeedRequestMessage { Speed = 2 });
+            b.Send(new SpeedRequestMessage { Speed = 2 });
+            for (int i = 1; i <= 50; i++)
+            {
+                a.Send(new CommandMessage { ClientSeq = i, Kind = 1 });
+                b.Send(new CommandMessage { ClientSeq = i, Kind = 2 });
+            }
 
-        async Task<List<CommandOrderedMessage>> Collect(IConnection c)
+            // Служебные приказы сервера (присутствие игроков, вид 102) идут в том же порядке, но клиент, вошедший
+            // на шаг позже, первых из них не получает. Поэтому сравниваются только приказы игроков.
+            async Task<List<CommandOrderedMessage>> Collect(IConnection c)
+            {
+                var list = new List<CommandOrderedMessage>();
+                while (list.Count < 100)
+                    if (await c.ReceiveAsync().AsTask().WaitAsync(limit) is CommandOrderedMessage m && m.PlayerId != Session.ServerPlayerId)
+                        list.Add(m);
+                return list;
+            }
+
+            List<CommandOrderedMessage> la = await Collect(a);
+            List<CommandOrderedMessage> lb = await Collect(b);
+            Assert.Equal(la.Select(m => (m.Seq, m.Tick, m.PlayerId, m.ClientSeq)), lb.Select(m => (m.Seq, m.Tick, m.PlayerId, m.ClientSeq)));
+            Assert.True(la.Zip(la.Skip(1)).All(p => p.First.Seq < p.Second.Seq), "номера порядка растут");
+            foreach (var g in la.GroupBy(m => m.PlayerId))
+                Assert.Equal(Enumerable.Range(1, 50).Select(i => (long)i), g.Select(m => (long)m.ClientSeq));
+            Assert.Equal(2, la.Select(m => m.PlayerId).Distinct().Count());
+        }
+        finally
         {
-            var list = new List<CommandOrderedMessage>();
-            while (list.Count < 100)
-                if (await c.ReceiveAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10)) is CommandOrderedMessage m) list.Add(m);
-            return list;
+            cts.Cancel();
+            a?.Close("конец"); b?.Close("конец");
+            try { await run.WaitAsync(TimeSpan.FromSeconds(10)); } catch { }
+            try { await server.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10)); } catch { }
+            try { Directory.Delete(dir, true); } catch { }
         }
-
-        List<CommandOrderedMessage> la = await Collect(a);
-        List<CommandOrderedMessage> lb = await Collect(b);
-        Assert.Equal(la.Select(m => (m.Seq, m.Tick, m.PlayerId, m.ClientSeq)), lb.Select(m => (m.Seq, m.Tick, m.PlayerId, m.ClientSeq)));
-        Assert.Equal(Enumerable.Range(1, 100).Select(i => (long)i), la.Select(m => m.Seq));
-
-        cts.Cancel();
-        await run;
-        a.Close("конец"); b.Close("конец");
-        try { Directory.Delete(dir, true); } catch { }
     }
 
     [Fact]
