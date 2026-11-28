@@ -17,7 +17,7 @@ public static class ProtocolInfo
     /// 6 — пароль в <c>Hello</c> (T-068), простой игрока (<c>PlayerState</c>, <c>PlayerInfo.Idle</c>) и тревога (<c>Alarm</c>) (T-040).
     /// 7 — служебная команда 102 «игрок в сети / не в сети» (T-032), «управляющий» — права до возвращения владельца (T-042).
     /// </summary>
-    public const int ProtocolVersion = 7;
+    public const int ProtocolVersion = 8;
 
     /// <summary>Идентификатор мода: packageId в About.xml и id экземпляра Harmony.</summary>
     public const string ModId = "MikiSnikirs.RWMLWC";

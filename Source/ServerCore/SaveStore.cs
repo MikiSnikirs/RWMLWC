@@ -20,6 +20,7 @@ public sealed class SaveStore
     public const int DefaultKeepCopies = 5;
 
     private readonly string _dir;
+    private readonly string _bugDir;
     private readonly string _backupDir;
 
     /// <summary>Сколько последних копий хранить в <c>saves/</c>.</summary>
@@ -35,8 +36,19 @@ public sealed class SaveStore
     {
         _dir = System.IO.Path.Combine(dataDir, "saves");
         _backupDir = System.IO.Path.Combine(dataDir, "backups");
+        _bugDir = System.IO.Path.Combine(dataDir, "bugreports");
         KeepCopies = Math.Max(1, keepCopies);
         Directory.CreateDirectory(_dir);
+    }
+
+    /// <summary>Сохранить отчёт об ошибке от игрока (v8): <c>bugreports/ГГГГММДД-ЧЧММСС_pN_имя.zip</c>. Возвращает путь.</summary>
+    public string StoreBugReport(int playerId, string playerName, byte[] data)
+    {
+        Directory.CreateDirectory(_bugDir);
+        string safe = new string((playerName ?? "").Where(c => char.IsLetterOrDigit(c) || c == '-' || c == '_').Take(24).ToArray());
+        string path = System.IO.Path.Combine(_bugDir, $"{DateTime.UtcNow:yyyyMMdd-HHmmss}_p{playerId}_{safe}.zip");
+        File.WriteAllBytes(path, data);
+        return path;
     }
 
     /// <summary>Резервные копии, от старой к новой.</summary>

@@ -36,6 +36,9 @@ internal static class SessionMenu
         }
         if (Current.ProgramState != ProgramState.Playing) yield break;
 
+        // Отчёт об ошибке: текст игрока + журналы и состояние сессии — у себя и на сервер (v8).
+        yield return new ListableOption("Сообщить об ошибке", () => Find.WindowStack.Add(new RWMLWC.Client.SessionView.Dialog_BugReport()));
+
         if (st == LockstepClient.State.InSession)
         {
             bool on = SplitColonies.ModeOn;
