@@ -32,6 +32,9 @@ public sealed class SaveStore
     /// <summary>Сколько резервных копий хранить.</summary>
     public int KeepBackups { get; init; } = 7;
 
+    /// <summary>Сколько последних отчётов об ошибке хранить в <c>bugreports/</c>; старые удаляются.</summary>
+    public int KeepBugReports { get; init; } = 200;
+
     public SaveStore(string dataDir, int keepCopies = DefaultKeepCopies)
     {
         _dir = System.IO.Path.Combine(dataDir, "saves");
@@ -46,8 +49,15 @@ public sealed class SaveStore
     {
         Directory.CreateDirectory(_bugDir);
         string safe = new string((playerName ?? "").Where(c => char.IsLetterOrDigit(c) || c == '-' || c == '_').Take(24).ToArray());
-        string path = System.IO.Path.Combine(_bugDir, $"{DateTime.UtcNow:yyyyMMdd-HHmmss}_p{playerId}_{safe}.zip");
+        string stem = $"{DateTime.UtcNow.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture)}_p{playerId}_{safe}";
+        string path = System.IO.Path.Combine(_bugDir, stem + ".zip");
+        for (int n = 2; File.Exists(path); n++) // два отчёта за одну секунду не затирают друг друга
+            path = System.IO.Path.Combine(_bugDir, $"{stem}-{n}.zip");
         File.WriteAllBytes(path, data);
+        File.SetLastWriteTimeUtc(path, DateTime.UtcNow);
+        foreach (string old in Directory.GetFiles(_bugDir, "*.zip").OrderBy(File.GetLastWriteTimeUtc).ThenBy(f => f, StringComparer.Ordinal)
+                     .SkipLast(Math.Max(1, KeepBugReports)))
+            File.Delete(old);
         return path;
     }
 

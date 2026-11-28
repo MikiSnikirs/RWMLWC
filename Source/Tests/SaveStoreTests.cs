@@ -142,4 +142,80 @@ public sealed class SaveStoreTests : IDisposable
         Assert.Equal(0, s.SaveTick);
         Assert.Empty(new SaveStore(_dir).List());
     }
+
+    private static void SendBugReport(C from, Session s, int id, byte[] data, int chunkSize, int? onlyChunks = null)
+    {
+        int count = Math.Max(1, (data.Length + chunkSize - 1) / chunkSize);
+        for (int i = 0; i < Math.Min(count, onlyChunks ?? count); i++)
+        {
+            int len = Math.Min(chunkSize, data.Length - i * chunkSize);
+            from.Conn.Send(new SnapshotChunkMessage
+            {
+                SnapshotId = id, MapId = ProtocolIds.BugReportMapId, Tick = 1,
+                ChunkIndex = i, ChunkCount = count, Data = data.AsSpan(i * chunkSize, len).ToArray(),
+            });
+        }
+        s.Pump();
+    }
+
+    private string[] BugReports() =>
+        Directory.Exists(Path.Combine(_dir, "bugreports")) ? Directory.GetFiles(Path.Combine(_dir, "bugreports"), "*.zip") : Array.Empty<string>();
+
+    [Fact]
+    public void BugReportIsStoredAndNotForwarded()
+    {
+        var data = new byte[300_000];
+        new Random(7).NextBytes(data);
+        var s = new Session(new SessionOptions { Store = new SaveStore(_dir) });
+        C a = Join(s, "A", World, 0);
+        C b = Join(s, "B", World, 0);
+        SendBugReport(a, s, id: 5, data, chunkSize: 100_000);
+        b.Drain();
+
+        string file = Assert.Single(BugReports());
+        Assert.Equal(data, File.ReadAllBytes(file));
+        Assert.Empty(b.Got.OfType<SnapshotChunkMessage>());
+    }
+
+    [Fact]
+    public void OversizedBugReportIsDropped()
+    {
+        var log = new List<string>();
+        var s = new Session(new SessionOptions { Store = new SaveStore(_dir), MaxBugReportBytes = 1000 }, log.Add);
+        C a = Join(s, "A", World, 0);
+        SendBugReport(a, s, id: 1, new byte[1500], chunkSize: 500);
+
+        Assert.Empty(BugReports());
+        Assert.Contains(log, l => l.Contains("отброшен"));
+    }
+
+    [Fact]
+    public void NewBugReportReplacesUnfinishedOne()
+    {
+        var s = new Session(new SessionOptions { Store = new SaveStore(_dir) });
+        C a = Join(s, "A", World, 0);
+        SendBugReport(a, s, id: 1, new byte[] { 1, 2, 3, 4 }, chunkSize: 1, onlyChunks: 3); // не дослан
+        SendBugReport(a, s, id: 2, new byte[] { 9, 8 }, chunkSize: 1);
+        SendBugReport(a, s, id: 1, new byte[] { 1, 2, 3, 4 }, chunkSize: 1, onlyChunks: 1); // хвост старого не собирает отчёт
+
+        Assert.Equal(new byte[] { 9, 8 }, File.ReadAllBytes(Assert.Single(BugReports())));
+    }
+
+    [Fact]
+    public void OldBugReportsAreRemoved()
+    {
+        var store = new SaveStore(_dir) { KeepBugReports = 3 };
+        var paths = new List<string>();
+        for (int i = 0; i < 3; i++)
+        {
+            paths.Add(store.StoreBugReport(1, "A", new byte[] { (byte)i }));
+            File.SetLastWriteTimeUtc(paths[^1], new DateTime(2026, 1, 1, 0, 0, i, DateTimeKind.Utc));
+        }
+        Assert.Equal(3, paths.Distinct().Count()); // в одну секунду — разные имена
+
+        string last = store.StoreBugReport(1, "A", new byte[] { 9 });
+
+        Assert.Equal(new[] { paths[1], paths[2], last }.OrderBy(p => p, StringComparer.Ordinal),
+                     BugReports().OrderBy(p => p, StringComparer.Ordinal));
+    }
 }

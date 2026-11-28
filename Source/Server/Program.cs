@@ -63,22 +63,20 @@ internal static class Program
             }
         }
 
-        if (!QuicTransport.IsSupported)
-        {
-            Console.Error.WriteLine("QUIC не поддерживается на этой системе (нужна Windows 11 / Server 2022 или новее).");
-            return 3;
-        }
-
         var cert = ServerCertificate.LoadOrCreate(Path.Combine(dataDir, "server.pfx"));
-        await using QuicServer server = await QuicServer.StartAsync(new IPEndPoint(IPAddress.Any, port), cert);
+        // QUIC (UDP) и запасной TCP + TLS (T-055) на одном номере порта; без QUIC в системе — только TCP.
+        IReadOnlyList<IConnectionListener> listeners = await NetTransport.ListenAsync(new IPEndPoint(IPAddress.Any, port), cert, Console.WriteLine);
+        await using var stopListeners = new ListenersDisposer(listeners);
+        IConnectionListener server = listeners[0];
         // Строку разбирает тест TST-012: порт и отпечаток сертификата.
         Console.WriteLine($"LISTENING {server.LocalEndPoint.Port} {ServerCertificate.Thumbprint(cert)}");
+        Console.WriteLine("транспорт: " + string.Join(" и ", listeners.Select(l => l.Kind)));
 
         using var stop = new CancellationTokenSource();
         Console.CancelKeyPress += (_, e) => { e.Cancel = true; stop.Cancel(); };
         if (echo)
         {
-            await EchoService.RunAsync(server, stop.Token, Console.WriteLine);
+            await Task.WhenAll(listeners.Select(l => EchoService.RunAsync(l, stop.Token, Console.WriteLine)));
             return 0;
         }
 
@@ -116,7 +114,7 @@ internal static class Program
         PrintConnectionCodes(server.LocalEndPoint.Port, ServerCertificate.Thumbprint(cert), publicHost);
         var host = new SessionHost(new Session(options, Console.WriteLine));
         _ = Task.Run(() => ConsoleLoop(host, store, stop));
-        await host.RunAsync(server, stop.Token, Console.WriteLine);
+        await host.RunAsync(listeners, stop.Token, Console.WriteLine);
         Console.WriteLine("сервер остановлен");
         return 0;
     }
@@ -172,7 +170,7 @@ internal static class Program
         foreach (IPAddress ip in LocalAddresses())
             Console.WriteLine("  в локальной сети: " + ConnectionCode.Format(ip.ToString(), port, thumbprint));
         if (publicHost == null)
-            Console.WriteLine($"  через интернет: укажите внешний адрес (--public-host) и пробросьте UDP-порт {port} на роутере.");
+            Console.WriteLine($"  через интернет: укажите внешний адрес (--public-host) и пробросьте порт {port} на роутере: UDP (QUIC) и TCP (запасной путь для Windows 10).");
     }
 
     private static IEnumerable<IPAddress> LocalAddresses()
@@ -267,5 +265,17 @@ internal static class Program
                     break;
             }
         }
+    }
+}
+
+/// <summary>Закрывает все слушающие стороны при выходе из Main.</summary>
+internal sealed class ListenersDisposer : IAsyncDisposable
+{
+    private readonly IReadOnlyList<IConnectionListener> _listeners;
+    public ListenersDisposer(IReadOnlyList<IConnectionListener> listeners) => _listeners = listeners;
+
+    public async ValueTask DisposeAsync()
+    {
+        foreach (IConnectionListener l in _listeners) await l.DisposeAsync().ConfigureAwait(false);
     }
 }

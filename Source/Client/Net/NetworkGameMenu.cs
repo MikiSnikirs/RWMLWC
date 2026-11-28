@@ -132,7 +132,7 @@ public class Dialog_ServerJoin : Window
                 void Go()
                 {
                     LockstepClient.ConnectPassword = password;
-                    LockstepClient.Connect(host, port, thumb, name);
+                    DirectConnect.Start(host, port, thumb, name);
                 }
                 Reconnect.Remember($"серверу {host}:{port}", Go);
                 Go();

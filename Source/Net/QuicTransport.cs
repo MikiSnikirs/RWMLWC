@@ -58,13 +58,15 @@ public static class QuicTransport
 }
 
 /// <summary>Слушающая сторона QUIC.</summary>
-public sealed class QuicServer : IAsyncDisposable
+public sealed class QuicServer : IConnectionListener
 {
     private readonly QuicListener _listener;
 
     private QuicServer(QuicListener listener) => _listener = listener;
 
     public IPEndPoint LocalEndPoint => _listener.LocalEndPoint;
+
+    public string Kind => "QUIC";
 
     public static async Task<QuicServer> StartAsync(IPEndPoint endPoint, X509Certificate2 certificate)
     {
